@@ -1,0 +1,26 @@
+{
+  "name": "make-no-mistakes",
+  "version": "1.0.0",
+  "description": "The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.",
+  "author": {
+    "name": "Luis Andres Pena Castillo",
+    "url": "https://github.com/lapc506"
+  },
+  "homepage": "https://github.com/lapc506/make-no-mistakes-toolkit",
+  "repository": "https://github.com/lapc506/make-no-mistakes-toolkit",
+  "license": "BSL-1.1",
+  "keywords": [
+    "claude-code",
+    "claude-code-plugin",
+    "workflow",
+    "linear",
+    "github",
+    "greptile",
+    "testing",
+    "e2e",
+    "security",
+    "pentest",
+    "developer-workflow",
+    "session-management"
+  ]
+}
