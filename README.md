@@ -151,5 +151,3 @@ See `skills/spec-recommend/references/bilingual-format.md` for the full template
 ## License
 
 [Business Source License 1.1](./LICENSE) — you may use, modify, and redistribute for non-competitive purposes. Converts to Non-Profit OSL 3.0 after 5 years.
-
-See [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md) for attribution of the Label Taxonomy system by Dojo Coding Labs.
