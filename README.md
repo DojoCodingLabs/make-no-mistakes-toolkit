@@ -7,13 +7,13 @@ A Claude Code plugin by [Luis Andres Pena Castillo](https://github.com/lapc506).
 ## Install
 
 ```bash
-claude plugin add lapc506/make-no-mistakes-toolkit
+claude plugin add DojoCodingLabs/make-no-mistakes-toolkit
 ```
 
 Or clone and install locally:
 
 ```bash
-git clone https://github.com/lapc506/make-no-mistakes-toolkit.git
+git clone https://github.com/DojoCodingLabs/make-no-mistakes-toolkit.git
 claude plugin add ./make-no-mistakes-toolkit
 ```
 
