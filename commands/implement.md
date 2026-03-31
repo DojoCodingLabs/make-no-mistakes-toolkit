@@ -120,6 +120,20 @@ gh run list --branch {baseBranch} --limit 3
 
 If any check fails, STOP and resolve before proceeding.
 
+## Mandatory Rule: Always New Branch + Worktree
+
+**Every issue gets a FRESH branch and its own worktree. No exceptions.**
+
+- NEVER work in the main working tree for implementation. The main tree stays on `{baseBranch}`, clean.
+- NEVER reuse an existing branch. Always create a new one, even if a previous attempt exists.
+- If a branch with the same name already exists, delete it first: `git branch -D {branch-name}` (and its worktree if any).
+- The branch type prefix (`feat/`, `fix/`, `chore/`, `test/`, `docs/`, `refactor/`) is determined from the Linear issue:
+  1. Check issue labels: `Bug` → `fix/`, `Feature` → `feat/`, `Testing` → `test/`, `Infra` → `chore/`, `Documentation` → `docs/`
+  2. Check issue title prefix: "Fix ..." → `fix/`, "Add ..." → `feat/`, etc.
+  3. Default: `feat/` if no clear signal
+
+**Branch naming**: `{type}/{issue-id}-{short-description}` (e.g., `feat/DOJ-2909-course-content-serializer`)
+
 ## Execution Protocol — Per Issue
 
 For EACH issue in the sequence, follow this exact workflow. No shortcuts. No exceptions.
@@ -131,13 +145,23 @@ For EACH issue in the sequence, follow this exact workflow. No shortcuts. No exc
    - Set status to **In Progress**
    - Comment: "Starting implementation. Branch: `{branch-name}`"
 
-2. **Create branch + worktree:**
+2. **Determine branch type** from Linear issue labels/title (see rule above).
+
+3. **Create NEW branch + worktree** (MANDATORY — never skip):
    ```bash
-   git worktree add .claude/worktrees/{issue-id} -b {issue-id}-{short-description} {baseBranch}
+   # Delete stale branch if it exists from a previous attempt
+   git branch -D {type}/{issue-id}-{short-description} 2>/dev/null || true
+
+   # Create fresh worktree with new branch
+   git worktree add .claude/worktrees/{issue-id} -b {type}/{issue-id}-{short-description} {baseBranch}
    cd .claude/worktrees/{issue-id}
+
+   # Verify you are in the worktree, NOT the main tree
+   git worktree list  # Current dir should be in .claude/worktrees/
+   pwd                # Must NOT be the repo root
    ```
 
-3. **Assess scope:**
+4. **Assess scope:**
    - If the issue will touch **>15 files**, STOP. Decompose into 2+ PRs by domain BEFORE starting.
    - Create sub-issues in Linear for each PR if decomposing.
    - Comment the decomposition plan on the parent issue.
@@ -244,6 +268,8 @@ When processing multiple issues:
 
 | Anti-Pattern | Why It Fails |
 |-------------|-------------|
+| Implementing in the main working tree | Pollutes the base branch, blocks parallel work, no isolation |
+| Reusing an existing branch for a new attempt | Carries stale commits, confuses reviewers, breaks clean history |
 | Working two branches in the same repo simultaneously | GitHub CLI race conditions — by design limitation |
 | Skipping Greptile re-review after fixes | You don't know if your fix introduced new issues |
 | Merging with failing CI | Breaks {baseBranch} for everyone |

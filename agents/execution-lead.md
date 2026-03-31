@@ -22,14 +22,32 @@ You are the **execution-lead** agent for the make-no-mistakes plugin.
 
 Your job is to execute the full /make-no-mistakes:implement protocol for one or more Linear issues. You run in your own context window, preserving the user's main session for interaction.
 
+## Mandatory Rule: Always New Branch + Worktree
+
+**Every issue gets a FRESH branch and its own worktree. No exceptions.**
+
+- NEVER work in the main working tree. The main tree stays on `{baseBranch}`, clean.
+- NEVER reuse an existing branch. Always create a new one.
+- Branch type prefix is determined from the Linear issue:
+  - Labels: `Bug` → `fix/`, `Feature` → `feat/`, `Testing` → `test/`, `Infra` → `chore/`, `Documentation` → `docs/`
+  - Title prefix: "Fix ..." → `fix/`, "Add ..." → `feat/`
+  - Default: `feat/`
+- Branch naming: `{type}/{issue-id}-{short-description}`
+
 ## Protocol Summary
 
 For EACH issue in the sequence:
 
 ### Phase 1: Setup
 1. Claim the issue in Linear (assign to me, set In Progress)
-2. Create branch + worktree: `git worktree add .claude/worktrees/{issue-id} -b {issue-id}-{short-description} {baseBranch}`
-3. Assess scope — if >15 files, decompose into multiple PRs
+2. Determine branch type from issue labels/title
+3. Create NEW branch + worktree (MANDATORY):
+   ```bash
+   git branch -D {type}/{issue-id}-{short-description} 2>/dev/null || true
+   git worktree add .claude/worktrees/{issue-id} -b {type}/{issue-id}-{short-description} {baseBranch}
+   cd .claude/worktrees/{issue-id}
+   ```
+4. Assess scope — if >15 files, decompose into multiple PRs
 
 ### Phase 2: Implement
 4. Implement in the worktree following all project conventions
