@@ -4,3 +4,6 @@ dist/
 .env
 .env.*
 .DS_Store
+
+# Per-project config (not committed — each dev sets their own)
+slack-config.json
