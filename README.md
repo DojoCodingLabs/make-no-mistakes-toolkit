@@ -7,14 +7,19 @@ A Claude Code plugin by [Luis Andres Pena Castillo](https://github.com/lapc506).
 ## Install
 
 ```bash
-claude plugin add DojoCodingLabs/make-no-mistakes-toolkit
+# Add the marketplace (one-time)
+claude plugin marketplace add DojoCodingLabs/make-no-mistakes-toolkit
+
+# Install the plugin
+claude plugin install make-no-mistakes
 ```
 
 Or clone and install locally:
 
 ```bash
 git clone https://github.com/DojoCodingLabs/make-no-mistakes-toolkit.git
-claude plugin add ./make-no-mistakes-toolkit
+claude plugin marketplace add ./make-no-mistakes-toolkit
+claude plugin install make-no-mistakes
 ```
 
 ## Install (OpenCode)
@@ -36,7 +41,7 @@ npx @lapc506/make-no-mistakes install
 
 ## What's Inside
 
-### Commands (10)
+### Commands (13)
 
 Deliberate actions you invoke explicitly.
 
@@ -52,6 +57,9 @@ Deliberate actions you invoke explicitly.
 | `/make-no-mistakes:goodnight [label]` | Save full session context as a handoff file for tomorrow |
 | `/make-no-mistakes:pending-left` | Track what's left unfinished across git, Linear, and session context |
 | `/make-no-mistakes:summarize` | Structured recap of everything done in the current session |
+| `/make-no-mistakes:daily-standup-add-completed [text]` | Append completed work items to today's standup file (auto-detects from PRs/issues) |
+| `/make-no-mistakes:daily-standup-post-slack [draft]` | Compose and post today's standup to the configured Slack channel |
+| `/make-no-mistakes:remind <topic>` | Recall past decisions, instructions, or feedback from memory and project context |
 
 ### Skills (5)
 
@@ -106,12 +114,29 @@ The plugin reads `linear-setup.json` at your repo root for project-specific sett
 
 If no `linear-setup.json` exists, the plugin auto-detects settings from your environment (GitHub org from current repo, Linear team from MCP, etc.).
 
+## Verify Installation
+
+**Claude Code:**
+
+```bash
+claude plugin list
+# should show "make-no-mistakes"
+```
+
+Or run `/plugin` inside Claude Code to see it in the plugin manager. Then invoke any command to confirm: `/make-no-mistakes:summarize`
+
+**OpenCode:**
+
+```bash
+make-no-mistakes doctor
+```
+
 ## Requirements
 
 - **Claude Code** — the CLI or IDE extension
-- **GitHub CLI** (`gh`) — authenticated
-- **Linear MCP** — configured in Claude Code (for issue tracking features)
-- **Slack MCP** — optional, for Slack reporting
+- **GitHub CLI** (`gh`) — authenticated (`gh auth login`)
+- **Linear MCP** — configured in Claude Code for issue tracking (add via Claude Code settings > MCP servers)
+- **Slack MCP** — optional, for standup posting and Slack reporting. See `slack-config.example.json` at the repo root for channel configuration
 
 ## The Name
 
@@ -128,7 +153,7 @@ make-no-mistakes-toolkit/
 │   ├── cli.ts
 │   ├── index.ts
 │   └── lib/
-├── commands/           # 10 explicit commands
+├── commands/           # 13 explicit commands
 ├── agents/             # 2 specialized subagents
 ├── skills/             # 5 auto-activating skills
 │   └── */SKILL.md
