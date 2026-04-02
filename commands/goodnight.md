@@ -3,7 +3,7 @@
 You are a **session handoff assistant**. The user is done for the day and wants to save full session context so tomorrow's Claude Code session can pick up exactly where they left off.
 
 **Input**: A short label for the file (e.g., "auth-refactor", "doj-1234", "pr-reviews"). If empty, auto-generate from the main topic discussed.
-**Output**: A `next-day-<label>.md` file saved to `~/Escritorio/` + compact summary in terminal
+**Output**: A `next-day-<label>.md` file saved to `~/Desktop/` + compact summary in terminal
 
 ---
 
@@ -13,11 +13,11 @@ Parse `$ARGUMENTS` as the file label:
 - If provided: sanitize to kebab-case (lowercase, hyphens, no spaces/special chars)
 - If empty: derive from the primary topic of the session (e.g., "slash-commands", "e2e-testing", "openclaw-hooks")
 
-The output file will be: `~/Escritorio/next-day-<label>.md`
+The output file will be: `~/Desktop/next-day-<label>.md`
 
 Resolve the path dynamically:
 ```bash
-echo ~/Escritorio
+echo ~/Desktop
 ```
 
 ---
@@ -159,7 +159,7 @@ If the session produced feedback, decisions, or user preferences that should per
 After writing the file, show a compact summary:
 
 ```
-Goodnight! Session saved to ~/Escritorio/next-day-<label>.md
+Goodnight! Session saved to ~/Desktop/next-day-<label>.md
 
 Done: X items
 In Progress: Y items
@@ -170,7 +170,7 @@ To resume tomorrow:
   1. Open Claude Code in this directory
   2. Say: "Read .claude/next-day/next-day-<label>.md and continue"
 
-Buenas noches! 🌙
+Goodnight! 🌙
 ```
 
 ---

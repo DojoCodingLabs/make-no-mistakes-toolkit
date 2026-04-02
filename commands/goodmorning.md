@@ -12,13 +12,13 @@ You are a **session bootstrap assistant**. The user just started their day and w
 Search for `next-day-*.md` files in these locations:
 
 ```bash
-find ~/Escritorio -maxdepth 1 -name "next-day-*.md" -type f 2>/dev/null
+find ~/Desktop -maxdepth 1 -name "next-day-*.md" -type f 2>/dev/null
 find .claude/next-day -maxdepth 1 -name "next-day-*.md" -type f 2>/dev/null
 ```
 
 If no files are found in either location, say:
 ```
-No hay archivos next-day pendientes. Empezá limpio!
+No pending next-day files found. Starting fresh!
 ```
 And stop.
 
@@ -32,7 +32,7 @@ For each file found, read the frontmatter and first few sections to extract:
 - **Session topic** (from frontmatter `session_topic:`)
 - **Status** (from frontmatter `status:` — `pending` or `resumed`)
 - **Branch** (from frontmatter `branch:`)
-- **Location** (Escritorio or .claude/next-day)
+- **Location** (Desktop or .claude/next-day)
 - **Done count** (number of completed items)
 - **In Progress count** (number of in-progress items)
 - **Pending count** (number of pending items)
@@ -44,14 +44,14 @@ For each file found, read the frontmatter and first few sections to extract:
 Show a table sorted by creation date (newest first):
 
 ```
-Buenos dias! Encontré X archivo(s) next-day:
+Good morning! Found X next-day file(s):
 
-| # | Label | Fecha | Topic | Status | Branch | Pendientes | Ubicación |
-|---|-------|-------|-------|--------|--------|------------|-----------|
-| 1 | openclaw | 2026-03-15 | Hook refactor | pending | feat/hooks | 3 | Escritorio |
+| # | Label | Date | Topic | Status | Branch | Pending | Location |
+|---|-------|------|-------|--------|--------|---------|----------|
+| 1 | openclaw | 2026-03-15 | Hook refactor | pending | feat/hooks | 3 | Desktop |
 | 2 | doj-1234 | 2026-03-14 | Auth fix | resumed | fix/auth | 1 | .claude/next-day |
 
-¿Cuál quieres retomar? (número, "all" para ver todos, o "none" para empezar limpio)
+Which one do you want to resume? (number, "all" to see all, or "none" to start fresh)
 ```
 
 If there's only 1 file, skip the selection and go directly to Step 4.
@@ -64,7 +64,7 @@ Read the full contents of the selected file and present:
 
 ### 4a. Quick Status
 ```
-Retomando: next-day-<label>.md (<date>)
+Resuming: next-day-<label>.md (<date>)
 Topic: <session_topic>
 Branch: <branch>
 ```
@@ -92,10 +92,10 @@ Display the "Resume Instructions" section from the file verbatim — these are t
 
 List all in-progress and pending items as a checklist:
 ```
-En progreso:
+In progress:
 - <item>: <current state>
 
-Pendiente:
+Pending:
 - [ ] <item>
 - [ ] <item>
 ```
@@ -108,7 +108,7 @@ Display the "Key Context" and "Key Files" sections — these are the breadcrumbs
 
 If the file references Linear issues, fetch their CURRENT state (not what the file says):
 ```
-Linear Issues (estado actual):
+Linear Issues (current state):
 - DOJ-XXXX: <title> — <current state> (was: <state in file>)
 ```
 
@@ -127,11 +127,11 @@ After presenting the file, update its frontmatter:
 ## Step 6: Offer Actions
 
 ```
-¿Qué quieres hacer?
-1. Empezar con el primer item pendiente
-2. Ver el Session Log completo (narrativa de la sesión anterior)
-3. Archivar este archivo (mover a .claude/next-day/archive/)
-4. Seguir con otra cosa
+What would you like to do?
+1. Start with the first pending item
+2. View the full Session Log (narrative from the previous session)
+3. Archive this file (move to .claude/next-day/archive/)
+4. Move on to something else
 ```
 
 ---
@@ -141,9 +141,9 @@ After presenting the file, update its frontmatter:
 After presenting the index (Step 3), if any files are older than 7 days, append a note:
 
 ```
-Archivos con más de 7 días:
-  - next-day-old-thing.md (12 días, Escritorio)
-¿Quieres archivarlos? (yes/no)
+Files older than 7 days:
+  - next-day-old-thing.md (12 days, Desktop)
+Archive them? (yes/no)
 ```
 
 Archive = move to `.claude/next-day/archive/` (create if needed), NOT delete.
