@@ -10,7 +10,7 @@
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
     "./cli": { "import": "./dist/cli.js" }
   },
-  "files": ["dist/", "commands/", "agents/", "skills/", "scripts/", "README.md", "LICENSE"],
+  "files": ["dist/", "commands/", "agents/", "skills/", "scripts/", "slack-config.example.json", "README.md", "LICENSE"],
   "engines": { "node": ">=20.11.0" },
   "publishConfig": { "access": "public" },
   "scripts": {
@@ -19,7 +19,7 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": ["opencode", "plugin", "claude-code", "workflow", "linear"],
-  "repository": { "type": "git", "url": "git+https://github.com/lapc506/make-no-mistakes-toolkit.git" },
+  "repository": { "type": "git", "url": "git+https://github.com/DojoCodingLabs/make-no-mistakes-toolkit.git" },
   "author": "Luis Andres Pena Castillo",
   "license": "BSL-1.1",
   "dependencies": {
