@@ -41,7 +41,7 @@ npx @lapc506/make-no-mistakes install
 
 ## What's Inside
 
-### Commands (13)
+### Commands (14)
 
 Deliberate actions you invoke explicitly.
 
@@ -60,6 +60,7 @@ Deliberate actions you invoke explicitly.
 | `/make-no-mistakes:daily-standup-add-completed [text]` | Append completed work items to today's standup file (auto-detects from PRs/issues) |
 | `/make-no-mistakes:daily-standup-post-slack [draft]` | Compose and post today's standup to the configured Slack channel |
 | `/make-no-mistakes:remind <topic>` | Recall past decisions, instructions, or feedback from memory and project context |
+| `/make-no-mistakes:takeover-pr <repo> [pr#]` | Pick a random open PR from a teammate, check it out, review it, and take over the work |
 
 ### Skills (5)
 
@@ -153,7 +154,7 @@ make-no-mistakes-toolkit/
 │   ├── cli.ts
 │   ├── index.ts
 │   └── lib/
-├── commands/           # 13 explicit commands
+├── commands/           # 14 explicit commands
 ├── agents/             # 2 specialized subagents
 ├── skills/             # 5 auto-activating skills
 │   └── */SKILL.md
