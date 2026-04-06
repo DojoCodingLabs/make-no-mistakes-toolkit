@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "make-no-mistakes",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.",
   "owner": {
     "name": "Luis Andres Pena Castillo",
@@ -10,8 +10,8 @@
   "plugins": [
     {
       "name": "make-no-mistakes",
-      "description": "Dev lifecycle orchestrator: disciplined Linear issue execution with worktree isolation, PR review with Greptile gating, team release sync, E2E test generation and execution, security pentesting, and session management. 10 commands, 5 auto-activating skills, 2 specialized agents.",
-      "version": "1.1.0",
+      "description": "Dev lifecycle orchestrator: disciplined Linear issue execution with worktree isolation, PR review with Greptile gating, team release sync, E2E test generation and execution, test suite previewer, security pentesting, and session management. 11 commands, 5 auto-activating skills, 2 specialized agents.",
+      "version": "1.2.0",
       "author": {
         "name": "Luis Andres Pena Castillo",
         "email": "lapc506@users.noreply.github.com"
