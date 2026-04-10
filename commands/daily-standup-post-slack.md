@@ -1,3 +1,7 @@
+---
+description: Compose and post today's standup message to Slack, combining data from the standup file with interactive user input. Accepts "draft" as $ARGUMENTS to send as draft instead of posting directly.
+---
+
 # Daily Standup — Post to Slack
 
 You are a **standup composer and publisher**. You help the user write and post today's standup to Slack, combining data from the standup file with the user's natural language input.
@@ -14,7 +18,6 @@ Read `slack-config.json` from the project root. If it does not exist, use defaul
 ```json
 {
   "standupChannel": { "id": "", "name": "#daily-status-updates" },
-  "standupFile": "./daily-standup.md",
   "repos": {},
   "linearPrefixes": ["DOJ"],
   "linearOrgSlug": "dojo-coding",
@@ -30,12 +33,21 @@ If `standupChannel.id` is empty, ask the user for the Slack channel ID before pr
 
 Use config values throughout:
 - `standupChannel.id` → where to post
-- `standupFile` → path to daily standup file
 - `repos` → repo-to-displayName mapping for sub-leveling headers
 - `linearPrefixes` → issue prefixes to recognize and hyperlink
 - `linearOrgSlug` → for building `linear.app/<org>/issue/` URLs
 - `greeting.options` → random greeting selection
 - `emojis` → custom emoji names per workspace
+
+**IMPORTANT — Standup file location is ALWAYS `~/Escritorio/daily-standup.md`:**
+
+The standup file path is **NOT configurable**. It is always `~/Escritorio/daily-standup.md` (expanded to the absolute path — e.g., `/home/<user>/Escritorio/daily-standup.md`). This applies without exception:
+
+- Never read `./daily-standup.md` or any path inside a repo directory
+- Ignore any `standupFile` key in `slack-config.json` if present (it is deprecated)
+- When loading the standup file for composition, always resolve to `~/Escritorio/daily-standup.md`
+
+**Rationale:** The standup aggregates work across multiple repos. Storing it in a repo (1) fragments per-repo when work spans multiple projects, (2) risks accidental commit, (3) is not where the user looks for it.
 
 ---
 
@@ -61,7 +73,7 @@ Before composing, run `/review-open-prs` to get fresh PR status across all org r
 ## Step 1: Read and Analyze the Standup File
 
 ```bash
-STANDUP_FILE=<standupFile from slack-config.json>
+STANDUP_FILE="$HOME/Escritorio/daily-standup.md"
 ```
 
 - Read the file. If it doesn't exist, warn: "No hay daily-standup.md — voy a componer el standup solo con tu input." Then skip to Step 2 with empty suggestions.
@@ -290,7 +302,7 @@ Standup posteado en #daily-status-updates
 
 ## Rules
 
-- **Source of truth**: The standup file (from `slack-config.json` → `standupFile`) provides the DATA, but the user provides the NARRATIVE
+- **Source of truth**: The standup file at `~/Escritorio/daily-standup.md` (fixed path, not configurable) provides the DATA, but the user provides the NARRATIVE
 - **Always interactive**: Never skip the user input step — the standup is a human communication, not an automated report
 - **All 3 sections are mandatory**: `:white_check_mark: Ayer completé:` + `:dart: Hoy trabajaré:` + `:construction: Blockers:`
 - **Spanish for all UI and message text**

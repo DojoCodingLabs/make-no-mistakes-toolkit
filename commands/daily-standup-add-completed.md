@@ -1,3 +1,7 @@
+---
+description: Append completed work items to today's standup file. Accepts a description, PR number, Linear issue ID, or --reset flag as $ARGUMENTS.
+---
+
 # Daily Standup — Add Completed Items
 
 You are a **standup assistant**. The user wants to append completed work items to today's standup file.
@@ -16,7 +20,6 @@ Read `slack-config.json` from the project root. If it does not exist, use defaul
 
 ```json
 {
-  "standupFile": "./daily-standup.md",
   "repos": {},
   "linearPrefixes": ["DOJ"],
   "linearOrgSlug": "dojo-coding"
@@ -24,17 +27,27 @@ Read `slack-config.json` from the project root. If it does not exist, use defaul
 ```
 
 Use the config values throughout this command:
-- `standupFile` → path to the daily standup file
 - `repos` → repo-to-project mapping for grouping items
 - `linearPrefixes` → which issue prefixes to recognize (e.g., DOJ, CIV, SEC, ALT)
 - `linearOrgSlug` → for building Linear URLs
+
+**IMPORTANT — Standup file location is ALWAYS `~/Escritorio/daily-standup.md`:**
+
+The standup file path is **NOT configurable**. It is always `~/Escritorio/daily-standup.md` (expanded to the absolute path — e.g., `/home/<user>/Escritorio/daily-standup.md`). This applies without exception:
+
+- Never read or write `./daily-standup.md` or any path inside a repo directory
+- Ignore any `standupFile` key in `slack-config.json` if present (it is deprecated)
+- If a `daily-standup.md` exists inside a repo directory, delete it and merge its content into `~/Escritorio/daily-standup.md`
+- The standup is a cross-repo summary — combining work from all repos into the single desktop file is intentional
+
+**Rationale:** The standup aggregates work across multiple repos. Storing it in a repo (1) fragments per-repo when work spans multiple projects, (2) risks accidental commit, (3) is not where the user looks for it. The user has the same rule for `/goodnight` — standup follows the same pattern.
 
 ---
 
 ## Step 1: Find or Create the File
 
 ```bash
-STANDUP_FILE=<standupFile from config>
+STANDUP_FILE="$HOME/Escritorio/daily-standup.md"
 ```
 
 ### If `--reset` flag is present:

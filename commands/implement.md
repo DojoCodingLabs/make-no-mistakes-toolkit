@@ -1,3 +1,7 @@
+---
+description: Execute Linear issues with full discipline -- sequential branches, worktree isolation, reviewer loops, CI verification, and clean merges. Accepts one or more Linear issue IDs or URLs as $ARGUMENTS.
+---
+
 # /implement — Disciplined Execution Protocol
 
 You are a senior engineering lead executing Linear issues with zero tolerance for process shortcuts.

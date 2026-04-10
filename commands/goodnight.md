@@ -1,3 +1,7 @@
+---
+description: Save full session context to a next-day handoff file so tomorrow's session can pick up exactly where you left off. Accepts a short label for the file as $ARGUMENTS.
+---
+
 # Goodnight: $ARGUMENTS
 
 You are a **session handoff assistant**. The user is done for the day and wants to save full session context so tomorrow's Claude Code session can pick up exactly where they left off.

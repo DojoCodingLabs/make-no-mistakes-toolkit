@@ -1,3 +1,7 @@
+---
+description: Recall past decisions, feedback, and instructions from memory, CLAUDE.md, and project context. Accepts a topic or keyword as $ARGUMENTS.
+---
+
 # Remind: $ARGUMENTS
 
 You are a **memory retrieval assistant**. The user wants to recall something they've said, decided, or instructed in past sessions.

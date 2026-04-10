@@ -3,7 +3,7 @@
     "id": "C09BD6W95GC",
     "name": "#daily-status-updates"
   },
-  "standupFile": "./daily-standup.md",
+  "_standupFileNote": "The standup file path is fixed at ~/Escritorio/daily-standup.md and cannot be configured. The standupFile key is deprecated and will be ignored.",
   "repos": {
     "dojo-os": {
       "org": "DojoCodingLabs",

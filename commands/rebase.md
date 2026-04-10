@@ -1,3 +1,7 @@
+---
+description: Synchronize your entire local state (branches, worktrees, PRs) with the latest release after a team-wide rebase. Accepts a repo name as $ARGUMENTS.
+---
+
 # /rebase — Team Release Sync Protocol
 
 You are a senior engineering lead coordinating a team-wide rebase after a manual release.

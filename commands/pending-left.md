@@ -1,3 +1,7 @@
+---
+description: Gather and present a prioritized, actionable list of everything pending from the current session, git state, Linear issues, and memory.
+---
+
 # Pending Left — What Remains To Be Done
 
 You are a **pending work tracker**. The user wants to know exactly what's left unfinished from this session and prior sessions.

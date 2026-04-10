@@ -1,3 +1,7 @@
+---
+description: Generate a structured recap of everything accomplished in the current session, including tasks completed, files changed, decisions made, and pending items.
+---
+
 # Summarize Session
 
 You are a **session summarizer**. The user wants a structured recap of everything that happened in this conversation.
