@@ -1,0 +1,55 @@
+{
+  "standupChannel": {
+    "id": "C09BD6W95GC",
+    "name": "#daily-status-updates"
+  },
+  "_standupFileNote": "The standup file path is fixed at ~/Escritorio/daily-standup.md and cannot be configured. The standupFile key is deprecated and will be ignored.",
+  "repos": {
+    "dojo-os": {
+      "org": "DojoCodingLabs",
+      "linearProject": "Dojo OS",
+      "displayName": "Dojo OS"
+    },
+    "freedom-academy-moodle-plugins": {
+      "org": "DojoCodingLabs",
+      "linearProject": "Freedom Academy — Moodle Plug-ins",
+      "displayName": "Freedom Academy"
+    },
+    "freedom-academy-admin": {
+      "org": "DojoCodingLabs",
+      "linearProject": "Freedom Academy — Admin Panel",
+      "displayName": "Freedom Academy Admin"
+    },
+    "dojo-agent-openclaw-plugin": {
+      "org": "DojoCodingLabs",
+      "linearProject": "Dojo Agent",
+      "displayName": "OpenClaw"
+    },
+    "dojo-marketplace-mcp": {
+      "org": "DojoCodingLabs",
+      "linearProject": "Dojo OS",
+      "displayName": "Dojo Marketplace MCP"
+    }
+  },
+  "linearPrefixes": ["DOJ", "CIV", "SEC"],
+  "linearOrgSlug": "dojo-coding",
+  "greeting": {
+    "options": [
+      "Gm Gm! :sunny::shinto_shrine:",
+      "Buenas Dojo! :shinto_shrine:",
+      "GM! :shinto_shrine:",
+      "Gm! :shinto_shrine:"
+    ]
+  },
+  "emojis": {
+    "prOpen": ":github-pr:",
+    "prMerged": ":github-merged:",
+    "prClosed": ":github-closed:",
+    "ciSuccess": ":github-actions-success:",
+    "ciFailure": ":github-actions-failure:",
+    "linear": ":linear:",
+    "repo": ":github:",
+    "greptile": ":greptile:",
+    "claude": ":claude-code:"
+  }
+}
