@@ -62,12 +62,13 @@ Deliberate actions you invoke explicitly.
 | `/make-no-mistakes:remind <topic>` | Recall past decisions, instructions, or feedback from memory and project context |
 | `/make-no-mistakes:takeover-pr <repo> [pr#]` | Pick a random open PR from a teammate, check it out, review it, and take over the work |
 
-### Skills (5)
+### Skills (6)
 
 Auto-activate by context — you don't need to remember the command name.
 
 | Skill | Triggers when you... |
 |-------|---------------------|
+| `implement-advisor` | Want to work on a Linear issue, implement a feature, or fix a bug (suggests `/make-no-mistakes:implement`) |
 | `spec-recommend` | Discuss specs, SRDs, implementation briefs, or say "what should I build" |
 | `spike-recommend` | Paste a Linear issue URL or ask to analyze an issue |
 | `review-open-prs` | Ask about open PRs, merge readiness, or Greptile scores |
@@ -156,7 +157,7 @@ make-no-mistakes-toolkit/
 │   └── lib/
 ├── commands/           # 14 explicit commands
 ├── agents/             # 2 specialized subagents
-├── skills/             # 5 auto-activating skills
+├── skills/             # 6 auto-activating skills
 │   └── */SKILL.md
 ├── scripts/            # Shared bash utilities
 ├── package.json

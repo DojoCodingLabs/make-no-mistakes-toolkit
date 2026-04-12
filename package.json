@@ -1,6 +1,6 @@
 {
   "name": "@lapc506/make-no-mistakes",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. OpenCode + Claude Code plugin.",
   "type": "module",
   "main": "./dist/index.js",

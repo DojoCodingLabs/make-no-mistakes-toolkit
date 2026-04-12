@@ -1,6 +1,6 @@
 {
   "name": "make-no-mistakes",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "description": "The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.",
   "author": {
     "name": "Luis Andres Pena Castillo",
