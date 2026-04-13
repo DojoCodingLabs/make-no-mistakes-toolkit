@@ -140,6 +140,60 @@ make-no-mistakes doctor
 - **Linear MCP** — configured in Claude Code for issue tracking (add via Claude Code settings > MCP servers)
 - **Slack MCP** — optional, for standup posting and Slack reporting. See `slack-config.example.json` at the repo root for channel configuration
 
+## Product Owner Extension (SPOPC)
+
+make-no-mistakes is expanding from a **developer lifecycle toolkit** into a **full product ownership layer**, grounded in the [Scrum Product Owner Professional Certificate (SPOPC)](https://certiprof.com/pages/scrum-product-owner-professional-certificate-spopc) methodology by CertiProf.
+
+The author holds three CertiProf certifications that inform this extension:
+
+- **Scrum Product Owner Professional (SPOPC)** — backlog management, stakeholder communication, value maximization
+- **User Stories Foundation (USFC)** — story writing, acceptance criteria, splitting strategies
+- **Scrum Foundation Professional (SFPC)** — Scrum framework, ceremonies, roles, artifacts
+
+### Why not a separate plugin?
+
+[gstack](https://github.com/garrytan/gstack) proved that a single toolkit can serve multiple roles — CEO, designer, engineer, QA — all through slash commands. Product ownership is part of the development lifecycle, not separate from it. make-no-mistakes already has the plumbing: Linear issue tracking, Slack messaging, daily standups, spike recommendations, and session management. The PO skills are natural extensions.
+
+### Planned PO Skills and Commands
+
+| Component | Type | Description |
+|-----------|------|-------------|
+| `backlog-groom` | Skill | Read SOPs + Linear project state, suggest prioritization, flag stale issues |
+| `sprint-review` | Command | Generate sprint metrics report — velocity, completion %, carryover items |
+| `vertical-health` | Command | Cross-reference product analytics + Linear velocity + GitHub activity for a product area |
+| `po-standup` | Command | PO-perspective standup: blockers, decisions needed, stakeholder updates |
+| `vertical-report` | Command | Weekly summary posted to the product area's Slack channel for stakeholders |
+| `product-discovery` | Command | GTM Discovery Roadmapping — ingest Linear issues, cluster into opportunities, prioritize with GTM Score matrix, output a Now/Next/Later roadmap. Uses [Double Diamond](https://www.productboard.com/glossary/double-diamond/) framework (Discover, Define, Develop, Deliver) and a composite GTM Score (Market Fit 30% + Business Impact 25% + GTM Readiness 20% + Effort 15% + Risk 10%). Integrates with Linear MCP for issue ingestion and optionally with [Productboard MCP](https://github.com/Enreign/productboard-mcp) for opportunity/feature export |
+
+### Two-Layer Architecture
+
+SOPs (Standard Operating Procedures) define the **what** and **why** per product area — these live in your own documentation repo, not here. make-no-mistakes reads them at runtime to apply context-specific policies.
+
+```
+your-docs-repo/sops/{product-area}/
+├── README.md              # Vision, KPIs, success metrics
+├── backlog-policy.md      # Prioritization criteria, Definition of Done
+├── release-checklist.md   # Pre-release gates specific to this area
+└── escalation-flow.md     # When and how to escalate to stakeholders
+```
+
+The plugin consumes these SOPs to give context-aware recommendations. Each Product Owner creates SOPs for their area using a shared template.
+
+### SPOPC-to-Tooling Mapping
+
+| SPOPC Concept | make-no-mistakes Implementation |
+|---------------|--------------------------------|
+| Product Backlog management | `backlog-groom` — reads Linear + SOP prioritization rules |
+| Sprint Review | `sprint-review` — auto-generated metrics from Linear + GitHub |
+| Stakeholder communication | `vertical-report` — weekly Slack summary to stakeholders |
+| Definition of Done | SOP at `sops/{product-area}/backlog-policy.md` |
+| ROI / Value maximization | `vertical-health` — PostHog analytics + Linear velocity |
+| User Stories | `spike-recommend` + `spec-recommend` (existing, USFC-informed) |
+| Sprint Planning | `review-active-issues` (existing) + `backlog-groom` (planned) |
+| Product Discovery | `product-discovery` — Double Diamond + GTM Score matrix via Linear + Productboard MCP |
+
+> **Status:** The PO extension is in design phase. The existing developer lifecycle commands are stable and production-ready. PO skills will be added incrementally without breaking existing functionality.
+
 ## The Name
 
 "Make no mistakes" started as an inside joke — a mantra for disciplined execution. Like the Ralph loop, it's a reminder that process isn't optional when shipping matters.
