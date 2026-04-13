@@ -357,6 +357,13 @@ After execution, save a report to `./linear-todo-templates/workspace-setup-repor
 
 13. **Conventional commit messages.** When the command creates commits (e.g., updating linear-setup.json), use conventional commit format: `chore: sync linear-setup.json with Linear workspace`.
 
+14. **Label validation in audit mode.** When running `audit`, check all existing issues for label violations:
+    - Grouped labels must be mutually exclusive (max 1 Type, 1 Size, 1 Strategy per issue)
+    - Maximum 2 Component labels per issue; 3+ means the issue needs decomposition
+    - Component labels must be coherent with the assigned project (e.g., no "Frontend" label on a "Backend API" project issue)
+    - Size XL issues should be flagged for decomposition, not left as-is
+    - Report violations in the audit output with specific issue identifiers
+
 ### Usage
 
 ```bash

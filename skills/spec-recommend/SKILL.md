@@ -225,6 +225,20 @@ Always report which context files were found and read. If a category yields no r
   * Quick Win
   * Epic
 
+### Label Validation Rules
+
+When recommending or assigning labels, enforce these rules:
+
+1. **Grouped labels are mutually exclusive.** An issue can have exactly ONE label from each group (Type, Size, Strategy). Never assign two Types, two Sizes, or two Strategies to the same issue.
+
+2. **Maximum 2 Component labels per issue.** If an issue needs 3+ Component labels (e.g., Frontend + Backend + Database), it is too large and must be decomposed into smaller issues. Recommend decomposition instead of adding more Component labels.
+
+3. **Component must be coherent with the assigned project.** An issue in the "Backend API" project should not have the "Frontend" Component label. If cross-cutting work is needed, create separate issues in each relevant project.
+
+4. **Epic is a Flag, not a substitute for Milestones.** Use project milestones for tracking phases of work. The Epic flag is only for issues that serve as parent containers with sub-issues.
+
+5. **Size XL means decompose, not label.** Never create a single issue with Size XL. Instead, decompose into smaller issues (S/M/L) and use a project milestone to group them.
+
 ---
 
 ## Dependency Resolution

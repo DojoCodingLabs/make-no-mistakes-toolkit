@@ -88,6 +88,20 @@ The issue will have labels from this taxonomy:
   * ⚡ Quick Win
   * 📦 Epic
 
+## Label Validation Rules
+
+When recommending or assigning labels, enforce these rules:
+
+1. **Grouped labels are mutually exclusive.** An issue can have exactly ONE label from each group (Type, Size, Strategy). Never assign two Types, two Sizes, or two Strategies to the same issue.
+
+2. **Maximum 2 Component labels per issue.** If an issue needs 3+ Component labels (e.g., Frontend + Backend + Database), it is too large and must be decomposed into smaller issues. Recommend decomposition instead of adding more Component labels.
+
+3. **Component must be coherent with the assigned project.** An issue in the "Backend API" project should not have the "Frontend" Component label. If cross-cutting work is needed, create separate issues in each relevant project.
+
+4. **Epic is a Flag, not a substitute for Milestones.** Use project milestones for tracking phases of work. The Epic flag is only for issues that serve as parent containers with sub-issues.
+
+5. **Size XL means decompose, not label.** Never create a single issue with Size XL. Instead, decompose into smaller issues (S/M/L) and use a project milestone to group them.
+
 
 ## Output Format
 
@@ -338,7 +352,13 @@ Evaluate the **long-term implications** of this implementation:
 
     * The final section is mandatory. Be explicit about the mechanism, the cost trade-off, and why.
 
-9. Output the file.
+9. Validate labels before output.
+
+    * Apply the Label Validation Rules (see above). If the issue has invalid label combinations, flag them in the brief header with `LABEL WARNING:` and recommend corrections.
+    * If the issue has 3+ Component labels, recommend decomposition into separate issues instead of generating a single brief.
+    * If grouped labels conflict (e.g., two Types), use the most specific one and flag the conflict.
+
+10. Output the file.
 
     * Save the brief as `./issue-briefs/{ISSUE-ID}.md` in the repo.
 
