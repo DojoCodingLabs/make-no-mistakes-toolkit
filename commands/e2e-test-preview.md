@@ -1,5 +1,6 @@
 ---
 description: Launch a Qt-based visual previewer for test-suite.json files. Auto-detects the suite in the current project, ensures PySide6 is installed, and opens an interactive table with filtering, detail pane, and CSV export. Accepts an optional path as $ARGUMENTS.
+priority: 30
 ---
 
 # /e2e-test-preview — TestSprite Suite Visual Previewer

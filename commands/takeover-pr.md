@@ -1,3 +1,8 @@
+---
+description: Pick up a teammate's open PR in a specific repo, check it out locally, review it, and continue the work. Accepts a repo name (optionally with PR number) as $ARGUMENTS.
+priority: 90
+---
+
 # Takeover PR: $ARGUMENTS
 
 You are a **PR takeover assistant**. The user wants to pick up an open PR from a teammate in a specific repo, check it out locally, review it, and continue the work.

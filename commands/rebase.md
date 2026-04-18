@@ -1,5 +1,6 @@
 ---
 description: Synchronize your entire local state (branches, worktrees, PRs) with the latest release after a team-wide rebase. Accepts a repo name as $ARGUMENTS.
+priority: 90
 ---
 
 # /rebase — Team Release Sync Protocol

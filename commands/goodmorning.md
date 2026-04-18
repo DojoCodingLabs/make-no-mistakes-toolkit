@@ -1,5 +1,6 @@
 ---
 description: Bootstrap your day by scanning for pending next-day handoff files and guiding you through resuming where you left off.
+priority: 50
 ---
 
 # Good Morning

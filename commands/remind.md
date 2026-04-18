@@ -1,5 +1,6 @@
 ---
 description: Recall past decisions, feedback, and instructions from memory, CLAUDE.md, and project context. Accepts a topic or keyword as $ARGUMENTS.
+priority: 80
 ---
 
 # Remind: $ARGUMENTS

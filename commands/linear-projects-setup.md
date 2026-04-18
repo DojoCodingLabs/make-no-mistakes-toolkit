@@ -1,5 +1,6 @@
 ---
 description: "Bootstrap a Linear workspace with label taxonomy, projects, milestones, and reviewer integrations. Modes: labels, projects, audit, sync, or clean slate (default). Accepts mode as $ARGUMENTS."
+priority: 20
 ---
 
 # Linear Workspace Setup -- Projects, Labels & Taxonomy
