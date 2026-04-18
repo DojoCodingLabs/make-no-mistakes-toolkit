@@ -1,5 +1,6 @@
 ---
 description: Execute Linear issues with full discipline -- sequential branches, worktree isolation, reviewer loops, CI verification, and clean merges. Accepts one or more Linear issue IDs or URLs as $ARGUMENTS.
+priority: 100
 ---
 
 # /implement — Disciplined Execution Protocol

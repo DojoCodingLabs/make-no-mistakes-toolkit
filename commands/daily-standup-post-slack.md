@@ -1,5 +1,6 @@
 ---
 description: Compose and post today's standup message to Slack, combining data from the standup file with interactive user input. Accepts "draft" as $ARGUMENTS to send as draft instead of posting directly.
+priority: 50
 ---
 
 # Daily Standup — Post to Slack

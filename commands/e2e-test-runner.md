@@ -1,5 +1,6 @@
 ---
 description: Execute E2E tests from a test-suite.json file. Selects the optimal runner for each scenario, produces immutable result files, and optionally reports to Linear or Markdown. Accepts a path to test-suite.json or a jq filter as $ARGUMENTS.
+priority: 30
 ---
 
 # /e2e-test-runner — TestSprite JSON Test Execution Orchestrator

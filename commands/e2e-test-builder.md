@@ -1,5 +1,6 @@
 ---
 description: Generate or update a TestSprite-compatible test-suite.json from use case documentation. Accepts a URL or file path as $ARGUMENTS.
+priority: 30
 ---
 
 # /e2e-test-builder — TestSprite JSON Test Suite Generator

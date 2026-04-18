@@ -1,5 +1,6 @@
 ---
 description: Generate a structured recap of everything accomplished in the current session, including tasks completed, files changed, decisions made, and pending items.
+priority: 80
 ---
 
 # Summarize Session

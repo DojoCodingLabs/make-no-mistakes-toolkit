@@ -1,5 +1,6 @@
 ---
 description: Gather and present a prioritized, actionable list of everything pending from the current session, git state, Linear issues, and memory.
+priority: 80
 ---
 
 # Pending Left — What Remains To Be Done

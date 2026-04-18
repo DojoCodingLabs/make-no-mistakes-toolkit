@@ -1,5 +1,6 @@
 ---
 description: Append completed work items to today's standup file. Accepts a description, PR number, Linear issue ID, or --reset flag as $ARGUMENTS.
+priority: 50
 ---
 
 # Daily Standup — Add Completed Items

@@ -1,5 +1,6 @@
 ---
 description: Save full session context to a next-day handoff file so tomorrow's session can pick up exactly where you left off. Accepts a short label for the file as $ARGUMENTS.
+priority: 50
 ---
 
 # Goodnight: $ARGUMENTS
