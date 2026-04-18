@@ -6,30 +6,68 @@ description: Execute Linear issues with full discipline -- sequential branches, 
 
 You are a senior engineering lead executing Linear issues with zero tolerance for process shortcuts.
 
-This protocol ensures every issue is implemented with full discipline: sequential branches, worktree isolation, agent teams for parallelism, all-reviewer loops, CI verification, and clean merges.
+This protocol ensures every issue is implemented with full discipline: isolated worktrees, parallel sub-agents for independent work, all-reviewer loops, CI verification, and clean merges.
 
-## Agent Teams
+## Parallel Execution
 
-When processing multiple independent issues, use Claude Code Agent Teams for parallel execution:
+When processing multiple independent issues, run them in parallel — each in its own git worktree, so branches never collide and PRs stay isolated. Two mechanisms are available; **prefer Mode A** for day-to-day work.
+
+### Mode A — Inline sub-agent dispatch (preferred)
+
+From within a running Claude Code session, dispatch one background sub-agent per independent issue using the `Agent` tool. Each sub-agent gets its own worktree automatically. The orchestrator (you) stays in the foreground and continues on another task, then receives a notification when each sub-agent completes.
+
+```text
+Agent(
+  description: "Implement DOJ-3234",
+  subagent_type: "general-purpose",
+  model: "opus",
+  isolation: "worktree",     // auto-creates a fresh worktree for this agent
+  run_in_background: true,   // non-blocking; you get a notification on completion
+  prompt: "<full self-contained brief — see 'Briefing' below>",
+)
+```
+
+Why this is the default:
+- Single session, no shell juggling or extra CLI invocation.
+- The orchestrator can keep working on a third issue while two agents run.
+- Completion is delivered as a `<task-notification>` inside the orchestrator's context — no polling needed.
+- Each sub-agent's worktree is locked and isolated, so parallel edits never conflict.
+
+### Mode B — Agent Teams CLI (experimental, legacy)
 
 ```bash
-# Enable agent teams (experimental)
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-
-# Launch with team coordination
 claude --team "Implement ALT-13, ALT-14, ALT-15 in parallel with worktree isolation"
 ```
 
-**When to use Agent Teams vs sequential:**
-- **Agent Teams**: 2+ issues with no dependency between them (e.g., ALT-15 + ALT-16 + ALT-37)
-- **Sequential**: Issues that depend on each other (e.g., ALT-13 depends on ALT-15)
-- **Hybrid**: Launch independent issues as teammates, then chain dependent ones sequentially after merge
+Use this only when you explicitly want a separate top-level session per teammate (e.g., different model selection per agent, or longer-running work that outlives the current session). For most issues Mode A is cheaper and simpler.
 
-**Team coordination rules:**
-- Each teammate gets its own worktree (no shared working directory)
-- The team lead monitors progress and resolves conflicts
-- PR creation is sequential (one at a time) to avoid GitHub CLI race conditions
-- All teammates must finish before proceeding to merge phase
+### When to parallelize vs. run sequentially
+
+- **Parallelize (Mode A or B)**: 2+ issues with no dependency between them (e.g., ALT-15 + ALT-16 + ALT-37). Different repos, different domains, or clearly independent pieces of the same codebase.
+- **Sequential**: Issues with explicit dependency links (`blockedBy`, `blocks`) in Linear, or when a later PR would almost certainly conflict with an earlier one.
+- **Hybrid**: Launch independent issues in parallel, then chain dependent ones sequentially after the first merges (rebase the dependent branch onto updated `{baseBranch}` before resuming).
+
+### Briefing parallel agents
+
+A background sub-agent starts with zero conversation context. Its prompt must be fully self-contained:
+
+- **What**: the exact Linear issue ID(s) and a one-paragraph restatement of the goal.
+- **Why**: the business/technical motivation, so the agent can judge trade-offs.
+- **Where**: relevant file paths, repo root, base branch, branch naming pattern.
+- **Resources**: secret names for GCP/secret-manager lookups, Sentry/Linear/Slack channel IDs, test credentials (staging only).
+- **Hard constraints**: never-touch-prod rules, file-count limit (`15-File Rule`), sensitive-table blocklists, CLAUDE.md rules that apply.
+- **Known parallel work**: other agents running concurrently and what they own, so the agent doesn't collide on files or open conflicting PRs.
+- **Deliverable shape**: final report format expected back (Linear state, PR link, Sentry state, Slack channel).
+
+Terse prompts produce shallow, generic work. Assume you won't be able to clarify mid-run — brief the agent like a smart colleague who just walked in.
+
+### Coordination rules for parallel execution
+
+- Each sub-agent gets its own worktree (Mode A does this automatically; Mode B requires explicit worktree setup per teammate).
+- The orchestrator monitors notifications and resolves any cross-agent conflicts.
+- **PR creation runs fine in parallel** when agents are on different branches (different refs = no race). Only serialize PR creation when two agents touch the same branch (they shouldn't — one agent per branch).
+- Wait for all agents to finish before declaring the batch complete, then sync `{baseBranch}` once.
 
 ## Specialized Subagents
 
@@ -63,7 +101,7 @@ Use the right subagent_type for each phase of the protocol:
 **Recommended workflow per issue:**
 1. `Explore` or `feature-dev:code-explorer` — understand the codebase area
 2. `Plan` or `feature-dev:code-architect` — design the approach
-3. `general-purpose` — implement in worktree (can run in parallel via Agent Teams)
+3. `general-purpose` — implement in worktree (can run in parallel via Mode A sub-agent dispatch, see "Parallel Execution")
 4. `pr-review-toolkit:code-reviewer` + `silent-failure-hunter` — pre-PR quality gate
 5. `srd-framework:srd-guardian` — validate against SRD acceptance criteria
 
@@ -181,11 +219,11 @@ For EACH issue in the sequence, follow this exact workflow. No shortcuts. No exc
     - This provides richer context than the Linear issue description alone
 
 5. **If multiple approaches exist:**
-   - Create competing worktrees (one per approach)
-   - Use agent teams to implement each approach in parallel
-   - Each approach may discover new issues — document them
+   - Dispatch one sub-agent per approach via Mode A (each gets its own worktree automatically)
+   - Run all approaches in parallel with `run_in_background: true`
+   - Each approach may discover new issues — document them in its final report
    - Synthesize the best parts of multiple solutions if needed
-   - Delete losing worktrees after synthesis
+   - Close losing sub-agent branches/PRs after synthesis
 
 6. **Write tests:**
    - Model E2E test cases with Slack MCP first (plan them in a test channel or thread)
@@ -274,7 +312,8 @@ When processing multiple issues:
 |-------------|-------------|
 | Implementing in the main working tree | Pollutes the base branch, blocks parallel work, no isolation |
 | Reusing an existing branch for a new attempt | Carries stale commits, confuses reviewers, breaks clean history |
-| Working two branches in the same repo simultaneously | GitHub CLI race conditions — by design limitation |
+| Two sub-agents sharing a single worktree | File races, non-deterministic diffs. One worktree per agent, always. |
+| Two sub-agents on the same branch | They overwrite each other's commits. One branch per agent, always. |
 | Skipping Greptile re-review after fixes | You don't know if your fix introduced new issues |
 | Merging with failing CI | Breaks {baseBranch} for everyone |
 | Leaving worktrees on disk after merge | Disk bloat, stale state, confusion |
