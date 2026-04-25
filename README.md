@@ -41,7 +41,7 @@ npx @lapc506/make-no-mistakes install
 
 ## What's Inside
 
-### Commands (15)
+### Commands (18)
 
 Deliberate actions you invoke explicitly.
 
@@ -62,6 +62,9 @@ Deliberate actions you invoke explicitly.
 | `/make-no-mistakes:daily-standup-post-slack [draft]` | Compose and post today's standup to the configured Slack channel |
 | `/make-no-mistakes:remind <topic>` | Recall past decisions, instructions, or feedback from memory and project context |
 | `/make-no-mistakes:takeover-pr <repo> [pr#]` | Pick a random open PR from a teammate, check it out, review it, and take over the work |
+| `/make-no-mistakes:secret-input` | Stage a secret/password via OS-native GUI dialog (Linux zenity/kdialog/pinentry, macOS osascript, Windows Get-Credential). The value never appears in the conversation log or terminal history. Cross-platform via `.sh` (Linux/macOS/WSL/Git Bash) + `.ps1` (native Windows) |
+| `/make-no-mistakes:secret-use ENVVAR -- <cmd>` | Run one command with the staged secret loaded as an environment variable. Env var lives only inside the consuming process and is unset on completion |
+| `/make-no-mistakes:secret-clear` | Wipe the staged secret (shred/rm-P/random-overwrite per OS). Idempotent — safe to call when no secret is staged. Always run when done with credentials |
 
 ### Skills (6)
 
