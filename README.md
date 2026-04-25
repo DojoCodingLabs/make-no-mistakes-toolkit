@@ -41,13 +41,14 @@ npx @lapc506/make-no-mistakes install
 
 ## What's Inside
 
-### Commands (14)
+### Commands (15)
 
 Deliberate actions you invoke explicitly.
 
 | Command | Description |
 |---------|-------------|
 | `/make-no-mistakes:implement <ISSUE-ID>` | Disciplined execution of Linear issues — worktree isolation, all-reviewer loops, CI verification, clean merges |
+| `/make-no-mistakes:prioritize <pillar-slug>` | MoSCoW + RICE-adapted applied to a pillar's Linear issues, traceable to its PIBER+IDCF sub-spike and the latest vision audit. Outputs priority report + description-footer per issue + snapshot comment on the sub-spike. Chain: `product-vision-audit → prioritize → spike-recommend → implement` |
 | `/make-no-mistakes:rebase <repo>` | Team release sync — rebase all branches, auto-merge ready PRs, health report |
 | `/make-no-mistakes:linear-projects-setup` | Bootstrap Linear workspace with full label taxonomy, projects, and integrations |
 | `/make-no-mistakes:e2e-test-builder <source>` | Generate a TestSprite-compatible `test-suite.json` from docs or PRDs |
