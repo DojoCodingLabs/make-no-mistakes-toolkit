@@ -41,13 +41,14 @@ npx @lapc506/make-no-mistakes install
 
 ## What's Inside
 
-### Commands (14)
+### Commands (18)
 
 Deliberate actions you invoke explicitly.
 
 | Command | Description |
 |---------|-------------|
 | `/make-no-mistakes:implement <ISSUE-ID>` | Disciplined execution of Linear issues — worktree isolation, all-reviewer loops, CI verification, clean merges |
+| `/make-no-mistakes:prioritize <pillar-slug>` | MoSCoW + RICE-adapted applied to a pillar's Linear issues, traceable to its PIBER+IDCF sub-spike and the latest vision audit. Outputs priority report + description-footer per issue + snapshot comment on the sub-spike. Chain: `product-vision-audit → prioritize → spike-recommend → implement` |
 | `/make-no-mistakes:rebase <repo>` | Team release sync — rebase all branches, auto-merge ready PRs, health report |
 | `/make-no-mistakes:linear-projects-setup` | Bootstrap Linear workspace with full label taxonomy, projects, and integrations |
 | `/make-no-mistakes:e2e-test-builder <source>` | Generate a TestSprite-compatible `test-suite.json` from docs or PRDs |
@@ -61,6 +62,9 @@ Deliberate actions you invoke explicitly.
 | `/make-no-mistakes:daily-standup-post-slack [draft]` | Compose and post today's standup to the configured Slack channel |
 | `/make-no-mistakes:remind <topic>` | Recall past decisions, instructions, or feedback from memory and project context |
 | `/make-no-mistakes:takeover-pr <repo> [pr#]` | Pick a random open PR from a teammate, check it out, review it, and take over the work |
+| `/make-no-mistakes:secret-input` | Stage a secret/password via OS-native GUI dialog (Linux zenity/kdialog/pinentry, macOS osascript, Windows Get-Credential). The value never appears in the conversation log or terminal history. Cross-platform via `.sh` (Linux/macOS/WSL/Git Bash) + `.ps1` (native Windows) |
+| `/make-no-mistakes:secret-use ENVVAR -- <cmd>` | Run one command with the staged secret loaded as an environment variable. Env var lives only inside the consuming process and is unset on completion |
+| `/make-no-mistakes:secret-clear` | Wipe the staged secret (shred/rm-P/random-overwrite per OS). Idempotent — safe to call when no secret is staged. Always run when done with credentials |
 
 ### Skills (6)
 
