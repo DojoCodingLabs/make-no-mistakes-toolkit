@@ -22,14 +22,14 @@ Read `slack-config.json` from the project root. If it does not exist, use defaul
 ```json
 {
   "repos": {},
-  "linearPrefixes": ["DOJ"],
-  "linearOrgSlug": "dojo-coding"
+  "linearPrefixes": ["APP"],
+  "linearOrgSlug": "yourorg"
 }
 ```
 
 Use the config values throughout this command:
 - `repos` → repo-to-project mapping for grouping items
-- `linearPrefixes` → which issue prefixes to recognize (e.g., DOJ, CIV, SEC, ALT)
+- `linearPrefixes` → which issue prefixes to recognize (e.g., APP, BACK, SEC)
 - `linearOrgSlug` → for building Linear URLs
 
 **IMPORTANT — Standup file location is ALWAYS `~/Escritorio/daily-standup.md`:**
@@ -76,7 +76,7 @@ STANDUP_FILE="$HOME/Escritorio/daily-standup.md"
 ## Step 2: Determine What to Add
 
 ### If `$ARGUMENTS` is provided:
-- Parse the text for PR numbers (`#NNN`), Linear issues (`DOJ-NNNN`), or free-form descriptions
+- Parse the text for PR numbers (`#NNN`), Linear issues (`APP-NNNN`), or free-form descriptions
 - For PR numbers: fetch title and status via `gh pr view`
 - For Linear issues: fetch title and status via Linear MCP
 - For free-form text: use as-is

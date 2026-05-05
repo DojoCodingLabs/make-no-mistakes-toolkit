@@ -114,7 +114,7 @@ Display the "Key Context" and "Key Files" sections — these are the breadcrumbs
 If the file references Linear issues, fetch their CURRENT state (not what the file says):
 ```
 Linear Issues (current state):
-- DOJ-XXXX: <title> — <current state> (was: <state in file>)
+- APP-XXXX: <title> — <current state> (was: <state in file>)
 ```
 
 Use `mcp__linear-server__get_issue` for each referenced issue.

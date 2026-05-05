@@ -20,8 +20,8 @@ Read `slack-config.json` from the project root. If it does not exist, use defaul
 {
   "standupChannel": { "id": "", "name": "#daily-status-updates" },
   "repos": {},
-  "linearPrefixes": ["DOJ"],
-  "linearOrgSlug": "dojo-coding",
+  "linearPrefixes": ["APP"],
+  "linearOrgSlug": "yourorg",
   "greeting": { "options": ["GM! :wave:"] },
   "emojis": {
     "prOpen": ":github-pr:", "prMerged": ":github-merged:",
@@ -155,7 +155,7 @@ Combine all 3 sections into the team's natural language format. The message MUST
 
 ### Format rules:
 
-1. **Greeting**: Choose one at random: `Gm Gm! :sunny::shinto_shrine:` / `Buenas Dojo! :shinto_shrine:` / `GM! :shinto_shrine:` / `Gm! :shinto_shrine:`
+1. **Greeting**: Choose one at random from the `greeting.options` list in `slack-config.json`. Fallback if missing: `GM!` / `Good morning team!` / `Gm Gm! :sunny:`
 2. **Sections are ALWAYS present** — even if empty (use "Nada pendiente" / "Ninguno" as needed)
 3. **Section headers** use standard Slack emojis (matching team convention):
    - `:white_check_mark:` _Ayer completé:_
@@ -163,20 +163,18 @@ Combine all 3 sections into the team's natural language format. The message MUST
    - `:construction:` _Blockers:_
 4. **Items** use `-` for bullet points (NEVER use `•` or other Unicode bullets — they break Slack formatting)
 5. **PR references MUST be hyperlinked**: `<https://github.com/ORG/REPO/pull/NNN|PR #NNN>` — NEVER bare `PR #NNN` without a link. Determine the org + repo from the `repos` config and the file's `### Repo (slug)` headers.
-6. **Linear issue references MUST be hyperlinked**: `<https://linear.app/dojo-coding/issue/DOJ-XXXX|DOJ-XXXX>` — NEVER bare `DOJ-XXXX` without a link. For CIV issues: `<https://linear.app/dojo-coding/issue/CIV-XXXX|CIV-XXXX>`. For SEC issues: `<https://linear.app/dojo-coding/issue/SEC-XXXX|SEC-XXXX>`.
+6. **Linear issue references MUST be hyperlinked**. Build the URL dynamically as `https://linear.app/{linearOrgSlug}/issue/{PREFIX}-{NUMBER}` where `linearOrgSlug` is read from `slack-config.json` and `PREFIX` is one of the entries in `linearPrefixes`. Example with `linearOrgSlug=yourorg` and `linearPrefixes=["APP","BACK","SEC"]`: `<https://linear.app/yourorg/issue/APP-1234|APP-1234>`. NEVER emit a bare issue ID without a link.
 7. **Mentions** of team members use Slack user IDs when known
-7. **Tone**: Natural, conversational Spanish — like the team writes, not robotic
+8. **Tone**: Natural, conversational Spanish — like the team writes, not robotic
 
-### Emoji mapping (custom Dojo workspace emojis)
+### Emoji mapping
 
-Use these custom emojis — NOT generic Unicode or default Slack emojis:
+Use the custom emoji slugs configured under `emojis` in `slack-config.json`. The default mapping below covers the typical case; override per-workspace if your Slack has different custom emoji names.
 
-**Repo group headers** (use when the standup spans multiple repos):
-- `### Dojo OS` → `:github: *Dojo OS*`
-- `### Freedom Academy` → `:github: *Freedom Academy*`
-- `### OpenClaw` → `:github: *OpenClaw*`
-- `### Dojo Marketplace MCP` → `:github: *Dojo Marketplace MCP*`
-- Other → `:github: *<Name>*`
+**Repo group headers** (use when the standup spans multiple repos): for each repo entry under `repos.<slug>` in `slack-config.json`, build a header like `:github: *<displayName>*`. Example with the default `myapp-mobile` / `myapp-backend` config:
+- `### MyApp Mobile` → `:github: *MyApp Mobile*`
+- `### MyApp Backend` → `:github: *MyApp Backend*`
+- Other → `:github: *<displayName>*`
 
 **Item-level emojis (use inline where relevant):**
 - PRs: `:github-pr:` for open, `:github-merged:` for merged, `:github-closed:` for closed

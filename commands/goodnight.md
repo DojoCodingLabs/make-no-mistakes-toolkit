@@ -143,7 +143,7 @@ To continue this work:
 - Open worktrees: <list if any>
 
 ## Linear Issues
-- <DOJ-XXXX>: <title> — <current state>
+- <APP-XXXX>: <title> — <current state>
 
 ## Session Log (Compressed)
 <2-3 paragraph narrative of what happened in the session, in chronological order, including key decision points and why things went the way they did. This is the "story" of the session for context continuity.>

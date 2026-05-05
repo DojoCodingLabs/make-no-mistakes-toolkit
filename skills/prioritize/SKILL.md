@@ -34,7 +34,7 @@ Lee `linear-setup.json` en la raiz del cwd. Schema esperado:
 
 ```json
 {
-  "team": { "key": "DOJ" },
+  "team": { "key": "APP" },
   "projects": { ... legacy mapping ... },
   "pillars": {
     "<slug>": {

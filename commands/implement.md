@@ -119,7 +119,7 @@ The `$ARGUMENTS` variable contains one or more Linear issue identifiers or URLs.
 ## Configuration
 
 This command reads project-specific settings from `linear-setup.json` at the repo root. If the file exists, it overrides defaults for:
-- `team.key` — Issue prefix (e.g., `ALT` instead of `DOJ`)
+- `team.key` — Issue prefix (e.g., `APP`, `BACK`, `MYTEAM` — anything matching your Linear team)
 - `git.baseBranch` — Base branch for PRs and rebasing (e.g., `main` instead of `develop`)
 - `git.branchPattern` — Branch naming pattern
 - `defaults.greptileReview` — Whether to tag Greptile

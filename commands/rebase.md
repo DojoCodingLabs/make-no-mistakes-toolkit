@@ -19,7 +19,7 @@ claude /rebase myapp-backend             # Sync with backend repo
 claude /rebase myapp-agent-plugin        # Sync with agent plugin repo
 ```
 
-The `$ARGUMENTS` variable contains the repo name (under DojoCodingLabs org).
+The `$ARGUMENTS` variable contains the repo name (under your GitHub org).
 
 ## Input Resolution
 

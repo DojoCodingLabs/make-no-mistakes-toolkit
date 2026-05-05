@@ -115,7 +115,7 @@ Path: `<codebase>/audits/<pillar>/priority-<YYYY-MM-DD>.md`
 
 **Framework**: MoSCoW + RICE (Reach × Impact × Confidence / Size)
 **Pillar**: <pillar-slug>
-**Sub-spike**: [<DOJ-XXXX>](<spike url>) -- <spike title>
+**Sub-spike**: [<APP-XXXX>](<spike url>) -- <spike title>
 **Project Linear**: [<project-name>](<project url>)
 **Vision audit**: <path or "none">  (alineacion: <FUERTE|PARCIAL|DEBIL|CRITICO|N/A>)
 **Issues evaluated**: <N>
