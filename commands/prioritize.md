@@ -19,19 +19,19 @@ v1 implementa solo `moscow-rice`. Otros frameworks (`rice`, `moscow`, `ice`, `ws
 
 ```bash
 # Default: dry-run false, genera report + aplica mutations a description
-/make-no-mistakes:prioritize pathways
+/make-no-mistakes:prioritize mobile
 
 # Primer sweep, sin audit aunque exista
-/make-no-mistakes:prioritize agent-doji --no-audit
+/make-no-mistakes:prioritize agent --no-audit
 
 # Solo reportar sin mutaciones
-/make-no-mistakes:prioritize community --dry-run
+/make-no-mistakes:prioritize backend --dry-run
 
 # Subset de issues
-/make-no-mistakes:prioritize launchpad --issue-ids ALT-123,ALT-124
+/make-no-mistakes:prioritize backend --issue-ids APP-123,APP-124
 
 # Override output path
-/make-no-mistakes:prioritize hackathons --out /tmp/priority-hackathons.md
+/make-no-mistakes:prioritize mobile --out /tmp/priority-mobile.md
 ```
 
 ## Parsing de argumentos
@@ -110,12 +110,14 @@ Si el usuario invoca `/prioritize` sin args, preguntar:
 
 ## Dog-fooding
 
-Este comando fue creado dogfooded para DojoOS. Los primeros runs validados fueron:
+Este comando fue dogfooded por el autor contra 2 pillars productivos (audits del
+2026-04-17), generando un report markdown por pillar en
+`<codebase>/audits/<pillar>/priority-<YYYY-MM-DD>.md` y un comment en el
+sub-spike correspondiente. Los identificadores concretos viven en notebook
+privado del autor.
 
-- `pathways` -> `dojo-os/audits/pathways/priority-2026-04-21.md`
-- `agent-doji` -> `dojo-agent-openclaw-plugin/audits/agent-doji/priority-2026-04-21.md`
-
-Ambos complementan los vision audits generados por `/business-model-toolkit:product-vision-audit` en la misma convencion de path.
+Los reports complementan los vision audits generados por
+`/business-model-toolkit:product-vision-audit` en la misma convencion de path.
 
 ## Chain posicion
 
@@ -127,10 +129,10 @@ product-vision-audit -> prioritize -> spike-recommend -> implement
 ```
 
 Un usuario tipico:
-1. Corre `product-vision-audit pathways` -> genera `audits/pathways/vision-audit-2026-04-17.md`.
-2. Corre `prioritize pathways` -> genera `audits/pathways/priority-2026-04-21.md` + mutations.
-3. Toma el top-3 Must del priority report y corre `spike-recommend ALT-XXX` para cada uno -> genera issue-brief bilingual.
-4. Corre `implement ALT-XXX` -> ejecuta el issue con discipline (worktree, reviewers, CI).
+1. Corre `product-vision-audit mobile` -> genera `audits/mobile/vision-audit-2026-04-17.md`.
+2. Corre `prioritize mobile` -> genera `audits/mobile/priority-2026-04-21.md` + mutations.
+3. Toma el top-3 Must del priority report y corre `spike-recommend APP-XXX` para cada uno -> genera issue-brief bilingual.
+4. Corre `implement APP-XXX` -> ejecuta el issue con discipline (worktree, reviewers, CI).
 
 ## Requisitos
 

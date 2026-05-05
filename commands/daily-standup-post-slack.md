@@ -221,39 +221,39 @@ Gm Gm! :sunny::shinto_shrine:
 :construction: Blockers: Ninguno
 ```
 
-**Narrative pitch + sub-leveled bullets** (Andrés style — the DEFAULT for this command):
+**Narrative pitch + sub-leveled bullets** (the DEFAULT for this command — the pitch line below each section header is plain text, then bullets per repo with sub-leveled item links):
 ```
-Buenas Dojo! :shinto_shrine:
+Good morning team!
 
 :white_check_mark: _Ayer completé:_
-Estuve enfocado en security hardening de Dojo OS, dashboard architecture para Freedom Academy, y el brainstorming completo del AI Setter Agent para OpenClaw.
-- :github: *Dojo OS*
-    - :github-merged: <https://github.com/DojoCodingLabs/dojo-os/pull/952|PR #952> — restore rate limiter on delete-account
-    - :github-pr: <https://github.com/DojoCodingLabs/dojo-os/pull/970|PR #970>, <https://github.com/DojoCodingLabs/dojo-os/pull/975|#975>, <https://github.com/DojoCodingLabs/dojo-os/pull/976|#976> — webhook fixes, SQL linter, field allowlists (<https://linear.app/dojo-coding/issue/SEC-37|SEC-37>/<https://linear.app/dojo-coding/issue/SEC-43|SEC-43>) — todos CI green + :greptile: pass
-    - :github-merged: <https://github.com/DojoCodingLabs/dojo-os/pull/971|PR #971> (<https://linear.app/dojo-coding/issue/DOJ-2682|DOJ-2682>) — course context threading para Dojo Agent
-    - :linear: Creados <https://linear.app/dojo-coding/issue/DOJ-2683|DOJ-2683> (tool visibility fix) + <https://linear.app/dojo-coding/issue/DOJ-2684|DOJ-2684> (test flaky)
-- :github: *Freedom Academy*
-    - :github-pr: <https://github.com/DojoCodingLabs/freedom-academy-moodle-plugins/pull/5|PR #5> — ADR-001: Dashboard architecture hybrid A+B (<https://linear.app/dojo-coding/issue/CIV-377|CIV-377>)
-    - :github-pr: <https://github.com/DojoCodingLabs/freedom-academy-moodle-plugins/pull/6|PR #6>–<https://github.com/DojoCodingLabs/freedom-academy-moodle-plugins/pull/8|#8> — Partner stats, journey dashboard, GA4/Meta CAPI tests
+Trabajo enfocado en security hardening del mobile, dashboard architecture en el backend, y brainstorming completo de un nuevo agent feature.
+- :github: *MyApp Mobile*
+    - :github-merged: <https://github.com/yourorg/myapp-mobile/pull/123|PR #123> — restore rate limiter on delete-account
+    - :github-pr: <https://github.com/yourorg/myapp-mobile/pull/130|PR #130>, <https://github.com/yourorg/myapp-mobile/pull/131|#131>, <https://github.com/yourorg/myapp-mobile/pull/132|#132> — webhook fixes, SQL linter, field allowlists (<https://linear.app/yourorg/issue/SEC-12|SEC-12>/<https://linear.app/yourorg/issue/SEC-13|SEC-13>) — todos CI green + :greptile: pass
+    - :github-merged: <https://github.com/yourorg/myapp-mobile/pull/133|PR #133> (<https://linear.app/yourorg/issue/APP-456|APP-456>) — course context threading para Agent
+    - :linear: Creados <https://linear.app/yourorg/issue/APP-457|APP-457> (tool visibility fix) + <https://linear.app/yourorg/issue/APP-458|APP-458> (test flaky)
+- :github: *MyApp Backend*
+    - :github-pr: <https://github.com/yourorg/myapp-backend/pull/5|PR #5> — ADR-001: Dashboard architecture hybrid A+B (<https://linear.app/yourorg/issue/BACK-377|BACK-377>)
+    - :github-pr: <https://github.com/yourorg/myapp-backend/pull/6|PR #6>–<https://github.com/yourorg/myapp-backend/pull/8|#8> — Partner stats, dashboard, analytics tests
     - :linear-in-review: 6 issues movidos a In Review
-- :github: *OpenClaw*
-    - :linear: Spike <https://linear.app/dojo-coding/issue/DOJ-2701|DOJ-2701> — AI Setter Agent brainstorming completo, 7 issues creados
-    - :linear-in-progress: <https://linear.app/dojo-coding/issue/DOJ-2702|DOJ-2702> — Setter persona + state machine (iniciado)
+- :github: *MyApp Agent*
+    - :linear: Spike <https://linear.app/yourorg/issue/APP-501|APP-501> — AI Setter Agent brainstorming completo, 7 issues creados
+    - :linear-in-progress: <https://linear.app/yourorg/issue/APP-502|APP-502> — Setter persona + state machine (iniciado)
 
 :dart: _Hoy trabajaré:_
 Voy a mergear los 3 PRs de security que están listos, continuar con el Setter Agent, y empezar RLS integration tests.
-- :github: *Dojo OS*
-    - Mergear <https://github.com/DojoCodingLabs/dojo-os/pull/970|PR #970>, <https://github.com/DojoCodingLabs/dojo-os/pull/975|#975>, <https://github.com/DojoCodingLabs/dojo-os/pull/976|#976> (todos listos, esperando review)
-    - <https://linear.app/dojo-coding/issue/SEC-44|SEC-44> (<https://linear.app/dojo-coding/issue/DOJ-2654|DOJ-2654>): RLS integration tests si queda tiempo
-- :github: *OpenClaw*
-    - Continuar con <https://linear.app/dojo-coding/issue/DOJ-2702|DOJ-2702> — Setter persona + state machine
+- :github: *MyApp Mobile*
+    - Mergear <https://github.com/yourorg/myapp-mobile/pull/130|PR #130>, <https://github.com/yourorg/myapp-mobile/pull/131|#131>, <https://github.com/yourorg/myapp-mobile/pull/132|#132> (todos listos, esperando review)
+    - <https://linear.app/yourorg/issue/SEC-14|SEC-14> (<https://linear.app/yourorg/issue/APP-654|APP-654>): RLS integration tests si queda tiempo
+- :github: *MyApp Agent*
+    - Continuar con <https://linear.app/yourorg/issue/APP-502|APP-502> — Setter persona + state machine
 
 :construction: _Blockers:_
 Tengo PRs esperando review y dependencias secuenciales en el Setter Agent.
-- :github: *Dojo OS*
-    - <https://github.com/DojoCodingLabs/dojo-os/pull/970|PR #970>, <https://github.com/DojoCodingLabs/dojo-os/pull/975|#975>, <https://github.com/DojoCodingLabs/dojo-os/pull/976|#976> listos para merge pero esperando review/aprobación
-- :github: *OpenClaw*
-    - <https://linear.app/dojo-coding/issue/DOJ-2704|DOJ-2704>–<https://linear.app/dojo-coding/issue/DOJ-2707|DOJ-2707> bloqueados hasta que <https://linear.app/dojo-coding/issue/DOJ-2702|DOJ-2702> esté completo
+- :github: *MyApp Mobile*
+    - <https://github.com/yourorg/myapp-mobile/pull/130|PR #130>, <https://github.com/yourorg/myapp-mobile/pull/131|#131>, <https://github.com/yourorg/myapp-mobile/pull/132|#132> listos para merge pero esperando review/aprobación
+- :github: *MyApp Agent*
+    - <https://linear.app/yourorg/issue/APP-504|APP-504>–<https://linear.app/yourorg/issue/APP-507|APP-507> bloqueados hasta que <https://linear.app/yourorg/issue/APP-502|APP-502> esté completo
 ```
 
 **Sub-leveling rules:**

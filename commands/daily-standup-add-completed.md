@@ -117,9 +117,9 @@ Each entry maps a repo slug to its display name and Linear project. If a repo is
 ```
 
 Item title patterns:
-- PRs: `#### PR #976 — Field allowlists (DOJ-2647 / SEC-37)`
-- Linear issues: `#### DOJ-2683 — Tool visibility fix`
-- Spikes: `#### Spike DOJ-2701 — AI Setter Agent`
+- PRs: `#### PR #123 — Field allowlists (APP-456 / SEC-12)`
+- Linear issues: `#### APP-457 — Tool visibility fix`
+- Spikes: `#### Spike APP-458 — AI Setter Agent`
 - Other: `#### Limpieza branches`
 
 ---
@@ -154,4 +154,4 @@ Pendientes restantes: <count>
 - Preserve the existing file structure — only append, never rewrite
 - If the file has content from a previous day, archive it don't delete it
 - **Omit local-only git housekeeping** — do NOT include: git rebases, branch cleanup, worktree management, next-day file archiving/deletion. These are maintenance, not deliverables.
-- **DO include spikes and investigations** — if a spike produced a Linear issue, a comment on an issue, a decision document, or any external artifact, it IS a deliverable and should be listed (e.g., "Spike DOJ-2410: strategic assessment completed, recommendations posted to Linear")
+- **DO include spikes and investigations** — if a spike produced a Linear issue, a comment on an issue, a decision document, or any external artifact, it IS a deliverable and should be listed (e.g., "Spike APP-459: strategic assessment completed, recommendations posted to Linear")

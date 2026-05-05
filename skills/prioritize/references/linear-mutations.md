@@ -60,7 +60,7 @@ Solo tocar nuestros propios delimiters.
 ```markdown
 ## Context
 This issue is about refactoring the certificate service to block auto-generation
-post-quiz, per the Pathways vision (DOJ-3222 D1).
+post-quiz, per the mobile vision (APP-101 D1).
 
 ## Acceptance criteria
 - [ ] Add attestor_id check before generating PDF
@@ -81,7 +81,7 @@ post-quiz, per the Pathways vision (DOJ-3222 D1).
 ```markdown
 ## Context
 This issue is about refactoring the certificate service to block auto-generation
-post-quiz, per the Pathways vision (DOJ-3222 D1).
+post-quiz, per the mobile vision (APP-101 D1).
 
 ## Acceptance criteria
 - [ ] Add attestor_id check before generating PDF
@@ -205,9 +205,9 @@ First priority snapshot. No comparison available.
 
 ### Target
 
-El spike del pillar: `pillars.<slug>.spike` (ej: DOJ-3222 para Pathways).
+El spike del pillar: `pillars.<slug>.spike` (ej: APP-101 para mobile).
 
-**NO** postear en el spike maestro DOJ-3228 (constitucion umbrella).
+**NO** postear en el spike maestro APP-001 (constitucion umbrella, si aplica).
 
 ### Formato
 

@@ -19,7 +19,7 @@ From within a running Claude Code session, dispatch one background sub-agent per
 
 ```text
 Agent(
-  description: "Implement DOJ-3234",
+  description: "Implement APP-1234",
   subagent_type: "general-purpose",
   model: "opus",
   isolation: "worktree",     // auto-creates a fresh worktree for this agent
@@ -175,7 +175,7 @@ If any check fails, STOP and resolve before proceeding.
   2. Check issue title prefix: "Fix ..." → `fix/`, "Add ..." → `feat/`, etc.
   3. Default: `feat/` if no clear signal
 
-**Branch naming**: `{type}/{issue-id}-{short-description}` (e.g., `feat/DOJ-2909-course-content-serializer`)
+**Branch naming**: `{type}/{issue-id}-{short-description}` (e.g., `feat/APP-1234-course-content-serializer`)
 
 ## Execution Protocol — Per Issue
 

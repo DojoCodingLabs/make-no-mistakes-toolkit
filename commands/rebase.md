@@ -14,9 +14,9 @@ This command is **idempotent** — safe to run multiple times. Each execution co
 ## How to use
 
 ```bash
-claude /rebase dojo-os                    # Sync with dojocoding repo (default)
-claude /rebase backend-agent              # Sync with backend-agent repo
-claude /rebase dojo-agent-openclaw-plugin  # Sync with OpenClaw plugin repo
+claude /rebase myapp-mobile              # Sync with mobile repo (default)
+claude /rebase myapp-backend             # Sync with backend repo
+claude /rebase myapp-agent-plugin        # Sync with agent plugin repo
 ```
 
 The `$ARGUMENTS` variable contains the repo name (under DojoCodingLabs org).

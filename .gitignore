@@ -7,3 +7,7 @@ dist/
 
 # Per-project config (not committed — each dev sets their own)
 slack-config.json
+
+# Local-only design history and IP-leak guard inputs.
+# Each contributor / fork keeps their own copy here. See README.md.
+.private/
