@@ -181,6 +181,36 @@ If any check fails, STOP and resolve before proceeding.
 
 For EACH issue in the sequence, follow this exact workflow. No shortcuts. No exceptions.
 
+### Phase 0: OpenSpec Context (MANDATORY when configured)
+
+Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPath`:
+
+1. **Resolve the configured changes directory** and check for an existing OpenSpec change that references this issue. The grep MUST use the configured path — projects may set `openspec.changesPath` to anything (e.g., `specs/changes/`) and a hardcoded `openspec/changes/` would silently miss every existing spec there:
+   ```bash
+   CHANGES_PATH=$(jq -r '.openspec.changesPath' linear-setup.json)
+   grep -r "{issue-id}" "$CHANGES_PATH"/*/proposal.md 2>/dev/null
+   ```
+   In all references below, `<changes>` denotes that resolved `$CHANGES_PATH` value, NOT the literal string `openspec/changes/`.
+
+2. **If found**: Read ALL three artifacts as primary implementation context:
+   - `<changes>/{change-slug}/proposal.md` — intent, domain, scope
+   - `<changes>/{change-slug}/design.md` — architectural decisions, rejected alternatives, pre-launch checklist
+   - `<changes>/{change-slug}/tasks.md` — atomic task list with file paths and commit messages
+
+   These three files are the CONTRACT. The Linear issue is the WHAT; OpenSpec is the HOW. Do not deviate from the spec without going back to it first.
+
+3. **If MISSING and the issue is non-trivial** (touches >2 files OR involves architectural decisions OR has reviewer-flagged risk): STOP and prepare the OpenSpec change BEFORE proceeding.
+   - Use `/superpowers:brainstorming` if the design needs more thinking
+   - Use `/make-no-mistakes:premortem` if the change is load-bearing in production
+   - **Draft the three artifacts** in `<changes>/{change-slug}/`: proposal.md (intent + scope + out-of-scope), design.md (decisions + rationale), tasks.md (atomic checklist with commit messages). Leave them uncommitted on disk — the implementation branch does not exist yet.
+   - **Defer the commit to Phase 1 step 4a** (below). Phase 1 creates the branch and worktree; the OpenSpec files are then committed as the very first commit on that branch.
+
+4. **If MISSING but the issue is trivial** (typo fix, dependency bump, single-line change): proceed to Phase 1 without OpenSpec. Add a one-line note to the PR description explaining why OpenSpec was skipped.
+
+5. **If `openspec.changesPath` is not configured** in `linear-setup.json`: skip this phase entirely. The project hasn't adopted OpenSpec yet.
+
+**Why mandatory**: per the adoption decision (Slack 2026-03-30, channel C0AE5MKAX7B), OpenSpec is the durable persistence of design decisions. A skill that makes it optional re-introduces the failure mode it was adopted to prevent — implementations diverging from intent because nobody wrote the intent down.
+
 ### Phase 1: Setup
 
 1. **Claim the issue in Linear:**
@@ -209,15 +239,19 @@ For EACH issue in the sequence, follow this exact workflow. No shortcuts. No exc
    - Create sub-issues in Linear for each PR if decomposing.
    - Comment the decomposition plan on the parent issue.
 
+4a. **Commit the OpenSpec change as the first commit** (only if Phase 0 step 3 drafted artifacts because none existed):
+   - Move/copy the `<changes>/{change-slug}/` directory drafted in Phase 0 into the worktree if it isn't already there.
+   - Commit it before any implementation work:
+     ```bash
+     git add "{changes-path}/{change-slug}/"
+     git commit -m "docs(openspec): {change-slug}"
+     ```
+   - The `docs(openspec)` commit MUST be commit #1 on the branch — reviewers and future agents read the spec before the diff.
+   - If Phase 0 found an existing change (step 2), skip this — the spec is already on `{baseBranch}`.
+
 ### Phase 2: Implement
 
-4. **Implement in the worktree.** Follow all project conventions from CLAUDE.md.
-
-4b. **Check for OpenSpec context:**
-    - If `linear-setup.json` has `openspec.changesPath`, check if an OpenSpec change exists that references this issue
-    - Look in `openspec/changes/*/proposal.md` for the issue ID
-    - If found, read ALL artifacts (proposal.md, design.md, tasks.md) as implementation context
-    - This provides richer context than the Linear issue description alone
+4. **Implement in the worktree.** Follow all project conventions from CLAUDE.md. If Phase 0 produced an OpenSpec change, treat its `tasks.md` as the authoritative checklist — work through it in order and do not improvise file paths or commit messages outside the spec.
 
 5. **If multiple approaches exist:**
    - Dispatch one sub-agent per approach via Mode A (each gets its own worktree automatically)
