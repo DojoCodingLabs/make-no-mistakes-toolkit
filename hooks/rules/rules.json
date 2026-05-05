@@ -352,7 +352,7 @@
       },
       {
         "field": "file_path",
-        "not_pattern": "\\.(env\\.example|test|spec)\\.|README|\\.md$|fixtures/|mocks?/"
+        "not_pattern": "\\.env\\.example|\\.(test|spec)\\.|README|\\.md$|fixtures/|mocks?/"
       }
     ],
     "action": "block",

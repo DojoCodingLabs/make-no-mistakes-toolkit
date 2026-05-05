@@ -1,7 +1,7 @@
 {
   "name": "make-no-mistakes",
-  "version": "1.4.1",
-  "description": "The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, manage sessions, and stash secrets via OS-native prompts. One plugin to make no mistakes.",
+  "version": "1.5.0",
+  "description": "The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, manage sessions, stash secrets, and enforce manifest-driven tool-call hooks. One plugin to make no mistakes.",
   "author": {
     "name": "Luis Andres Pena Castillo",
     "url": "https://github.com/lapc506"

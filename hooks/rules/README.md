@@ -1,0 +1,114 @@
+# Rules manifest — contributor guide
+
+This directory holds the **single source of truth** for every rule the
+make-no-mistakes hooks enforce.
+
+- `rules.yaml` — humans edit this. One row per rule, atomic fields.
+- `rules.json` — generated build artifact. Runtime (`hooks/lib/eval-rule.sh`)
+  reads this; never edit by hand.
+- `scripts/build-rules.mjs` — `npm run build-rules` regenerates `rules.json`
+  and validates schema. CI fails if `rules.json` is stale.
+
+## Schema
+
+Every rule is one YAML row with these fields:
+
+```yaml
+- id: <kebab-case-unique>           # required, used to cite the rule
+  description: <one-line>           # required, shown in stderr on match
+  applies_to: [Bash | Edit | Write | MultiEdit | Slack]   # required, non-empty
+  match:                            # required, non-empty array (AND-chain)
+    - field: command | file_path | content | text
+      pattern: '<ERE regex>'        # optional; if present, field MUST match
+      not_pattern: '<ERE regex>'    # optional; if present, field must NOT match
+      flags: i                      # optional; only "i" (case-insensitive) supported
+  action: block | warn              # required
+  bypass_marker: <kebab-case> | null  # optional acknowledgement token
+  memory_ref: <filename>            # optional metadata only — NOT printed at runtime
+  message: |                        # required, multi-line stderr output
+    Block / warning text shown when this rule fires.
+  tests:                            # required, non-empty array
+    - name: <kebab-case>
+      input:
+        tool_input:
+          command: '...'           # OR file_path / content / text
+      expected_exit: 0 | 2          # 0 = allow / warn; 2 = block
+      expected_stderr_contains: '<substring>'  # optional
+```
+
+### Match semantics
+
+Conditions in `match` form an **AND-chain**: the rule fires only when ALL
+conditions hold. Within a single condition:
+
+- `pattern` and `not_pattern` operate on the same field.
+- If both are present, `pattern` must match AND `not_pattern` must NOT match.
+- If only `not_pattern` is present, the condition is "this field must NOT
+  match this pattern" (no positive requirement).
+
+To express OR across conditions, write multiple rules with the same effect
+(e.g., one rule per `applies_to` tool). To express OR within a single
+condition, use ERE alternation in `pattern` (e.g., `(php -r|set_config)`).
+
+### Bypass markers
+
+If `bypass_marker: foo-rule`, the rule is skipped when the literal substring
+`// hook-bypass: foo-rule` or `# hook-bypass: foo-rule` appears anywhere in
+the raw tool_input JSON. Bypasses are explicit acknowledgements — they sit
+inside the command/content itself, not as silent flags.
+
+`bypass_marker: null` (or omitted) means the rule cannot be bypassed.
+
+## Adding a rule
+
+1. Edit `rules.yaml` — append a new row following the schema.
+2. Run `npm run build-rules` to regenerate `rules.json`. Schema errors
+   surface at this step (missing fields, invalid action, etc.).
+3. Run `npm run test-hooks` to verify your `tests` array passes.
+4. Commit both `rules.yaml` AND `rules.json` (CI verifies they're in sync).
+
+## IP-leak guard (opt-in, gitignored)
+
+If the build output says `IP-leak guard active`, you have a local
+`.private/forbidden-names.txt` (one regex per line) that the build script
+checks against the serialized rules. Use this to prevent committing client
+or org names in test fixtures, references, or messages. The list lives
+gitignored so the toolkit itself never publishes the names.
+
+Example `.private/forbidden-names.txt`:
+
+```
+# One regex per line, # for comments
+mycompany
+client-acme
+client-beta
+```
+
+## Tier 2 — decomposing non-deterministic memories
+
+Many narrative-style guidelines can be converted to deterministic rules
+using these techniques:
+
+- **T1 Narrative → structural assertion.** "Slack alerts group by project →
+  milestone → assignee" becomes a rule that parses the message and asserts
+  the labels appear in that order.
+- **T2 Scope boundary → path-based block.** "Don't edit X owner's domain"
+  becomes a rule with `field: file_path` matching the owner's path glob.
+- **T3 Behavioral mandate → Stop-event reminder.** "Never ask 'should I
+  continue?'" becomes a Stop hook that scans the recent assistant message
+  for stop-asking patterns and surfaces a reminder for the next turn.
+- **T4 Preference → linter on alternative.** "Don't use 'refactor' in PR
+  titles" becomes a PreToolUse rule on the gh/Linear API that warns when
+  the title contains the discouraged word.
+- **T5 Fall-through judgment → explicit gate.** "Don't mark complementary
+  issues as blocking" becomes a PreToolUse rule on save_issue that, when
+  `blockedBy` is set, requires a `blocking_reason:` key in the description.
+- **T6 Context-sensitive → structural proxy.** "Filter PostHog from alerts"
+  becomes a PostToolUse rule that detects alert-shaped messages (3+ issue
+  refs in same body) and warns when posthog/dashboard/instrumentation
+  keywords appear.
+- **T7 Multi-part → AND-chain of detectors.** Combine path + content +
+  exception detectors in `match` to express compound rules.
+
+Use these patterns when proposing new rules — most "soft" guidelines can be
+converted to deterministic checks with a structural proxy.

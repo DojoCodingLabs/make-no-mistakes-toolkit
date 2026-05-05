@@ -268,7 +268,7 @@
       pattern: '(password|secret|api_key|apikey|token|access_key|private_key)["\'']?[[:space:]]*[:=][[:space:]]*["\'']?[A-Za-z0-9_!@#$%^&*+/=-]{12,}'
       flags: i
     - field: file_path
-      not_pattern: '\.(env\.example|test|spec)\.|README|\.md$|fixtures/|mocks?/'
+      not_pattern: '\.env\.example|\.(test|spec)\.|README|\.md$|fixtures/|mocks?/'
   action: block
   bypass_marker: secret-leak
   memory_ref: feedback_never_leak_secrets.md
