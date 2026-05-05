@@ -9,5 +9,7 @@ dist/
 slack-config.json
 
 # Local-only design history and IP-leak guard inputs.
-# Each contributor / fork keeps their own copy here. See README.md.
+# Each contributor / fork keeps their own copy here. See README.md and
+# hooks/rules/README.md (the latter documents the IP-leak guard format —
+# opt-in list of client/org names that must never appear in rules.yaml).
 .private/
