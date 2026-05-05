@@ -75,6 +75,26 @@ for (const rule of rules) {
     console.error(`rule ${rule.id} missing tests (non-empty array required)`);
     process.exit(1);
   }
+  if (typeof rule.message !== 'string' || rule.message.trim().length === 0) {
+    console.error(`rule ${rule.id} missing required message (non-empty string)`);
+    process.exit(1);
+  }
+  // bypass_marker is optional, but when present must be kebab-case.
+  // Without this constraint, an author could pick a marker containing
+  // ERE-special characters (., +, (, [, etc.), which eval-rule.sh would
+  // interpolate verbatim into a grep pattern — leading to silent
+  // mismatches or grep errors that escalate to unintended blocks.
+  if (rule.bypass_marker !== undefined && rule.bypass_marker !== null) {
+    if (
+      typeof rule.bypass_marker !== 'string' ||
+      !/^[a-z0-9-]+$/.test(rule.bypass_marker)
+    ) {
+      console.error(
+        `rule ${rule.id} has invalid bypass_marker: must be kebab-case (^[a-z0-9-]+$) or null, got: ${JSON.stringify(rule.bypass_marker)}`,
+      );
+      process.exit(1);
+    }
+  }
 
   // IP-leak guard: scan the entire rule (serialized) for forbidden patterns.
   // This catches leaks in references, messages, test fixtures, anywhere.

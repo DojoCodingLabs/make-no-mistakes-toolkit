@@ -76,9 +76,13 @@
   description: Warn when gcloud command is missing --project= flag
   applies_to: [Bash]
   match:
+    # Allow zero or more global flags (--verbosity=debug, --quiet, etc.)
+    # between `gcloud` and the subcommand. Without this allowance, a
+    # command like `gcloud --verbosity=debug compute instances list`
+    # would slip past the warning even though it lacks --project=.
     - field: command
-      pattern: '^[[:space:]]*gcloud[[:space:]]+(compute|sql|run|iam|secrets|projects|storage|functions|builds|artifacts|container|auth)[[:space:]]'
-      not_pattern: '--project[= ]|gcloud[[:space:]]+(version|help|info|config)[[:space:]]'
+      pattern: '^[[:space:]]*gcloud([[:space:]]+--[a-zA-Z0-9_-]+(=[^[:space:]]+)?)*[[:space:]]+(compute|sql|run|iam|secrets|projects|storage|functions|builds|artifacts|container|auth)[[:space:]]'
+      not_pattern: '--project[= ]|gcloud([[:space:]]+--[a-zA-Z0-9_-]+(=[^[:space:]]+)?)*[[:space:]]+(version|help|info|config)[[:space:]]'
   action: warn
   bypass_marker: null
   memory_ref: feedback_gcloud_explicit_flags.md
@@ -105,6 +109,12 @@
         tool_input:
           command: 'gcloud version'
       expected_exit: 0
+    - name: warns-with-global-flags-before-subcommand
+      input:
+        tool_input:
+          command: 'gcloud --verbosity=debug compute instances list'
+      expected_exit: 0
+      expected_stderr_contains: 'gcloud-missing-project'
 
 - id: prod-ops-no-approval
   description: Block production operations without explicit user acknowledgement
@@ -337,19 +347,25 @@
       expected_exit: 0
 
 - id: slack-tables-no-codeblock
-  description: Warn on markdown tables in Slack outside code blocks
+  description: Warn when a markdown table separator row appears in Slack text
   applies_to: [Slack]
   match:
+    # Match the distinctive markdown-table separator row (|---|---|).
+    # Plain pipe-prose without a separator is too noisy; the separator
+    # almost exclusively appears inside actual tables. False-positive: a
+    # table legitimately wrapped in a fenced code block still triggers the
+    # warning, but warn-only is tolerable. Detecting "inside a code block"
+    # reliably from a single regex is not feasible in bash; line-by-line
+    # parsing would be needed to do it perfectly.
     - field: text
-      pattern: '\|[^|]*\|[^|]*\|'
-      not_pattern: '```'
+      pattern: '^\|[-:|[:space:]]+\|[[:space:]]*$'
   action: warn
   bypass_marker: null
   memory_ref: feedback_slack_tables.md
-  references: []
   message: |
-    Slack style: markdown table detected outside a code block.
-    Wrap table content in ``` fences for Slack to render it correctly.
+    Slack style: markdown table syntax detected.
+    Slack mrkdwn does not render bare pipe-tables — wrap the table in
+    triple-backtick fences for it to display correctly.
   tests:
     - name: warns-on-bare-table
       input:
@@ -357,18 +373,15 @@
           text: |
             Resultados:
             | col1 | col2 | col3 |
+            | ---- | ---- | ---- |
             | a    | b    | c    |
       expected_exit: 0
       expected_stderr_contains: slack-tables-no-codeblock
-    - name: allows-table-in-codeblock
+    - name: allows-message-with-stray-pipes
       input:
         tool_input:
           text: |
-            Resultados:
-            ```
-            | col1 | col2 | col3 |
-            | a    | b    | c    |
-            ```
+            Just a paragraph with | a stray pipe | character — no table here.
       expected_exit: 0
 
 - id: slack-spanish-tildes

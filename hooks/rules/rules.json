@@ -72,8 +72,8 @@
     "match": [
       {
         "field": "command",
-        "pattern": "^[[:space:]]*gcloud[[:space:]]+(compute|sql|run|iam|secrets|projects|storage|functions|builds|artifacts|container|auth)[[:space:]]",
-        "not_pattern": "--project[= ]|gcloud[[:space:]]+(version|help|info|config)[[:space:]]"
+        "pattern": "^[[:space:]]*gcloud([[:space:]]+--[a-zA-Z0-9_-]+(=[^[:space:]]+)?)*[[:space:]]+(compute|sql|run|iam|secrets|projects|storage|functions|builds|artifacts|container|auth)[[:space:]]",
+        "not_pattern": "--project[= ]|gcloud([[:space:]]+--[a-zA-Z0-9_-]+(=[^[:space:]]+)?)*[[:space:]]+(version|help|info|config)[[:space:]]"
       }
     ],
     "action": "warn",
@@ -109,6 +109,16 @@
           }
         },
         "expected_exit": 0
+      },
+      {
+        "name": "warns-with-global-flags-before-subcommand",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --verbosity=debug compute instances list"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "gcloud-missing-project"
       }
     ]
   },
@@ -454,38 +464,36 @@
   },
   {
     "id": "slack-tables-no-codeblock",
-    "description": "Warn on markdown tables in Slack outside code blocks",
+    "description": "Warn when a markdown table separator row appears in Slack text",
     "applies_to": [
       "Slack"
     ],
     "match": [
       {
         "field": "text",
-        "pattern": "\\|[^|]*\\|[^|]*\\|",
-        "not_pattern": "```"
+        "pattern": "^\\|[-:|[:space:]]+\\|[[:space:]]*$"
       }
     ],
     "action": "warn",
     "bypass_marker": null,
     "memory_ref": "feedback_slack_tables.md",
-    "references": [],
-    "message": "Slack style: markdown table detected outside a code block.\nWrap table content in ``` fences for Slack to render it correctly.\n",
+    "message": "Slack style: markdown table syntax detected.\nSlack mrkdwn does not render bare pipe-tables — wrap the table in\ntriple-backtick fences for it to display correctly.\n",
     "tests": [
       {
         "name": "warns-on-bare-table",
         "input": {
           "tool_input": {
-            "text": "Resultados:\n| col1 | col2 | col3 |\n| a    | b    | c    |\n"
+            "text": "Resultados:\n| col1 | col2 | col3 |\n| ---- | ---- | ---- |\n| a    | b    | c    |\n"
           }
         },
         "expected_exit": 0,
         "expected_stderr_contains": "slack-tables-no-codeblock"
       },
       {
-        "name": "allows-table-in-codeblock",
+        "name": "allows-message-with-stray-pipes",
         "input": {
           "tool_input": {
-            "text": "Resultados:\n```\n| col1 | col2 | col3 |\n| a    | b    | c    |\n```\n"
+            "text": "Just a paragraph with | a stray pipe | character — no table here.\n"
           }
         },
         "expected_exit": 0

@@ -56,11 +56,24 @@ fi
 # Bypass check first — a single explicit acknowledgement short-circuits all
 # pattern matching. We accept both "//" and "#" comment styles since rules
 # apply to commands (shell, #) and code/content (slash-slash).
+#
+# `build-rules.mjs` enforces bypass_marker matches ^[a-z0-9-]+$, so the
+# value is safe to interpolate directly into an ERE. We re-validate here as
+# defense in depth — if the schema gate ever loosens, an attacker rule
+# author could otherwise inject ERE special chars (., +, [, etc.) and
+# either silently mismatch real bypass comments or trigger a grep error.
 BYPASS_MARKER="$(printf '%s' "$RULE_JSON" | jq -r '.bypass_marker // empty')"
 if [ -n "$BYPASS_MARKER" ]; then
-  if printf '%s' "$INPUT_RAW" | grep -qE "(//|#)[[:space:]]*hook-bypass:[[:space:]]*${BYPASS_MARKER}\b"; then
-    exit 0
-  fi
+  case "$BYPASS_MARKER" in
+    *[!a-z0-9-]*)
+      echo "make-no-mistakes: rule ${RULE_ID} has invalid bypass_marker (must be kebab-case); ignoring bypass." >&2
+      ;;
+    *)
+      if printf '%s' "$INPUT_RAW" | grep -qE "(//|#)[[:space:]]*hook-bypass:[[:space:]]*${BYPASS_MARKER}\b"; then
+        exit 0
+      fi
+      ;;
+  esac
 fi
 
 # Iterate match conditions. ALL must hold for the rule to fire.

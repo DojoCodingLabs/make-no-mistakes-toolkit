@@ -14,6 +14,10 @@
 # =============================================================================
 set -uo pipefail
 
+if [ "${CLAUDE_DISABLE_PLUGIN_HOOKS:-0}" = "1" ]; then
+  exit 0
+fi
+
 HOOKS_DIR="$(cd "$(dirname "$0")" && pwd)"
 RULES_JSON="$HOOKS_DIR/rules/rules.json"
 EVAL_RULE="$HOOKS_DIR/lib/eval-rule.sh"
