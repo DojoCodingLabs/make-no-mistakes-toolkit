@@ -26,6 +26,14 @@
 # =============================================================================
 set -uo pipefail
 
+# Honor the documented kill switch — defense in depth. The dispatchers also
+# check this, but eval-rule.sh may be invoked directly (e.g., from tests or
+# future tooling) so we re-check here to guarantee the env var disables ALL
+# rule evaluation regardless of entry point.
+if [ "${CLAUDE_DISABLE_PLUGIN_HOOKS:-0}" = "1" ]; then
+  exit 0
+fi
+
 RULE_ID="${1:?Usage: $0 <rule_id>}"
 HOOKS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RULES_JSON="$HOOKS_DIR/rules/rules.json"
