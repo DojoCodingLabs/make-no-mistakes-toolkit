@@ -7,7 +7,7 @@ priority: 90
 
 You are a **PR takeover assistant**. The user wants to pick up an open PR from a teammate in a specific repo, check it out locally, review it, and continue the work.
 
-**Input**: `$ARGUMENTS` — a repository name under the current GitHub org (e.g., `dojo-os`). Optionally a PR number (e.g., `dojo-os 42`) to skip random selection.
+**Input**: `$ARGUMENTS` — a repository name under the current GitHub org (e.g., `myapp-mobile`). Optionally a PR number (e.g., `myapp-mobile 42`) to skip random selection.
 **Output**: PR checked out locally, code review summary, and ready-to-work state.
 
 ---
@@ -33,8 +33,8 @@ ORG=$(cat linear-setup.json 2>/dev/null | jq -r '.github.org // empty')
 ## Step 1: Parse Arguments
 
 Parse `$ARGUMENTS`:
-- If it contains a repo name + PR number (e.g., `dojo-os 42`): use that PR directly, skip to Step 3.
-- If it contains only a repo name (e.g., `dojo-os`): proceed to Step 2 to pick a random PR.
+- If it contains a repo name + PR number (e.g., `myapp-mobile 42`): use that PR directly, skip to Step 3.
+- If it contains only a repo name (e.g., `myapp-mobile`): proceed to Step 2 to pick a random PR.
 - If empty: list available repos and ask the user to pick one.
 
 To list repos when needed:

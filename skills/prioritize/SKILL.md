@@ -18,7 +18,7 @@ El output es:
 
 1. Un report markdown en `<codebase>/audits/<pillar>/priority-<YYYY-MM-DD>.md`.
 2. Descripcion de cada issue en Linear con un footer autogenerado (delimiter HTML, idempotente).
-3. Un comment snapshot en el sub-spike del pillar (DOJ-3222 para Pathways, etc.).
+3. Un comment snapshot en el sub-spike del pillar (APP-101 para mobile, BACK-101 para backend, etc.).
 
 ## Anti-trigger
 
@@ -34,7 +34,7 @@ Lee `linear-setup.json` en la raiz del cwd. Schema esperado:
 
 ```json
 {
-  "team": { "key": "DOJ" },
+  "team": { "key": "APP" },
   "projects": { ... legacy mapping ... },
   "pillars": {
     "<slug>": {
@@ -148,7 +148,7 @@ Generar 3 artifacts en paralelo (via Agent tool subagents para I/O pesado) o sec
 
 **Artifact 3 -- Snapshot comment en sub-spike**:
 - Solo si `--dry-run=false`.
-- Target: `pillars.<slug>.spike` (ej: DOJ-3222 para pathways).
+- Target: `pillars.<slug>.spike` (ej: APP-101 para mobile).
 - NO editar comment anterior. Siempre agregar uno nuevo con fecha.
 - Si existe comment previo con patron matching, agregar link al bottom del nuevo comment.
 - Usar `mcp__linear-server__save_comment` con el body del template (ver `references/linear-mutations.md` seccion "Sub-spike comment template").

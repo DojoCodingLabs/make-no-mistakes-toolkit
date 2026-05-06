@@ -20,8 +20,8 @@ Read `slack-config.json` from the project root. If it does not exist, use defaul
 {
   "standupChannel": { "id": "", "name": "#daily-status-updates" },
   "repos": {},
-  "linearPrefixes": ["DOJ"],
-  "linearOrgSlug": "dojo-coding",
+  "linearPrefixes": ["APP"],
+  "linearOrgSlug": "yourorg",
   "greeting": { "options": ["GM! :wave:"] },
   "emojis": {
     "prOpen": ":github-pr:", "prMerged": ":github-merged:",
@@ -97,8 +97,8 @@ For each of the 3 sections:
 
 ### Section A: `:white_check_mark: Ayer completé:`
 
-**Generate a one-sentence pitch** from the `completado` items. Example:
-> "Estuve enfocado en security hardening de Dojo OS (4 PRs), dashboard architecture para Freedom Academy (ADR + 3 PRs), y el brainstorming completo del AI Setter Agent para OpenClaw."
+**Generate a one-sentence pitch** from the `completado` items. Example (substitute the project / repo names from your `slack-config.json`):
+> "Estuve enfocado en security hardening del mobile (4 PRs), dashboard architecture en el backend (ADR + 3 PRs), y el brainstorming completo del AI Setter Agent para el agent plugin."
 
 **Ask via AskUserQuestion:**
 - Option 1: "Usar este resumen" (recommended) — use the generated pitch as-is
@@ -138,10 +138,10 @@ For each of the 3 sections:
 ```
 :white_check_mark: _Ayer completé:_
 <one-sentence narrative pitch — the human voice>
-- :github: *Dojo OS*
+- :github: *<repo displayName from slack-config.json>*
     - :github-merged: PR #952 — restore rate limiter
     - :github-pr: PRs #970, #975, #976 — ...
-- :github: *Freedom Academy*
+- :github: *<another repo displayName>*
     - ...
 ```
 
@@ -155,7 +155,7 @@ Combine all 3 sections into the team's natural language format. The message MUST
 
 ### Format rules:
 
-1. **Greeting**: Choose one at random: `Gm Gm! :sunny::shinto_shrine:` / `Buenas Dojo! :shinto_shrine:` / `GM! :shinto_shrine:` / `Gm! :shinto_shrine:`
+1. **Greeting**: Choose one at random from the `greeting.options` list in `slack-config.json`. Fallback if missing: `GM!` / `Good morning team!` / `Gm Gm! :sunny:`
 2. **Sections are ALWAYS present** — even if empty (use "Nada pendiente" / "Ninguno" as needed)
 3. **Section headers** use standard Slack emojis (matching team convention):
    - `:white_check_mark:` _Ayer completé:_
@@ -163,20 +163,18 @@ Combine all 3 sections into the team's natural language format. The message MUST
    - `:construction:` _Blockers:_
 4. **Items** use `-` for bullet points (NEVER use `•` or other Unicode bullets — they break Slack formatting)
 5. **PR references MUST be hyperlinked**: `<https://github.com/ORG/REPO/pull/NNN|PR #NNN>` — NEVER bare `PR #NNN` without a link. Determine the org + repo from the `repos` config and the file's `### Repo (slug)` headers.
-6. **Linear issue references MUST be hyperlinked**: `<https://linear.app/dojo-coding/issue/DOJ-XXXX|DOJ-XXXX>` — NEVER bare `DOJ-XXXX` without a link. For CIV issues: `<https://linear.app/dojo-coding/issue/CIV-XXXX|CIV-XXXX>`. For SEC issues: `<https://linear.app/dojo-coding/issue/SEC-XXXX|SEC-XXXX>`.
+6. **Linear issue references MUST be hyperlinked**. Build the URL dynamically as `https://linear.app/{linearOrgSlug}/issue/{PREFIX}-{NUMBER}` where `linearOrgSlug` is read from `slack-config.json` and `PREFIX` is one of the entries in `linearPrefixes`. Example with `linearOrgSlug=yourorg` and `linearPrefixes=["APP","BACK","SEC"]`: `<https://linear.app/yourorg/issue/APP-1234|APP-1234>`. NEVER emit a bare issue ID without a link.
 7. **Mentions** of team members use Slack user IDs when known
-7. **Tone**: Natural, conversational Spanish — like the team writes, not robotic
+8. **Tone**: Natural, conversational Spanish — like the team writes, not robotic
 
-### Emoji mapping (custom Dojo workspace emojis)
+### Emoji mapping
 
-Use these custom emojis — NOT generic Unicode or default Slack emojis:
+Use the custom emoji slugs configured under `emojis` in `slack-config.json`. The default mapping below covers the typical case; override per-workspace if your Slack has different custom emoji names.
 
-**Repo group headers** (use when the standup spans multiple repos):
-- `### Dojo OS` → `:github: *Dojo OS*`
-- `### Freedom Academy` → `:github: *Freedom Academy*`
-- `### OpenClaw` → `:github: *OpenClaw*`
-- `### Dojo Marketplace MCP` → `:github: *Dojo Marketplace MCP*`
-- Other → `:github: *<Name>*`
+**Repo group headers** (use when the standup spans multiple repos): for each repo entry under `repos.<slug>` in `slack-config.json`, build a header like `:github: *<displayName>*`. Example with the default `myapp-mobile` / `myapp-backend` config:
+- `### MyApp Mobile` → `:github: *MyApp Mobile*`
+- `### MyApp Backend` → `:github: *MyApp Backend*`
+- Other → `:github: *<displayName>*`
 
 **Item-level emojis (use inline where relevant):**
 - PRs: `:github-pr:` for open, `:github-merged:` for merged, `:github-closed:` for closed
@@ -196,7 +194,7 @@ When incorporating content from the file or user input, apply these conversions:
 5. **Italic** (`_text_` or `*text*`) → Slack italic: `_text_`
 6. **Checkboxes** (`- [ ] text`) → Keep as-is
 7. **PR item headers** (`#### PR #NNN — ...`) → `:github-pr: *PR #NNN — ...*` (or `:github-merged:` for merged PRs)
-8. **Repo group headers** (`### Dojo OS`) → `:github: *Dojo OS*` (include when standup spans multiple repos)
+8. **Repo group headers** (`### <displayName>`) → `:github: *<displayName>*` (include when standup spans multiple repos). Map each `### <header>` in the standup file to the matching `repos.<slug>.displayName` entry from `slack-config.json`.
 
 ### Condensing rules:
 
@@ -221,39 +219,39 @@ Gm Gm! :sunny::shinto_shrine:
 :construction: Blockers: Ninguno
 ```
 
-**Narrative pitch + sub-leveled bullets** (Andrés style — the DEFAULT for this command):
+**Narrative pitch + sub-leveled bullets** (the DEFAULT for this command — the pitch line below each section header is plain text, then bullets per repo with sub-leveled item links):
 ```
-Buenas Dojo! :shinto_shrine:
+Good morning team!
 
 :white_check_mark: _Ayer completé:_
-Estuve enfocado en security hardening de Dojo OS, dashboard architecture para Freedom Academy, y el brainstorming completo del AI Setter Agent para OpenClaw.
-- :github: *Dojo OS*
-    - :github-merged: <https://github.com/DojoCodingLabs/dojo-os/pull/952|PR #952> — restore rate limiter on delete-account
-    - :github-pr: <https://github.com/DojoCodingLabs/dojo-os/pull/970|PR #970>, <https://github.com/DojoCodingLabs/dojo-os/pull/975|#975>, <https://github.com/DojoCodingLabs/dojo-os/pull/976|#976> — webhook fixes, SQL linter, field allowlists (<https://linear.app/dojo-coding/issue/SEC-37|SEC-37>/<https://linear.app/dojo-coding/issue/SEC-43|SEC-43>) — todos CI green + :greptile: pass
-    - :github-merged: <https://github.com/DojoCodingLabs/dojo-os/pull/971|PR #971> (<https://linear.app/dojo-coding/issue/DOJ-2682|DOJ-2682>) — course context threading para Dojo Agent
-    - :linear: Creados <https://linear.app/dojo-coding/issue/DOJ-2683|DOJ-2683> (tool visibility fix) + <https://linear.app/dojo-coding/issue/DOJ-2684|DOJ-2684> (test flaky)
-- :github: *Freedom Academy*
-    - :github-pr: <https://github.com/DojoCodingLabs/freedom-academy-moodle-plugins/pull/5|PR #5> — ADR-001: Dashboard architecture hybrid A+B (<https://linear.app/dojo-coding/issue/CIV-377|CIV-377>)
-    - :github-pr: <https://github.com/DojoCodingLabs/freedom-academy-moodle-plugins/pull/6|PR #6>–<https://github.com/DojoCodingLabs/freedom-academy-moodle-plugins/pull/8|#8> — Partner stats, journey dashboard, GA4/Meta CAPI tests
+Trabajo enfocado en security hardening del mobile, dashboard architecture en el backend, y brainstorming completo de un nuevo agent feature.
+- :github: *MyApp Mobile*
+    - :github-merged: <https://github.com/yourorg/myapp-mobile/pull/123|PR #123> — restore rate limiter on delete-account
+    - :github-pr: <https://github.com/yourorg/myapp-mobile/pull/130|PR #130>, <https://github.com/yourorg/myapp-mobile/pull/131|#131>, <https://github.com/yourorg/myapp-mobile/pull/132|#132> — webhook fixes, SQL linter, field allowlists (<https://linear.app/yourorg/issue/SEC-12|SEC-12>/<https://linear.app/yourorg/issue/SEC-13|SEC-13>) — todos CI green + :greptile: pass
+    - :github-merged: <https://github.com/yourorg/myapp-mobile/pull/133|PR #133> (<https://linear.app/yourorg/issue/APP-456|APP-456>) — course context threading para Agent
+    - :linear: Creados <https://linear.app/yourorg/issue/APP-457|APP-457> (tool visibility fix) + <https://linear.app/yourorg/issue/APP-458|APP-458> (test flaky)
+- :github: *MyApp Backend*
+    - :github-pr: <https://github.com/yourorg/myapp-backend/pull/5|PR #5> — ADR-001: Dashboard architecture hybrid A+B (<https://linear.app/yourorg/issue/BACK-377|BACK-377>)
+    - :github-pr: <https://github.com/yourorg/myapp-backend/pull/6|PR #6>–<https://github.com/yourorg/myapp-backend/pull/8|#8> — Partner stats, dashboard, analytics tests
     - :linear-in-review: 6 issues movidos a In Review
-- :github: *OpenClaw*
-    - :linear: Spike <https://linear.app/dojo-coding/issue/DOJ-2701|DOJ-2701> — AI Setter Agent brainstorming completo, 7 issues creados
-    - :linear-in-progress: <https://linear.app/dojo-coding/issue/DOJ-2702|DOJ-2702> — Setter persona + state machine (iniciado)
+- :github: *MyApp Agent*
+    - :linear: Spike <https://linear.app/yourorg/issue/APP-501|APP-501> — AI Setter Agent brainstorming completo, 7 issues creados
+    - :linear-in-progress: <https://linear.app/yourorg/issue/APP-502|APP-502> — Setter persona + state machine (iniciado)
 
 :dart: _Hoy trabajaré:_
 Voy a mergear los 3 PRs de security que están listos, continuar con el Setter Agent, y empezar RLS integration tests.
-- :github: *Dojo OS*
-    - Mergear <https://github.com/DojoCodingLabs/dojo-os/pull/970|PR #970>, <https://github.com/DojoCodingLabs/dojo-os/pull/975|#975>, <https://github.com/DojoCodingLabs/dojo-os/pull/976|#976> (todos listos, esperando review)
-    - <https://linear.app/dojo-coding/issue/SEC-44|SEC-44> (<https://linear.app/dojo-coding/issue/DOJ-2654|DOJ-2654>): RLS integration tests si queda tiempo
-- :github: *OpenClaw*
-    - Continuar con <https://linear.app/dojo-coding/issue/DOJ-2702|DOJ-2702> — Setter persona + state machine
+- :github: *MyApp Mobile*
+    - Mergear <https://github.com/yourorg/myapp-mobile/pull/130|PR #130>, <https://github.com/yourorg/myapp-mobile/pull/131|#131>, <https://github.com/yourorg/myapp-mobile/pull/132|#132> (todos listos, esperando review)
+    - <https://linear.app/yourorg/issue/SEC-14|SEC-14> (<https://linear.app/yourorg/issue/APP-654|APP-654>): RLS integration tests si queda tiempo
+- :github: *MyApp Agent*
+    - Continuar con <https://linear.app/yourorg/issue/APP-502|APP-502> — Setter persona + state machine
 
 :construction: _Blockers:_
 Tengo PRs esperando review y dependencias secuenciales en el Setter Agent.
-- :github: *Dojo OS*
-    - <https://github.com/DojoCodingLabs/dojo-os/pull/970|PR #970>, <https://github.com/DojoCodingLabs/dojo-os/pull/975|#975>, <https://github.com/DojoCodingLabs/dojo-os/pull/976|#976> listos para merge pero esperando review/aprobación
-- :github: *OpenClaw*
-    - <https://linear.app/dojo-coding/issue/DOJ-2704|DOJ-2704>–<https://linear.app/dojo-coding/issue/DOJ-2707|DOJ-2707> bloqueados hasta que <https://linear.app/dojo-coding/issue/DOJ-2702|DOJ-2702> esté completo
+- :github: *MyApp Mobile*
+    - <https://github.com/yourorg/myapp-mobile/pull/130|PR #130>, <https://github.com/yourorg/myapp-mobile/pull/131|#131>, <https://github.com/yourorg/myapp-mobile/pull/132|#132> listos para merge pero esperando review/aprobación
+- :github: *MyApp Agent*
+    - <https://linear.app/yourorg/issue/APP-504|APP-504>–<https://linear.app/yourorg/issue/APP-507|APP-507> bloqueados hasta que <https://linear.app/yourorg/issue/APP-502|APP-502> esté completo
 ```
 
 **Sub-leveling rules:**

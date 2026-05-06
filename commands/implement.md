@@ -19,7 +19,7 @@ From within a running Claude Code session, dispatch one background sub-agent per
 
 ```text
 Agent(
-  description: "Implement DOJ-3234",
+  description: "Implement APP-1234",
   subagent_type: "general-purpose",
   model: "opus",
   isolation: "worktree",     // auto-creates a fresh worktree for this agent
@@ -119,7 +119,7 @@ The `$ARGUMENTS` variable contains one or more Linear issue identifiers or URLs.
 ## Configuration
 
 This command reads project-specific settings from `linear-setup.json` at the repo root. If the file exists, it overrides defaults for:
-- `team.key` — Issue prefix (e.g., `ALT` instead of `DOJ`)
+- `team.key` — Issue prefix (e.g., `APP`, `BACK`, `MYTEAM` — anything matching your Linear team)
 - `git.baseBranch` — Base branch for PRs and rebasing (e.g., `main` instead of `develop`)
 - `git.branchPattern` — Branch naming pattern
 - `defaults.greptileReview` — Whether to tag Greptile
@@ -175,7 +175,7 @@ If any check fails, STOP and resolve before proceeding.
   2. Check issue title prefix: "Fix ..." → `fix/`, "Add ..." → `feat/`, etc.
   3. Default: `feat/` if no clear signal
 
-**Branch naming**: `{type}/{issue-id}-{short-description}` (e.g., `feat/DOJ-2909-course-content-serializer`)
+**Branch naming**: `{type}/{issue-id}-{short-description}` (e.g., `feat/APP-1234-course-content-serializer`)
 
 ## Execution Protocol — Per Issue
 

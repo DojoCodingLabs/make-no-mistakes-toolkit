@@ -59,7 +59,7 @@ Present the summary in this format:
 - **<topic>**: <what was decided and why>
 
 ### Linear Issues / GitHub PRs
-- <DOJ-XXXX>: <what was done on this issue>
+- <APP-XXXX>: <what was done on this issue>
 - <PR #XXX>: <status>
 
 ### Blockers & Resolutions

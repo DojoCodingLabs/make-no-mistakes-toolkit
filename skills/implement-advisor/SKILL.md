@@ -4,10 +4,12 @@ description: >
   Detects when the user wants to work on a Linear issue, implement a feature,
   fix a bug, or start development work. Suggests the /make-no-mistakes:implement command.
   Triggers on: "implement", "work on issue", "start on", "pick up issue",
-  "Linear issue", "build feature", "fix bug", "start coding", "work on ALT-",
-  "work on DOJ-", "implement this", "let's build", "start implementing",
+  "Linear issue", "build feature", "fix bug", "start coding",
+  "work on <PREFIX>-NNN" or "implement <PREFIX>-NNN" for any Linear issue
+  prefix (APP, BACK, SEC, MYTEAM, etc. — based on your workspace),
+  "implement this", "let's build", "start implementing",
   "pick up this ticket", "work on this task", "execute this issue",
-  "develop this feature", "ship this", "implement ALT-", "implement DOJ-",
+  "develop this feature", "ship this",
   pastes a Linear issue URL, or provides an issue ID.
   Does NOT trigger on: rebase, sync branches, standup, test execution,
   code review, general coding questions, or session management tasks.

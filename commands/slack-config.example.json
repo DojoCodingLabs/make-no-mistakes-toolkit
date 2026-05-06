@@ -1,44 +1,43 @@
 {
   "standupChannel": {
-    "id": "C09BD6W95GC",
+    "id": "C0123456789",
     "name": "#daily-status-updates"
   },
   "_standupFileNote": "The standup file path is fixed at ~/Escritorio/daily-standup.md and cannot be configured. The standupFile key is deprecated and will be ignored.",
   "repos": {
-    "dojo-os": {
-      "org": "DojoCodingLabs",
-      "linearProject": "Dojo OS",
-      "displayName": "Dojo OS"
+    "myapp-mobile": {
+      "org": "yourorg",
+      "linearProject": "MyApp Mobile",
+      "displayName": "MyApp Mobile"
     },
-    "freedom-academy-moodle-plugins": {
-      "org": "DojoCodingLabs",
-      "linearProject": "Freedom Academy — Moodle Plug-ins",
-      "displayName": "Freedom Academy"
+    "myapp-backend": {
+      "org": "yourorg",
+      "linearProject": "MyApp Backend",
+      "displayName": "MyApp Backend"
     },
-    "freedom-academy-admin": {
-      "org": "DojoCodingLabs",
-      "linearProject": "Freedom Academy — Admin Panel",
-      "displayName": "Freedom Academy Admin"
+    "myapp-admin": {
+      "org": "yourorg",
+      "linearProject": "MyApp Admin",
+      "displayName": "MyApp Admin"
     },
-    "dojo-agent-openclaw-plugin": {
-      "org": "DojoCodingLabs",
-      "linearProject": "Dojo Agent",
-      "displayName": "OpenClaw"
+    "myapp-agent-plugin": {
+      "org": "yourorg",
+      "linearProject": "MyApp Agent",
+      "displayName": "MyApp Agent"
     },
-    "dojo-marketplace-mcp": {
-      "org": "DojoCodingLabs",
-      "linearProject": "Dojo OS",
-      "displayName": "Dojo Marketplace MCP"
+    "myapp-shared-mcp": {
+      "org": "yourorg",
+      "linearProject": "MyApp Shared",
+      "displayName": "MyApp Shared MCP"
     }
   },
-  "linearPrefixes": ["DOJ", "CIV", "SEC"],
-  "linearOrgSlug": "dojo-coding",
+  "linearPrefixes": ["APP", "BACK", "SEC"],
+  "linearOrgSlug": "yourorg",
   "greeting": {
     "options": [
-      "Gm Gm! :sunny::shinto_shrine:",
-      "Buenas Dojo! :shinto_shrine:",
-      "GM! :shinto_shrine:",
-      "Gm! :shinto_shrine:"
+      "Gm Gm! :sunny:",
+      "Good morning team!",
+      "GM!"
     ]
   },
   "emojis": {

@@ -49,7 +49,7 @@ Scan the project's `CLAUDE.md` for rules, conventions, and instructions relevant
 - Architecture decisions
 - Any section matching the query keywords
 
-Also check subdirectory CLAUDE.md files if the query relates to a specific repo (e.g., `dojo-os/CLAUDE.md`).
+Also check subdirectory CLAUDE.md files if the query relates to a specific repo (e.g., `myapp-mobile/CLAUDE.md`).
 
 ---
 

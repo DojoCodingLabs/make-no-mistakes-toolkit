@@ -40,7 +40,7 @@ Before starting, detect the workspace context:
 1. **GitHub org**: `gh repo view --json owner --jq .owner.login` (from current repo)
 2. **Linear team**: Query `mcp__linear-server__list_teams` to detect the user's team(s)
 3. **Project config**: Read `linear-setup.json` at repo root if it exists for:
-   - `team.key` — Issue prefix (e.g., `ALT`, `DOJ`)
+   - `team.key` — Issue prefix (e.g., `APP`, `BACK`)
    - `projects` — Map of project slugs to names/IDs
 4. **Slack channel**: If the user wants Slack reporting, ask which channel to use on first run
 

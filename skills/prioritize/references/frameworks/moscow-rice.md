@@ -171,10 +171,9 @@ Exit 1: "Codebase path '<path>' does not exist. Check linear-setup.json `pillars
 
 ## Testing
 
-v1 testeado via dogfooding contra:
-
-- `pathways` (spike DOJ-3222, audit 2026-04-17) en dojo-os.
-- `agent-doji` (spike DOJ-3229, audit 2026-04-17) en dojo-agent-openclaw-plugin.
+v1 testeado via dogfooding contra 2 pillars productivos del autor (spikes activos
++ audits del 2026-04-17). Identificadores concretos no se publican aqui — viven
+en notebook privado del autor.
 
 Expected output validated:
 - Numero de Musts coincide con el count de recommendations del audit + features P0 + killshot theses.
