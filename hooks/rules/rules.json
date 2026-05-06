@@ -1,0 +1,543 @@
+[
+  {
+    "id": "ssh-db-mutation",
+    "description": "Block gcloud compute ssh with inline DB or Moodle config commands",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "gcloud[[:space:]]+compute[[:space:]]+ssh.*--command.*(php[[:space:]]+-r|set_config|mdl_|scorm_|mysql[[:space:]]+-|mysqldump|\\$DB->)"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "ssh-db-rule",
+    "memory_ref": "feedback_scripts_not_db.md",
+    "message": "BLOCKED: gcloud compute ssh + inline DB/Moodle command detected.\n\nUse a versioned script in scripts/ instead. If none fits, write+commit\none first. Bypass: add \"// hook-bypass: ssh-db-rule\" to the command.\n",
+    "tests": [
+      {
+        "name": "blocks-ssh-php-r",
+        "input": {
+          "tool_input": {
+            "command": "gcloud compute ssh acme-vm --command=\"docker exec moodle php -r 'var_dump(1);'\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-ssh-set-config",
+        "input": {
+          "tool_input": {
+            "command": "gcloud compute ssh acme-vm --command=\"set_config('foo', 'bar', 'moodlecourse')\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-ssh-mysql-shell",
+        "input": {
+          "tool_input": {
+            "command": "gcloud compute ssh acme-vm --command=\"mysql -u root -e 'SELECT 1'\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-regular-ssh",
+        "input": {
+          "tool_input": {
+            "command": "gcloud compute ssh acme-vm --command=\"ls /var/log\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "gcloud compute ssh acme-vm --command=\"php -r 'echo 1;'\" # hook-bypass: ssh-db-rule"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "gcloud-missing-project",
+    "description": "Warn when gcloud command is missing --project= flag",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "^[[:space:]]*gcloud([[:space:]]+--[a-zA-Z0-9_-]+(=[^[:space:]]+)?)*[[:space:]]+(compute|sql|run|iam|secrets|projects|storage|functions|builds|artifacts|container|auth)[[:space:]]",
+        "not_pattern": "--project[= ]|gcloud([[:space:]]+--[a-zA-Z0-9_-]+(=[^[:space:]]+)?)*[[:space:]]+(version|help|info|config)[[:space:]]"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": null,
+    "memory_ref": "feedback_gcloud_explicit_flags.md",
+    "references": [],
+    "message": "WARNING: gcloud command without explicit --project= flag.\n\nActive config drift can cause cross-project mistakes. Pass --project=<id>\non every gcloud command (and --account= for multi-account setups).\n",
+    "tests": [
+      {
+        "name": "warns-on-compute-without-project",
+        "input": {
+          "tool_input": {
+            "command": "gcloud compute instances list"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "gcloud-missing-project"
+      },
+      {
+        "name": "allows-with-project",
+        "input": {
+          "tool_input": {
+            "command": "gcloud compute instances list --project=acme-dev"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-version-subcommand",
+        "input": {
+          "tool_input": {
+            "command": "gcloud version"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "warns-with-global-flags-before-subcommand",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --verbosity=debug compute instances list"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "gcloud-missing-project"
+      }
+    ]
+  },
+  {
+    "id": "prod-ops-no-approval",
+    "description": "Block production operations without explicit user acknowledgement",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "--project=([a-z0-9-]+-prod\\b|production\\b)|--env=prod\\b|\\bENV=prod\\b|--target=prod\\b"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "prod-ops",
+    "memory_ref": "feedback_never_touch_prod_without_approval.md",
+    "references": [],
+    "message": "BLOCKED: production operation detected.\n\nProduction changes require explicit user approval. Once confirmed, add\n\"// hook-bypass: prod-ops\" to the command to acknowledge.\n",
+    "tests": [
+      {
+        "name": "blocks-prod-project-flag",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --project=acme-prod compute instances list"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-env-prod",
+        "input": {
+          "tool_input": {
+            "command": "ENV=prod npm run deploy"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-staging",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --project=acme-dev compute instances list"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --project=acme-prod compute instances list # hook-bypass: prod-ops"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "destructive-db-ops",
+    "description": "Block destructive DB operations even with --local",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "supabase[[:space:]]+db[[:space:]]+(reset|push|repair)\\b|psql[^|]*\\b(DROP[[:space:]]+(TABLE|DATABASE|SCHEMA)|TRUNCATE|DELETE[[:space:]]+FROM)\\b"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "db-destructive",
+    "memory_ref": "feedback_db_ops_explicit_permission.md",
+    "references": [],
+    "message": "BLOCKED: destructive DB operation.\n\nEven with --local, ask explicit user permission first. Once confirmed,\nadd \"// hook-bypass: db-destructive\" to the command.\n",
+    "tests": [
+      {
+        "name": "blocks-supabase-reset",
+        "input": {
+          "tool_input": {
+            "command": "supabase db reset --local"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-psql-drop-table",
+        "input": {
+          "tool_input": {
+            "command": "psql -c \"DROP TABLE users\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-psql-truncate",
+        "input": {
+          "tool_input": {
+            "command": "psql -c \"TRUNCATE users\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-supabase-status",
+        "input": {
+          "tool_input": {
+            "command": "supabase status"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass",
+        "input": {
+          "tool_input": {
+            "command": "supabase db reset --local # hook-bypass: db-destructive"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "manual-edge-fn-deploy",
+    "description": "Block manual Edge Function deploy (CI-only)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "supabase[[:space:]]+functions[[:space:]]+deploy\\b"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "edge-fn-manual",
+    "memory_ref": "feedback_edge_functions_via_ci.md",
+    "references": [],
+    "message": "BLOCKED: manual Edge Function deploy.\n\nDeploy via CI workflow (push to develop for staging, main for prod).\nBypass: add \"// hook-bypass: edge-fn-manual\" if a hotfix justifies it.\n",
+    "tests": [
+      {
+        "name": "blocks-functions-deploy",
+        "input": {
+          "tool_input": {
+            "command": "supabase functions deploy my-function"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-functions-list",
+        "input": {
+          "tool_input": {
+            "command": "supabase functions list"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass",
+        "input": {
+          "tool_input": {
+            "command": "supabase functions deploy my-function # hook-bypass: edge-fn-manual"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "minified-build-output",
+    "description": "Block writing minified content to build/ directories",
+    "applies_to": [
+      "Edit",
+      "Write",
+      "MultiEdit"
+    ],
+    "match": [
+      {
+        "field": "file_path",
+        "pattern": "amd/build/.*\\.min\\.js$|dist/.*\\.min\\.(js|css)$"
+      },
+      {
+        "field": "content",
+        "pattern": "(var [a-z]=function|;function [a-z]\\(\\)|^[a-zA-Z0-9_$]+=function\\([a-zA-Z0-9_$,]*\\)\\{)"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "minified-build",
+    "memory_ref": "feedback_no_minified_build.md",
+    "references": [],
+    "message": "BLOCKED: minified content being written to build/.\n\nBuild artifacts must stay human-readable. Replace with a readable copy\nof src/. Bypass: \"// hook-bypass: minified-build\" inside the content.\n",
+    "tests": [
+      {
+        "name": "blocks-minified-amd-build",
+        "input": {
+          "tool_input": {
+            "file_path": "plugins/foo/amd/build/main.min.js",
+            "content": "var a=function(b){return b};var c=function(){};"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-readable-amd-build",
+        "input": {
+          "tool_input": {
+            "file_path": "plugins/foo/amd/build/main.min.js",
+            "content": "define(['jquery'], function($) {\n    'use strict';\n    return {\n        init: function() { console.log('hello'); }\n    };\n});\n"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-build-paths",
+        "input": {
+          "tool_input": {
+            "file_path": "src/utils/helper.js",
+            "content": "var a=function(b){return b};"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "secrets-hardcoded",
+    "description": "Block hardcoded credential patterns being written to source files",
+    "applies_to": [
+      "Edit",
+      "Write",
+      "MultiEdit"
+    ],
+    "match": [
+      {
+        "field": "content",
+        "pattern": "(password|secret|api_key|apikey|token|access_key|private_key)[\"\\']?[[:space:]]*[:=][[:space:]]*[\"\\']?[A-Za-z0-9_!@#$%^&*+/=-]{12,}",
+        "flags": "i"
+      },
+      {
+        "field": "file_path",
+        "not_pattern": "\\.env\\.example|\\.(test|spec)\\.|README|\\.md$|fixtures/|mocks?/"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "secret-leak",
+    "memory_ref": "feedback_never_leak_secrets.md",
+    "references": [],
+    "message": "POTENTIAL SECRET LEAK: hardcoded credential pattern detected.\n\nUse Secret Manager / .env / local memory for real values. If this is a\nplaceholder or test fixture, prefix with \"EXAMPLE_\" / \"CHANGEME_\", move\nto .env.example, or add \"// hook-bypass: secret-leak\" near the line.\n",
+    "tests": [
+      {
+        "name": "blocks-hardcoded-password-in-src",
+        "input": {
+          "tool_input": {
+            "file_path": "src/config.ts",
+            "content": "const password = \"supersecret123ABC!\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-hardcoded-api-key",
+        "input": {
+          "tool_input": {
+            "file_path": "src/lib/api.ts",
+            "content": "const api_key: \"sk_live_abc123def456ghi789\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-env-example",
+        "input": {
+          "tool_input": {
+            "file_path": ".env.example",
+            "content": "PASSWORD=changeme_supersecret_placeholder"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass",
+        "input": {
+          "tool_input": {
+            "file_path": "src/config.ts",
+            "content": "const password = \"supersecret123ABC!\" // hook-bypass: secret-leak"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-test-file",
+        "input": {
+          "tool_input": {
+            "file_path": "src/auth.test.ts",
+            "content": "const password = \"supersecret123ABC!\""
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "slack-unicode-bullets",
+    "description": "Warn on Unicode bullets in Slack messages (use - instead)",
+    "applies_to": [
+      "Slack"
+    ],
+    "match": [
+      {
+        "field": "text",
+        "pattern": "[•◦▪▫]"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": null,
+    "memory_ref": "feedback_slack_no_unicode_bullets.md",
+    "references": [],
+    "message": "Slack style: Unicode bullets (•◦▪▫) detected. Use \"-\" instead.\n",
+    "tests": [
+      {
+        "name": "warns-on-bullet",
+        "input": {
+          "tool_input": {
+            "text": "Hola • mundo"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "slack-unicode-bullets"
+      },
+      {
+        "name": "allows-dash-bullet",
+        "input": {
+          "tool_input": {
+            "text": "Hola - mundo"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "slack-tables-no-codeblock",
+    "description": "Warn when a markdown table separator row appears in Slack text",
+    "applies_to": [
+      "Slack"
+    ],
+    "match": [
+      {
+        "field": "text",
+        "pattern": "^\\|[-:|[:space:]]+\\|[[:space:]]*$"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": null,
+    "memory_ref": "feedback_slack_tables.md",
+    "message": "Slack style: markdown table syntax detected.\nSlack mrkdwn does not render bare pipe-tables — wrap the table in\ntriple-backtick fences for it to display correctly.\n",
+    "tests": [
+      {
+        "name": "warns-on-bare-table",
+        "input": {
+          "tool_input": {
+            "text": "Resultados:\n| col1 | col2 | col3 |\n| ---- | ---- | ---- |\n| a    | b    | c    |\n"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "slack-tables-no-codeblock"
+      },
+      {
+        "name": "allows-message-with-stray-pipes",
+        "input": {
+          "tool_input": {
+            "text": "Just a paragraph with | a stray pipe | character — no table here.\n"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "slack-spanish-tildes",
+    "description": "Warn when common Spanish words appear without tildes",
+    "applies_to": [
+      "Slack"
+    ],
+    "match": [
+      {
+        "field": "text",
+        "pattern": "\\b(migracion|verificacion|analisis|patron|tambien|configuracion|implementacion|version|integracion|notificacion|aplicacion|comunicacion)\\b",
+        "flags": "i"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": null,
+    "memory_ref": "feedback_spanish_accents.md",
+    "references": [],
+    "message": "Slack style: Spanish word without tilde detected. Always write with accents\n(migración, verificación, análisis, patrón, también, configuración, ...).\n",
+    "tests": [
+      {
+        "name": "warns-on-tildeless-migracion",
+        "input": {
+          "tool_input": {
+            "text": "La migracion fue exitosa"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "slack-spanish-tildes"
+      },
+      {
+        "name": "allows-with-tilde",
+        "input": {
+          "tool_input": {
+            "text": "La migración fue exitosa"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  }
+]

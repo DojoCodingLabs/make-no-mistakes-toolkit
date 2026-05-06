@@ -217,12 +217,76 @@ make-no-mistakes-toolkit/
 ├── agents/             # 2 specialized subagents
 ├── skills/             # 6 auto-activating skills
 │   └── */SKILL.md
-├── scripts/            # Shared bash utilities
+├── hooks/              # Manifest-driven PreToolUse + PostToolUse hooks (v1.5.0+)
+│   ├── hooks.json      # Claude Code wiring (thin)
+│   ├── pre-bash.sh     # Bash dispatcher
+│   ├── pre-edit.sh     # Edit/Write/MultiEdit dispatcher
+│   ├── post-slack.sh   # Slack message dispatcher (warn-only)
+│   ├── test-hooks.sh   # Parametrized test runner
+│   ├── lib/            # Generic helpers (parse-input, eval-rule)
+│   └── rules/
+│       ├── rules.yaml  # Rules SSoT — humans edit
+│       ├── rules.json  # Build artifact — runtime reads
+│       └── README.md   # Contributor guide
+├── scripts/            # Shared bash + node utilities
+│   └── build-rules.mjs # rules.yaml -> rules.json compiler
 ├── package.json
 └── README.md
 ```
 
-**Design principle:** Commands for destructive/token-intensive actions (you decide when). Skills for read-only analysis (context-aware, auto-activate). Agents for heavy orchestration (own context window).
+**Design principle:** Commands for destructive/token-intensive actions (you decide when). Skills for read-only analysis (context-aware, auto-activate). Agents for heavy orchestration (own context window). Hooks for deterministic guardrails on every tool call (no human in the loop).
+
+## Hooks (v1.5.0+)
+
+When this plugin is enabled, every tool call you make in any repo runs through
+the manifest-driven hooks in `hooks/rules/rules.yaml`. The Tier 1 ruleset
+ships 10 rules:
+
+**PreToolUse on `Bash` (block by default):**
+- `ssh-db-mutation` — blocks `gcloud compute ssh ... --command="...php -r/mysql/set_config..."` (forces use of versioned scripts)
+- `prod-ops-no-approval` — blocks `--project=*-prod` operations without explicit acknowledgement
+- `destructive-db-ops` — blocks `supabase db reset|push|repair` and inline `DROP/TRUNCATE/DELETE FROM`
+- `manual-edge-fn-deploy` — blocks `supabase functions deploy` (forces CI-only deploys)
+- `gcloud-missing-project` — warns when a `gcloud` subcommand is missing `--project=`
+
+**PreToolUse on `Edit | Write | MultiEdit` (block):**
+- `minified-build-output` — blocks writing minified content to `amd/build/*.min.js` or `dist/*.min.{js,css}`
+- `secrets-hardcoded` — blocks hardcoded `password|secret|token|api_key|...` patterns in source files (env.example/test/spec/README/fixtures/mocks paths exempted)
+
+**PostToolUse on Slack messages (warn-only):**
+- `slack-unicode-bullets` — warns when `•◦▪▫` bullets are used (use `-` instead)
+- `slack-tables-no-codeblock` — warns when markdown tables ship outside ` ``` ` fences (Slack mrkdwn doesn't render bare tables)
+- `slack-spanish-tildes` — warns on common Spanish words missing tildes (`migracion` → `migración`, etc.)
+
+### Bypassing a rule
+
+Each blocking rule has a `bypass_marker`. Add the literal string
+`// hook-bypass: <marker>` (or `# hook-bypass: <marker>`) anywhere in the
+command or content to acknowledge the rule and proceed:
+
+```bash
+# Bypass markers shipped in Tier 1:
+# // hook-bypass: ssh-db-rule
+# // hook-bypass: prod-ops
+# // hook-bypass: db-destructive
+# // hook-bypass: edge-fn-manual
+# // hook-bypass: minified-build
+# // hook-bypass: secret-leak
+```
+
+Bypasses are explicit acknowledgements — they sit inside the command/content
+itself, not as silent flags.
+
+### Adding your own rules
+
+Edit `hooks/rules/rules.yaml`, run `npm run build-rules`, run
+`npm run test-hooks` to verify, and commit. See `hooks/rules/README.md` for
+the schema and Tier 2 decomposition techniques.
+
+### Disabling all hooks
+
+Remove the plugin from `~/.claude/settings.json` `enabledPlugins`, or set
+`CLAUDE_DISABLE_PLUGIN_HOOKS=1` in your shell.
 
 ## Bilingual Format
 

@@ -1,25 +1,58 @@
 {
   "name": "@lapc506/make-no-mistakes",
-  "version": "1.4.1",
-  "description": "The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, manage sessions, and stash secrets via OS-native prompts. OpenCode + Claude Code plugin.",
+  "version": "1.5.0",
+  "description": "The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, manage sessions, stash secrets, and enforce manifest-driven tool-call hooks (no SSH+DB, no manual prod, no minified build, no secret leaks, Slack format). OpenCode + Claude Code plugin.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": { "make-no-mistakes": "dist/cli.js" },
-  "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./cli": { "import": "./dist/cli.js" }
+  "bin": {
+    "make-no-mistakes": "dist/cli.js"
   },
-  "files": ["dist/", "commands/", "agents/", "skills/", "scripts/", "slack-config.example.json", "README.md", "LICENSE"],
-  "engines": { "node": ">=20.11.0" },
-  "publishConfig": { "access": "public" },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./cli": {
+      "import": "./dist/cli.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "commands/",
+    "agents/",
+    "skills/",
+    "scripts/",
+    "hooks/",
+    "slack-config.example.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean && tsup src/cli.ts --format esm --clean false",
+    "build-rules": "node scripts/build-rules.mjs",
+    "test-hooks": "bash hooks/test-hooks.sh",
     "test": "echo 'no tests yet' && exit 0",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build && npm run build-rules"
   },
-  "keywords": ["opencode", "plugin", "claude-code", "workflow", "linear"],
-  "repository": { "type": "git", "url": "git+https://github.com/DojoCodingLabs/make-no-mistakes-toolkit.git" },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "claude-code",
+    "workflow",
+    "linear",
+    "hooks"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DojoCodingLabs/make-no-mistakes-toolkit.git"
+  },
   "author": "Luis Andres Pena Castillo",
   "license": "BSL-1.1",
   "dependencies": {
@@ -28,6 +61,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "js-yaml": "^4.1.1",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
