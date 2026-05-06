@@ -97,8 +97,8 @@ For each of the 3 sections:
 
 ### Section A: `:white_check_mark: Ayer completé:`
 
-**Generate a one-sentence pitch** from the `completado` items. Example:
-> "Estuve enfocado en security hardening de Dojo OS (4 PRs), dashboard architecture para Freedom Academy (ADR + 3 PRs), y el brainstorming completo del AI Setter Agent para OpenClaw."
+**Generate a one-sentence pitch** from the `completado` items. Example (substitute the project / repo names from your `slack-config.json`):
+> "Estuve enfocado en security hardening del mobile (4 PRs), dashboard architecture en el backend (ADR + 3 PRs), y el brainstorming completo del AI Setter Agent para el agent plugin."
 
 **Ask via AskUserQuestion:**
 - Option 1: "Usar este resumen" (recommended) — use the generated pitch as-is
@@ -138,10 +138,10 @@ For each of the 3 sections:
 ```
 :white_check_mark: _Ayer completé:_
 <one-sentence narrative pitch — the human voice>
-- :github: *Dojo OS*
+- :github: *<repo displayName from slack-config.json>*
     - :github-merged: PR #952 — restore rate limiter
     - :github-pr: PRs #970, #975, #976 — ...
-- :github: *Freedom Academy*
+- :github: *<another repo displayName>*
     - ...
 ```
 
@@ -194,7 +194,7 @@ When incorporating content from the file or user input, apply these conversions:
 5. **Italic** (`_text_` or `*text*`) → Slack italic: `_text_`
 6. **Checkboxes** (`- [ ] text`) → Keep as-is
 7. **PR item headers** (`#### PR #NNN — ...`) → `:github-pr: *PR #NNN — ...*` (or `:github-merged:` for merged PRs)
-8. **Repo group headers** (`### Dojo OS`) → `:github: *Dojo OS*` (include when standup spans multiple repos)
+8. **Repo group headers** (`### <displayName>`) → `:github: *<displayName>*` (include when standup spans multiple repos). Map each `### <header>` in the standup file to the matching `repos.<slug>.displayName` entry from `slack-config.json`.
 
 ### Condensing rules:
 
