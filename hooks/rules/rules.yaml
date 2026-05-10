@@ -1496,7 +1496,7 @@
     # every edits[].old_string so a single pattern check covers both
     # tool surfaces.
     - field: old_string
-      pattern: '(console\.log\(|console\.debug\(|console\.error\(|debug\(|logger\.(debug|info|trace)\()'
+      pattern: '(console\.log\(|console\.debug\(|console\.error\(|\bdebug\(|logger\.(debug|info|trace)\()'
       flags: i
   action: warn
   bypass_marker: console-log-deletion-verified
@@ -1543,6 +1543,35 @@
         tool_input:
           old_string: 'const x = 1'
           new_string: 'const x = 2'
+      expected_exit: 0
+    # MultiEdit shape: parse-input.sh flattens every edits[].old_string into a
+    # single newline-joined value via jq. These two tests lock in that the
+    # MultiEdit code path fires correctly, and that null old_string entries
+    # (filtered by `| strings` in the jq expression) do not blow up the rule.
+    - name: warns-on-multiedit-deleting-console-log
+      input:
+        tool_input:
+          edits:
+            - old_string: "console.log('debug:', x)"
+              new_string: ''
+      expected_exit: 0
+      expected_stderr_contains: 'warn-deletes-console-log'
+    - name: warns-on-multiedit-second-edit-deletes-logger
+      input:
+        tool_input:
+          edits:
+            - old_string: 'const x = 1'
+              new_string: 'const x = 2'
+            - old_string: 'logger.debug("trace", { id })'
+              new_string: ''
+      expected_exit: 0
+      expected_stderr_contains: 'warn-deletes-console-log'
+    - name: allows-multiedit-not-touching-logs
+      input:
+        tool_input:
+          edits:
+            - old_string: 'const x = 1'
+              new_string: 'const x = 2'
       expected_exit: 0
     - name: allows-bypass-marker
       input:
