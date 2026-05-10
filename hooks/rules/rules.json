@@ -2402,5 +2402,241 @@
         "expected_exit": 0
       }
     ]
+  },
+  {
+    "id": "warn-bash-mutation-without-leading-cd",
+    "description": "Warn when bash mutation commands (git commit/push/mv/rm/reset/merge/revert, sed -i / sed --in-place, gh pr create/merge/edit) don't start with an absolute-path `cd /<...>` (or `pushd /<...>`, `cd ~/<...>`, `cd $VAR/<...>`) — prevents commits landing on the wrong branch when working across multiple parallel worktrees",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "git[[:space:]]+(commit|push|mv|rm[[:space:]]|reset|revert|merge)|sed[[:space:]]+-i([[:space:]]|[^[:space:]-])|sed[[:space:]]+--in-place[[:space:]]|gh[[:space:]]+pr[[:space:]]+(create|merge|edit)"
+      },
+      {
+        "field": "command",
+        "not_pattern": "^[[:space:]]*(cd|pushd)[[:space:]]+(/|~|\\$)"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": "cd-worktree-rule",
+    "memory_ref": "feedback_cd_between_worktrees.md",
+    "references": [
+      "DOJ-4007 PR-2/PR-3 cross-ref fixup (2026-05-10) — bug that motivated this rule"
+    ],
+    "message": "WARN: bash mutation command (git commit/push/mv/rm/reset/merge/revert,\nsed -i, or gh pr create/merge/edit) detected without a leading\n`cd /<path>` prefix.\n\nPer feedback_cd_between_worktrees.md: when working across multiple\nparallel git worktrees in the same session, EVERY bash invocation that\ntouches a specific worktree MUST start with explicit\n`cd /full/path/to/worktree && ...`.\n\nBug pattern this prevents (real, 2026-05-10):\n- Two parallel worktrees for two PRs (PR-2 + PR-3 of same repo).\n- First worktree's sed + commit + push: correct (cwd was PR-2).\n- Second worktree's sed + commit + push: missing cd → still in PR-2 cwd\n  → commit landed on PR-2 branch instead of PR-3 branch.\n- Required revert on PR-2 + correct re-apply on PR-3. Confused commit\n  history visible to reviewers.\n\nIf the command operates on absolute paths or doesn't need cwd context,\nor you've intentionally verified cwd via `pwd` immediately before,\nadd \"# hook-bypass: cd-worktree-rule\" to acknowledge.\n",
+    "tests": [
+      {
+        "name": "warns-on-git-commit-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "git add foo.md && git commit -m \"fix\""
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-git-push-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "git push origin main"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-git-mv-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "git mv content/old content/new"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-git-rm-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "git rm path/to/file.md"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-sed-i-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "sed -i s/foo/bar/g content/file.md"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-sed-i-bak-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "sed -i.bak s/foo/bar/g content/file.md"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-sed-in-place-long-form-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "sed --in-place s/foo/bar/g content/file.md"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-git-commit-with-relative-cd",
+        "input": {
+          "tool_input": {
+            "command": "cd worktree-dir && git commit -m \"fix\""
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-git-push-with-dotdot-cd",
+        "input": {
+          "tool_input": {
+            "command": "cd ../sibling-dir && git push"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-gh-pr-create-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --base main --title foo"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-gh-pr-merge-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "gh pr merge 27 --squash --delete-branch"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-git-reset-hard-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "git reset --hard origin/main"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "passes-with-cd-prefix",
+        "input": {
+          "tool_input": {
+            "command": "cd /home/user/repo && git commit -m fix && git push"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "passes-with-pushd-prefix",
+        "input": {
+          "tool_input": {
+            "command": "pushd /home/user/repo && git commit -m fix"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "passes-with-tilde-cd-prefix",
+        "input": {
+          "tool_input": {
+            "command": "cd ~/repo && git commit -m fix"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "passes-with-env-var-cd-prefix",
+        "input": {
+          "tool_input": {
+            "command": "cd $WORKTREE && git push"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "passes-on-git-status",
+        "input": {
+          "tool_input": {
+            "command": "git status"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "passes-on-git-log",
+        "input": {
+          "tool_input": {
+            "command": "git log --oneline -3"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "passes-on-git-diff",
+        "input": {
+          "tool_input": {
+            "command": "git diff --stat"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "passes-on-gh-pr-list",
+        "input": {
+          "tool_input": {
+            "command": "gh pr list --author=@me"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "passes-on-gh-pr-view",
+        "input": {
+          "tool_input": {
+            "command": "gh pr view 27 --json mergeable"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "passes-with-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "git push origin main # hook-bypass: cd-worktree-rule"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
   }
 ]
