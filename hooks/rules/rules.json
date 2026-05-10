@@ -1846,5 +1846,476 @@
         "expected_exit": 0
       }
     ]
+  },
+  {
+    "id": "warn-deletes-console-log",
+    "description": "Warn when an Edit operation removes a line containing a debug-logging call (memory feedback_never_delete_debug_logs.md — gate via env var, never delete)",
+    "applies_to": [
+      "Edit",
+      "MultiEdit"
+    ],
+    "match": [
+      {
+        "field": "old_string",
+        "pattern": "(console\\.log\\(|console\\.debug\\(|console\\.error\\(|debug\\(|logger\\.(debug|info|trace)\\()",
+        "flags": "i"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": "console-log-deletion-verified",
+    "memory_ref": "feedback_never_delete_debug_logs.md",
+    "message": "WARNING: Edit removes a line containing a debug-log call.\n\nPer feedback_never_delete_debug_logs.md NEVER delete debug logs;\ngate them with an env var (e.g. DEBUG_TOOLS), disable for prod,\nre-enable when needed.\n\nPer feedback_never_remove_debug_logs_early.md even when converting\nto env-gating, NEVER delete before verifying the fix in prod.\n\nUse the bypass marker (console-log-deletion-verified) ONLY when:\n  - Converting to env-gating (the new gate replaces the log)\n  - The fix has been verified in prod for >24h\n  - The log was a documented debug-temp called out in the original\n    commit message\n",
+    "tests": [
+      {
+        "name": "warns-on-edit-deleting-console-log",
+        "input": {
+          "tool_input": {
+            "old_string": "console.log('debug:', x)",
+            "new_string": ""
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-deletes-console-log"
+      },
+      {
+        "name": "warns-on-edit-deleting-logger-debug",
+        "input": {
+          "tool_input": {
+            "old_string": "logger.debug(\"trace\", { id })",
+            "new_string": ""
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-deletes-console-log"
+      },
+      {
+        "name": "warns-on-edit-deleting-console-error",
+        "input": {
+          "tool_input": {
+            "old_string": "if (err) console.error(err)",
+            "new_string": "if (err) reportToSentry(err)"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-deletes-console-log"
+      },
+      {
+        "name": "allows-edit-not-touching-logs",
+        "input": {
+          "tool_input": {
+            "old_string": "const x = 1",
+            "new_string": "const x = 2"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "old_string": "console.log('debug:', x) // hook-bypass: console-log-deletion-verified",
+            "new_string": ""
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "warn-time-estimates-in-plans",
+    "description": "Warn when plan/spec/design files contain time-based estimates (memory feedback_no_time_estimates.md — use sequential ordering, not days/sprints/cycles)",
+    "applies_to": [
+      "Edit",
+      "Write",
+      "MultiEdit"
+    ],
+    "match": [
+      {
+        "field": "file_path",
+        "pattern": "(plans?/|specs?/|design/|openspec/|docs/superpowers/).*\\.md$"
+      },
+      {
+        "field": "content",
+        "pattern": "\\b[0-9]+[[:space:]]*(days?|sprints?|weeks?|d[ií]as?|semanas?|cycles?|ciclos?)\\b",
+        "flags": "i"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": "time-estimates-allowed",
+    "memory_ref": "feedback_no_time_estimates.md",
+    "message": "WARNING: time-based estimate (X days/weeks/sprints) in plan/spec.\n\nPer feedback_no_time_estimates.md never use days/sprints/cycles;\nuse sequential ordering with conceptual milestones.\n\nReplace with:\n  - \"Phase 1, Phase 2, Phase 3\"\n  - \"After X ships -> Y starts\"\n  - \"Once Greptile 5/5 + CI green -> merge\"\n\nBypass marker (time-estimates-allowed) ONLY when the doc is\nmarketing / external-facing (where calendar dates are expected).\n",
+    "tests": [
+      {
+        "name": "warns-on-3-days-in-plan",
+        "input": {
+          "tool_input": {
+            "file_path": "plans/2026-05-feature.md",
+            "content": "Estimate: 3 days for the implementation phase."
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-time-estimates-in-plans"
+      },
+      {
+        "name": "warns-on-2-sprints-in-spec",
+        "input": {
+          "tool_input": {
+            "file_path": "specs/2026-05-pricing.md",
+            "content": "Will land in 2 sprints."
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-time-estimates-in-plans"
+      },
+      {
+        "name": "warns-on-spanish-dias",
+        "input": {
+          "tool_input": {
+            "file_path": "openspec/changes/2026-05-foo/design.md",
+            "content": "Listo en 5 dias."
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-time-estimates-in-plans"
+      },
+      {
+        "name": "warns-on-spanish-semanas-with-tilde",
+        "input": {
+          "tool_input": {
+            "file_path": "docs/superpowers/plans/foo.md",
+            "content": "Tomara 4 semanas mas o menos."
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-time-estimates-in-plans"
+      },
+      {
+        "name": "allows-non-time-content",
+        "input": {
+          "tool_input": {
+            "file_path": "plans/2026-05-feature.md",
+            "content": "## Plan\\n\\nPhase 1: spike. Phase 2: implement."
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-plan-files",
+        "input": {
+          "tool_input": {
+            "file_path": "README.md",
+            "content": "Will land in 2 sprints"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "file_path": "plans/marketing-launch.md",
+            "content": "3 weeks to launch # hook-bypass: time-estimates-allowed"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "warn-pr-create-many-files",
+    "description": "Warn on `gh pr create` — caller must verify the PR has <=15 files (memory feedback_split_large_prs.md / 15-file rule)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "gh[[:space:]]+pr[[:space:]]+create\\b"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": "pr-file-count-verified",
+    "memory_ref": "feedback_split_large_prs.md",
+    "message": "WARNING: `gh pr create`.\n\nPer feedback_split_large_prs.md / the 15-file rule (DOJ-2482):\nPRs with >15 files get abandoned more easily — split by domain\nbefore opening.\n\nVerify with:\n  git diff --stat <base>..HEAD | tail -1\n\nIf the diff touches <=15 files, use bypass marker\n`pr-file-count-verified`. If it touches >15 files, abort and split.\n",
+    "tests": [
+      {
+        "name": "warns-on-pr-create-bare",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --title \"feat: foo\" --base main"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-pr-create-many-files"
+      },
+      {
+        "name": "warns-on-pr-create-with-body",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --base develop --title \"feat: foo\" --body \"Adds X\""
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-pr-create-many-files"
+      },
+      {
+        "name": "warns-on-pr-create-with-base",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --base develop --head feature-x"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-pr-create-many-files"
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --title \"feat: foo\" --base main # hook-bypass: pr-file-count-verified"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-pr-create-gh-commands",
+        "input": {
+          "tool_input": {
+            "command": "gh pr list"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-gh-pr-edit",
+        "input": {
+          "tool_input": {
+            "command": "gh pr edit 16 --add-label foo"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "warn-posthog-in-alerts",
+    "description": "Warn when Slack messages mention PostHog / dashboard / instrumentation (memory feedback_no_posthog_nag.md — Juan owns; out of scope for other POs)",
+    "applies_to": [
+      "Slack"
+    ],
+    "match": [
+      {
+        "field": "text",
+        "pattern": "\\b(posthog|dashboard|instrumentation)\\b",
+        "flags": "i"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": "posthog-mention-approved",
+    "memory_ref": "feedback_no_posthog_nag.md",
+    "message": "WARNING: PostHog / dashboard / instrumentation mention in Slack.\n\nPer feedback_no_posthog_nag.md the agent / automation must EXCLUDE\nPostHog / dashboards / instrumentation from alerts; Juan owns that\nsurface, other POs explicitly told it is out of scope.\n\nUse the bypass marker (posthog-mention-approved) ONLY when:\n  - The alert is addressed to Juan directly (his Slack user-id)\n  - You confirmed with Juan that the alert is welcome\n",
+    "tests": [
+      {
+        "name": "warns-posthog-in-slack",
+        "input": {
+          "tool_input": {
+            "text": "Vi una metrica rara en PostHog ayer, podemos revisar?"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-posthog-in-alerts"
+      },
+      {
+        "name": "warns-dashboard-in-slack",
+        "input": {
+          "tool_input": {
+            "text": "El dashboard de Sentry esta en rojo"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-posthog-in-alerts"
+      },
+      {
+        "name": "warns-instrumentation-in-slack",
+        "input": {
+          "tool_input": {
+            "text": "Falta instrumentation en el endpoint /foo"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-posthog-in-alerts"
+      },
+      {
+        "name": "allows-non-posthog-text",
+        "input": {
+          "tool_input": {
+            "text": "PR #16 listo para review"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "text": "Subi un evento nuevo a PostHog # hook-bypass: posthog-mention-approved"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "block-sibling-suffix-storage",
+    "description": "Block storage uploads that use a sibling-suffix layout (memory feedback_explicit_storage_prefixes.md — use originals/ + processed/ subdirs instead)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "(supabase[[:space:]]+storage[[:space:]]+upload|gcloud[[:space:]]+storage[[:space:]]+cp|gsutil[[:space:]]+cp).*\\.(processed|original|raw|optimized)\\.(zip|tar|gz|bin|jpg|jpeg|png|pdf|mp4)\\b",
+        "flags": "i"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "sibling-suffix-storage-allowed",
+    "memory_ref": "feedback_explicit_storage_prefixes.md",
+    "message": "BLOCKED: storage upload with a sibling-suffix layout.\n\nPer feedback_explicit_storage_prefixes.md pipelines that transform\nartefacts must use <bucket>/originals/ + <bucket>/processed/\n(or stage-specific names), never siblings like foo.zip +\nfoo.processed.zip in the same folder.\n\nUse:\n  <bucket>/originals/foo.zip\n  <bucket>/processed/foo.zip\n\nBypass marker (sibling-suffix-storage-allowed) ONLY for legacy\nbuckets in active migration.\n",
+    "tests": [
+      {
+        "name": "blocks-supabase-storage-processed-suffix",
+        "input": {
+          "tool_input": {
+            "command": "supabase storage upload my-bucket/foo.processed.zip ./foo.processed.zip"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-storage-cp",
+        "input": {
+          "tool_input": {
+            "command": "gcloud storage cp ./foo.processed.zip gs://my-bucket/foo.processed.zip"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gsutil-original-suffix",
+        "input": {
+          "tool_input": {
+            "command": "gsutil cp ./foo.original.mp4 gs://my-bucket/foo.original.mp4"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-clean-paths",
+        "input": {
+          "tool_input": {
+            "command": "supabase storage upload my-bucket/originals/foo.zip ./foo.zip"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-storage-cp",
+        "input": {
+          "tool_input": {
+            "command": "cp ./foo.processed.zip /tmp/foo.processed.zip"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "gcloud storage cp ./foo.processed.zip gs://my-bucket/foo.processed.zip # hook-bypass: sibling-suffix-storage-allowed"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "warn-localhost-in-pr-body",
+    "description": "Warn when `gh pr create` / `gh pr edit` body contains a localhost reference (memory feedback_test_on_staging.md — QA target is dev.dojocoding.io, not localhost)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "gh[[:space:]]+pr[[:space:]]+(create|edit).*--body([[:space:]]|=|$)"
+      },
+      {
+        "field": "command",
+        "pattern": "(localhost|127\\.0\\.0\\.1)"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": "localhost-in-pr-body-allowed",
+    "memory_ref": "feedback_test_on_staging.md",
+    "message": "WARNING: localhost reference in PR body.\n\nPer feedback_test_on_staging.md the QA testing target is\ndev.dojocoding.io (staging), not localhost. Any reviewer who tries\nto verify against localhost will hit env mismatches:\n  - Local DB differs from staging\n  - Edge Functions missing local secrets\n  - Different feature flags\n\nReplace localhost links with dev.dojocoding.io equivalents.\n\nBypass marker (localhost-in-pr-body-allowed) ONLY for steps that\nlegitimately require an explicit local build (e.g. asking the\nreviewer to run `bun run dev` before pushing).\n",
+    "tests": [
+      {
+        "name": "warns-pr-create-with-localhost",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --base develop --title \"feat: foo\" --body \"Test on http://localhost:5173/foo\""
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-localhost-in-pr-body"
+      },
+      {
+        "name": "warns-pr-edit-with-127",
+        "input": {
+          "tool_input": {
+            "command": "gh pr edit 16 --body \"Hit http://127.0.0.1:54321/health\""
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-localhost-in-pr-body"
+      },
+      {
+        "name": "allows-pr-create-with-staging-url",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --base develop --title \"feat: foo\" --body \"Test on https://dev.dojocoding.io/foo\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-pr-localhost",
+        "input": {
+          "tool_input": {
+            "command": "curl http://localhost:5173/foo"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-pr-create-no-body",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --base develop --title \"feat: foo\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --body \"Run bun run dev on localhost:5173 # hook-bypass: localhost-in-pr-body-allowed\""
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
   }
 ]
