@@ -181,6 +181,37 @@ If any check fails, STOP and resolve before proceeding.
 
 For EACH issue in the sequence, follow this exact workflow. No shortcuts. No exceptions.
 
+### Phase 0: OpenSpec Context (MANDATORY when configured)
+
+Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPath`:
+
+1. **Resolve the configured changes directory** and check for an existing OpenSpec change that references this issue. The grep MUST use the configured path — projects may set `openspec.changesPath` to anything (e.g., `specs/changes/`) and a hardcoded `openspec/changes/` would silently miss every existing spec there:
+   ```bash
+   CHANGES_PATH=$(jq -r '.openspec.changesPath' linear-setup.json)
+   grep -r "{issue-id}" "$CHANGES_PATH"/*/proposal.md 2>/dev/null
+   ```
+   In all references below, `<changes>` denotes that resolved `$CHANGES_PATH` value, NOT the literal string `openspec/changes/`.
+
+2. **If found**: Read ALL three artifacts as primary implementation context:
+   - `<changes>/{change-slug}/proposal.md` — intent, domain, scope
+   - `<changes>/{change-slug}/design.md` — architectural decisions, rejected alternatives, pre-launch checklist
+   - `<changes>/{change-slug}/tasks.md` — atomic task list with file paths and commit messages
+
+   These three files are the CONTRACT. The Linear issue is the WHAT; OpenSpec is the HOW. Do not deviate from the spec without going back to it first.
+
+3. **If MISSING and the issue is non-trivial** (touches >2 files OR involves architectural decisions OR has reviewer-flagged risk): STOP and prepare the OpenSpec change BEFORE proceeding.
+   - Use `/superpowers:brainstorming` if the design needs more thinking
+   - Use `/make-no-mistakes:premortem` if the change is load-bearing in production
+   - **Compute the change slug deterministically** so every later step (and any restart) targets the same directory. The slug MUST follow the same shape as the implementation branch: `{issue-id-lowercase}-{short-kebab-description}` (e.g., `doj-3946-atomic-primitives-sprint`). Lowercase only, ASCII alphanumerics + hyphens, no leading/trailing hyphens, no other separators.
+   - **Draft the three artifacts** in `<changes>/<change-slug>/`: proposal.md (intent + scope + out-of-scope), design.md (decisions + rationale), tasks.md (atomic checklist with commit messages). Leave them uncommitted on disk — the implementation branch does not exist yet.
+   - **Defer the commit to Phase 1 step 4a** (below). Phase 1 creates the branch and worktree; the OpenSpec files are then committed as the very first commit on that branch.
+
+4. **If MISSING but the issue is trivial** (typo fix, dependency bump, single-line change): proceed to Phase 1 without OpenSpec. Add a one-line note to the PR description explaining why OpenSpec was skipped.
+
+5. **If `openspec.changesPath` is not configured** in `linear-setup.json`: skip this phase entirely. The project hasn't adopted OpenSpec yet.
+
+**Why mandatory**: per the adoption decision (Slack 2026-03-30, channel C0AE5MKAX7B), OpenSpec is the durable persistence of design decisions. A skill that makes it optional re-introduces the failure mode it was adopted to prevent — implementations diverging from intent because nobody wrote the intent down.
+
 ### Phase 1: Setup
 
 1. **Claim the issue in Linear:**
@@ -209,24 +240,42 @@ For EACH issue in the sequence, follow this exact workflow. No shortcuts. No exc
    - Create sub-issues in Linear for each PR if decomposing.
    - Comment the decomposition plan on the parent issue.
 
+4a. **Commit the OpenSpec change as the first commit** (only if Phase 0 step 3 drafted artifacts because none existed):
+   - Phase 0 wrote the artifacts to the **main working tree** at `{main-tree}/$CHANGES_PATH/<change-slug>/`. Phase 1 step 3 created a fresh worktree from `{baseBranch}`, which does NOT carry over those uncommitted files. Copy them into the current worktree explicitly. The `CHANGE_SLUG` value MUST match the slug Phase 0 step 3 chose (same `{issue-id-lowercase}-{short-kebab-description}` rule):
+     ```bash
+     # Inside the new worktree (Phase 1 step 3 cd'd here).
+     CHANGES_PATH=$(jq -r '.openspec.changesPath' linear-setup.json)
+     # Bind the slug Phase 0 step 3 produced. Replace the placeholder before
+     # running — never leave it as a literal "<change-slug>" string.
+     CHANGE_SLUG="<change-slug>"   # e.g. doj-3946-atomic-primitives-sprint
+     # Resolve the main working tree's filesystem path from git's worktree
+     # registry — first row of `git worktree list --porcelain` is always the
+     # primary tree, regardless of which worktree we're currently in.
+     MAIN_TREE=$(git worktree list --porcelain | awk '/^worktree/ {print $2; exit}')
+     # Skip the copy if the worktree already has the directory (e.g. an
+     # earlier run already staged it, or the spec was committed previously).
+     if [ ! -d "$CHANGES_PATH/$CHANGE_SLUG" ]; then
+       mkdir -p "$CHANGES_PATH"
+       cp -r "$MAIN_TREE/$CHANGES_PATH/$CHANGE_SLUG" "$CHANGES_PATH/"
+     fi
+     git add "$CHANGES_PATH/$CHANGE_SLUG/"
+     git commit -m "docs(openspec): $CHANGE_SLUG"
+     ```
+   - The `docs(openspec)` commit MUST be commit #1 on the branch — reviewers and future agents read the spec before the diff.
+   - If Phase 0 found an existing change (step 2), skip this entire step — the spec is already on `{baseBranch}` and inherited by the new worktree.
+
 ### Phase 2: Implement
 
-4. **Implement in the worktree.** Follow all project conventions from CLAUDE.md.
+5. **Implement in the worktree.** Follow all project conventions from CLAUDE.md. If Phase 0 produced an OpenSpec change, treat its `tasks.md` as the authoritative checklist — work through it in order and do not improvise file paths or commit messages outside the spec.
 
-4b. **Check for OpenSpec context:**
-    - If `linear-setup.json` has `openspec.changesPath`, check if an OpenSpec change exists that references this issue
-    - Look in `openspec/changes/*/proposal.md` for the issue ID
-    - If found, read ALL artifacts (proposal.md, design.md, tasks.md) as implementation context
-    - This provides richer context than the Linear issue description alone
-
-5. **If multiple approaches exist:**
+6. **If multiple approaches exist:**
    - Dispatch one sub-agent per approach via Mode A (each gets its own worktree automatically)
    - Run all approaches in parallel with `run_in_background: true`
    - Each approach may discover new issues — document them in its final report
    - Synthesize the best parts of multiple solutions if needed
    - Close losing sub-agent branches/PRs after synthesis
 
-6. **Write tests:**
+7. **Write tests:**
    - Model E2E test cases with Slack MCP first (plan them in a test channel or thread)
    - Split test cases: some for **Playwright**, others for **Chrome DevTools MCP**
    - Browser ALWAYS in focus. **NEVER headless.** Both Playwright and Chrome DevTools MCP.
@@ -238,33 +287,33 @@ For EACH issue in the sequence, follow this exact workflow. No shortcuts. No exc
 
 ### Phase 3: PR + Review Loop
 
-7. **Create the PR:**
+8. **Create the PR:**
    ```bash
    gh pr create --base {baseBranch} --title "{issue-id}: {concise title}" --body "..."
    ```
    - Link the Linear issue in the PR body
    - Add "Created by Claude Code on behalf of @{user}"
 
-8. **Tag ALL reviewers:**
+9. **Tag ALL reviewers:**
    - Comment `@greptile review` on the PR
    - Wait for automated reviews from **Greptile**, **CodeRabbit**, and **Graphite**
    - All three reviewers are configured in the project — check all of them
 
-9. **Fix reviewer feedback:**
-   - Address ALL insights from Greptile, CodeRabbit, AND Graphite
-   - Commit fixes to the same branch
-   - Re-tag: `@greptile review` again if needed
-   - Target: Greptile confidence **≥ 3/5**, CodeRabbit no critical issues, Graphite no blockers
-   - If a reviewer doesn't respond within 5 minutes, proceed but note it to the user
+10. **Fix reviewer feedback:**
+    - Address ALL insights from Greptile, CodeRabbit, AND Graphite
+    - Commit fixes to the same branch
+    - Re-tag: `@greptile review` again if needed
+    - Target: Greptile confidence **≥ 3/5**, CodeRabbit no critical issues, Graphite no blockers
+    - If a reviewer doesn't respond within 5 minutes, proceed but note it to the user
 
-10. **Verify CI:**
+11. **Verify CI:**
     ```bash
     gh pr checks {pr-number} --watch
     ```
     - ALL checks must pass before proceeding
     - If CI fails, fix and push — do not skip
 
-11. **Check merge conflicts:**
+12. **Check merge conflicts:**
     ```bash
     gh pr view {pr-number} --json mergeable
     ```
@@ -273,16 +322,16 @@ For EACH issue in the sequence, follow this exact workflow. No shortcuts. No exc
 
 ### Phase 4: Merge + Cleanup
 
-12. **Merge the PR:**
+13. **Merge the PR:**
     ```bash
     gh pr merge {pr-number} --squash --delete-branch
     ```
 
-13. **Update Linear:**
+14. **Update Linear:**
     - Set status to **Done**
     - Comment: "Merged via PR #{pr-number}"
 
-14. **Clean up worktrees:**
+15. **Clean up worktrees:**
     ```bash
     git worktree remove .claude/worktrees/{issue-id} --force
     # Verify ALL worktrees for this issue are removed
@@ -290,13 +339,13 @@ For EACH issue in the sequence, follow this exact workflow. No shortcuts. No exc
     git worktree prune
     ```
 
-15. **Sync before next issue:**
+16. **Sync before next issue:**
     ```bash
     git checkout {baseBranch}
     git pull origin {baseBranch} --rebase
     ```
 
-16. **Repeat** from Phase 1 for the next issue.
+17. **Repeat** from Phase 1 for the next issue.
 
 ## Chain Merge Strategy
 
