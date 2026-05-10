@@ -240,15 +240,25 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
    - Comment the decomposition plan on the parent issue.
 
 4a. **Commit the OpenSpec change as the first commit** (only if Phase 0 step 3 drafted artifacts because none existed):
-   - Move/copy the `<changes>/{change-slug}/` directory drafted in Phase 0 into the worktree if it isn't already there.
-   - Re-export `CHANGES_PATH` inside the worktree (the variable from Phase 0 was set in the parent shell), then commit before any implementation work:
+   - Phase 0 wrote the artifacts to the **main working tree** at `{main-tree}/$CHANGES_PATH/{change-slug}/`. Phase 1 step 3 created a fresh worktree from `{baseBranch}`, which does NOT carry over those uncommitted files. Copy them into the current worktree explicitly:
      ```bash
+     # Inside the new worktree (Phase 1 step 3 cd'd here).
      CHANGES_PATH=$(jq -r '.openspec.changesPath' linear-setup.json)
+     # Resolve the main working tree's filesystem path from git's worktree
+     # registry — first row of `git worktree list --porcelain` is always the
+     # primary tree, regardless of which worktree we're currently in.
+     MAIN_TREE=$(git worktree list --porcelain | awk '/^worktree/ {print $2; exit}')
+     # Skip the copy if the worktree already has the directory (e.g. an
+     # earlier run already staged it, or the spec was committed previously).
+     if [ ! -d "$CHANGES_PATH/{change-slug}" ]; then
+       mkdir -p "$CHANGES_PATH"
+       cp -r "$MAIN_TREE/$CHANGES_PATH/{change-slug}" "$CHANGES_PATH/"
+     fi
      git add "$CHANGES_PATH/{change-slug}/"
      git commit -m "docs(openspec): {change-slug}"
      ```
    - The `docs(openspec)` commit MUST be commit #1 on the branch — reviewers and future agents read the spec before the diff.
-   - If Phase 0 found an existing change (step 2), skip this — the spec is already on `{baseBranch}`.
+   - If Phase 0 found an existing change (step 2), skip this entire step — the spec is already on `{baseBranch}` and inherited by the new worktree.
 
 ### Phase 2: Implement
 
