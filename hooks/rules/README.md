@@ -84,6 +84,43 @@ client-acme
 client-beta
 ```
 
+## Per-install substitutions (opt-in, gitignored)
+
+Some rules need values that are specific to your team or environment —
+for example, the `block-supabase-db-push-prod` rule guards a Supabase
+production project ref that varies per organization. Hard-coding such
+values in the public rules.yaml would either leak the value upstream or
+leave consumers of this toolkit with a rule that silently never fires.
+
+The build script supports literal-string substitution from a gitignored
+`.private/substitutions.json` file. The file is a flat JSON object where
+keys are UPPER_SNAKE token names and values are the literal replacement
+strings. For each pair, every occurrence of `__TOKEN__` in `rules.yaml` is
+replaced before the YAML is parsed, so both the rule patterns and the
+test fixtures see the substituted value.
+
+Example `.private/substitutions.json`:
+
+```json
+{
+  "PROD_SUPABASE_REF": "abcdefghij1234567890",
+  "STAGING_SUPABASE_REF": "klmnopqrst0987654321"
+}
+```
+
+When the file is absent, `__TOKEN__` placeholders remain in `rules.json`
+verbatim. The rule still parses and runs; it simply does not fire for any
+real-world command (only for commands that happen to contain the literal
+placeholder text). This is a deliberately documented inert state — it is
+preferable to a silently-broken protection.
+
+Tokens currently consumed by the published rule set:
+
+- `PROD_SUPABASE_REF` — production Supabase project ref, used by the
+  `block-supabase-db-push-prod` rule and its test fixtures.
+- `STAGING_SUPABASE_REF` — staging Supabase project ref, used as the
+  negative-match example in the same rule's test array.
+
 ## Rule families
 
 The manifest groups rules into informal families by prefix / domain.
@@ -110,12 +147,15 @@ Adding a new family is fine — just keep ids unique and follow the schema.
   `pr-create-with-migrations-needs-deploy-note`,
   `block-supabase-db-push-prod`) — keep schema mutations inside
   versioned `supabase/migrations/` files, nudge developers away from
-  SQL-Editor-style direct execution against `*.supabase.co` hosts,
-  remind PR authors to document migration deployment, and hard-block
-  `supabase db push` aimed at the production project ref. Added after
-  a Slack discussion surfaced drift between manually-applied SQL and
-  the migrations directory when migrations failed to auto-run on
-  staging after a teammate's PR merged.
+  direct `psql` / `pg_dump` / `pg_restore` execution against
+  `*.supabase.co` hosts, remind PR authors to document migration
+  deployment, and hard-block `supabase db push` aimed at the production
+  project ref or `--linked` (which transparently resolves to whichever
+  project was last linked, possibly production). The production project
+  ref is configured per install via the substitutions mechanism described
+  above (`PROD_SUPABASE_REF` token). Added after a discussion surfaced
+  drift between manually-applied SQL and the migrations directory when
+  migrations failed to auto-run after a teammate's PR merged.
 
 ## Tier 2 — decomposing non-deterministic memories
 
