@@ -1177,6 +1177,21 @@
         tool_input:
           command: 'npm test'
       expected_exit: 0
+    - name: blocks-pnpm-dlx-playwright-headless
+      input:
+        tool_input:
+          command: 'pnpm dlx playwright test'
+      expected_exit: 2
+    - name: blocks-yarn-dlx-playwright-headless
+      input:
+        tool_input:
+          command: 'yarn dlx playwright test'
+      expected_exit: 2
+    - name: allows-pnpm-dlx-playwright-headed
+      input:
+        tool_input:
+          command: 'pnpm dlx playwright test --headed'
+      expected_exit: 0
     - name: allows-bypass-marker
       input:
         tool_input:
@@ -1233,6 +1248,11 @@
       input:
         tool_input:
           command: 'git push origin feature-x'
+      expected_exit: 0
+    - name: allows-force-with-lease-and-force-combined
+      input:
+        tool_input:
+          command: 'git push -f origin main --force-with-lease'
       expected_exit: 0
     - name: allows-bypass-marker
       input:
@@ -1347,11 +1367,30 @@
           file_path: '/home/user/repo/docs/notes.md'
           content: '# Notes'
       expected_exit: 0
-    - name: allows-bypass-marker
+    - name: allows-bypass-marker-write-tool
       input:
         tool_input:
           file_path: '/tmp/daily-standup.md'
           content: '# Standup // hook-bypass: standup-non-desktop-acknowledged'
+      expected_exit: 0
+    # Edit and MultiEdit expose `new_string` / `old_string` / `edits[]` instead
+    # of `content`, so we lock in that the bypass marker placed in any of those
+    # fields still short-circuits the rule. The dispatcher scans the entire raw
+    # tool_input JSON for the marker, so any string-valued field is reachable.
+    - name: allows-bypass-marker-edit-tool
+      input:
+        tool_input:
+          file_path: '/tmp/daily-standup.md'
+          old_string: '# Old'
+          new_string: '# Standup // hook-bypass: standup-non-desktop-acknowledged'
+      expected_exit: 0
+    - name: allows-bypass-marker-multiedit-tool
+      input:
+        tool_input:
+          file_path: '/tmp/daily-standup.md'
+          edits:
+            - old_string: '# A'
+              new_string: '# B // hook-bypass: standup-non-desktop-acknowledged'
       expected_exit: 0
 
 - id: block-goodnight-not-in-escritorio
@@ -1407,9 +1446,24 @@
           file_path: '/home/user/repo/docs/notes.md'
           content: '# Notes'
       expected_exit: 0
-    - name: allows-bypass-marker
+    - name: allows-bypass-marker-write-tool
       input:
         tool_input:
           file_path: '/tmp/next-day-2026-05-09.md'
           content: '# Handoff // hook-bypass: goodnight-non-desktop-acknowledged'
+      expected_exit: 0
+    - name: allows-bypass-marker-edit-tool
+      input:
+        tool_input:
+          file_path: '/tmp/next-day-2026-05-09.md'
+          old_string: '# Old'
+          new_string: '# Handoff // hook-bypass: goodnight-non-desktop-acknowledged'
+      expected_exit: 0
+    - name: allows-bypass-marker-multiedit-tool
+      input:
+        tool_input:
+          file_path: '/tmp/next-day-2026-05-09.md'
+          edits:
+            - old_string: '# A'
+              new_string: '# B // hook-bypass: goodnight-non-desktop-acknowledged'
       expected_exit: 0
