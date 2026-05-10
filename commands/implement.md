@@ -202,7 +202,8 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
 3. **If MISSING and the issue is non-trivial** (touches >2 files OR involves architectural decisions OR has reviewer-flagged risk): STOP and prepare the OpenSpec change BEFORE proceeding.
    - Use `/superpowers:brainstorming` if the design needs more thinking
    - Use `/make-no-mistakes:premortem` if the change is load-bearing in production
-   - **Draft the three artifacts** in `<changes>/{change-slug}/`: proposal.md (intent + scope + out-of-scope), design.md (decisions + rationale), tasks.md (atomic checklist with commit messages). Leave them uncommitted on disk — the implementation branch does not exist yet.
+   - **Compute the change slug deterministically** so every later step (and any restart) targets the same directory. The slug MUST follow the same shape as the implementation branch: `{issue-id-lowercase}-{short-kebab-description}` (e.g., `doj-3946-atomic-primitives-sprint`). Lowercase only, ASCII alphanumerics + hyphens, no leading/trailing hyphens, no other separators.
+   - **Draft the three artifacts** in `<changes>/<change-slug>/`: proposal.md (intent + scope + out-of-scope), design.md (decisions + rationale), tasks.md (atomic checklist with commit messages). Leave them uncommitted on disk — the implementation branch does not exist yet.
    - **Defer the commit to Phase 1 step 4a** (below). Phase 1 creates the branch and worktree; the OpenSpec files are then committed as the very first commit on that branch.
 
 4. **If MISSING but the issue is trivial** (typo fix, dependency bump, single-line change): proceed to Phase 1 without OpenSpec. Add a one-line note to the PR description explaining why OpenSpec was skipped.
@@ -240,22 +241,25 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
    - Comment the decomposition plan on the parent issue.
 
 4a. **Commit the OpenSpec change as the first commit** (only if Phase 0 step 3 drafted artifacts because none existed):
-   - Phase 0 wrote the artifacts to the **main working tree** at `{main-tree}/$CHANGES_PATH/{change-slug}/`. Phase 1 step 3 created a fresh worktree from `{baseBranch}`, which does NOT carry over those uncommitted files. Copy them into the current worktree explicitly:
+   - Phase 0 wrote the artifacts to the **main working tree** at `{main-tree}/$CHANGES_PATH/<change-slug>/`. Phase 1 step 3 created a fresh worktree from `{baseBranch}`, which does NOT carry over those uncommitted files. Copy them into the current worktree explicitly. The `CHANGE_SLUG` value MUST match the slug Phase 0 step 3 chose (same `{issue-id-lowercase}-{short-kebab-description}` rule):
      ```bash
      # Inside the new worktree (Phase 1 step 3 cd'd here).
      CHANGES_PATH=$(jq -r '.openspec.changesPath' linear-setup.json)
+     # Bind the slug Phase 0 step 3 produced. Replace the placeholder before
+     # running — never leave it as a literal "<change-slug>" string.
+     CHANGE_SLUG="<change-slug>"   # e.g. doj-3946-atomic-primitives-sprint
      # Resolve the main working tree's filesystem path from git's worktree
      # registry — first row of `git worktree list --porcelain` is always the
      # primary tree, regardless of which worktree we're currently in.
      MAIN_TREE=$(git worktree list --porcelain | awk '/^worktree/ {print $2; exit}')
      # Skip the copy if the worktree already has the directory (e.g. an
      # earlier run already staged it, or the spec was committed previously).
-     if [ ! -d "$CHANGES_PATH/{change-slug}" ]; then
+     if [ ! -d "$CHANGES_PATH/$CHANGE_SLUG" ]; then
        mkdir -p "$CHANGES_PATH"
-       cp -r "$MAIN_TREE/$CHANGES_PATH/{change-slug}" "$CHANGES_PATH/"
+       cp -r "$MAIN_TREE/$CHANGES_PATH/$CHANGE_SLUG" "$CHANGES_PATH/"
      fi
-     git add "$CHANGES_PATH/{change-slug}/"
-     git commit -m "docs(openspec): {change-slug}"
+     git add "$CHANGES_PATH/$CHANGE_SLUG/"
+     git commit -m "docs(openspec): $CHANGE_SLUG"
      ```
    - The `docs(openspec)` commit MUST be commit #1 on the branch — reviewers and future agents read the spec before the diff.
    - If Phase 0 found an existing change (step 2), skip this entire step — the spec is already on `{baseBranch}` and inherited by the new worktree.
