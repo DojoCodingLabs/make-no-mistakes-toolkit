@@ -1239,7 +1239,7 @@
     "match": [
       {
         "field": "command",
-        "pattern": "curl.*((-X[[:space:]]*(POST|PATCH|PUT|DELETE).*\\.supabase\\.co/rest/v1/)|(\\.supabase\\.co/rest/v1/.*-X[[:space:]]*(POST|PATCH|PUT|DELETE)))",
+        "pattern": "curl.*((-X[[:space:]]*(POST|PATCH|PUT|DELETE).*\\.supabase\\.co/rest/v1/)|(\\.supabase\\.co/rest/v1/.*-X[[:space:]]*(POST|PATCH|PUT|DELETE))|((-d[[:space:]]|--data([[:space:]]|=|-raw[[:space:]]|-raw=|-binary[[:space:]]|-binary=)).*\\.supabase\\.co/rest/v1/)|(\\.supabase\\.co/rest/v1/.*(-d[[:space:]]|--data([[:space:]]|=|-raw[[:space:]]|-raw=|-binary[[:space:]]|-binary=))))",
         "flags": "i"
       }
     ],
@@ -1325,6 +1325,36 @@
           }
         },
         "expected_exit": 0
+      },
+      {
+        "name": "warns-curl-implicit-post-via-d",
+        "input": {
+          "tool_input": {
+            "command": "curl -d '{\"id\":1}' https://example.supabase.co/rest/v1/profiles"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-curl-mutating-supabase-rest"
+      },
+      {
+        "name": "warns-curl-implicit-post-via-data-raw",
+        "input": {
+          "tool_input": {
+            "command": "curl --data-raw '{\"id\":1}' https://example.supabase.co/rest/v1/profiles"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-curl-mutating-supabase-rest"
+      },
+      {
+        "name": "warns-curl-supabase-then-d",
+        "input": {
+          "tool_input": {
+            "command": "curl https://example.supabase.co/rest/v1/profiles -d '{\"id\":1}'"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-curl-mutating-supabase-rest"
       },
       {
         "name": "allows-bypass-marker",

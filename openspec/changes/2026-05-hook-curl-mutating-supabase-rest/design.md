@@ -37,19 +37,29 @@ are the same class of nudge.
 Use a **sanitized** Supabase host (`example.supabase.co`) — same convention
 as the migration-discipline rules added in PR #15 round-2. Real project
 refs would either leak in the public toolkit or trip the IP-leak guard.
-Tests required (≥5):
 
-1. `blocks-curl-post-supabase-rest` — POST mutation, expects warn.
-2. `blocks-curl-patch` — PATCH mutation, expects warn.
-3. `blocks-curl-put` — PUT mutation, expects warn.
-4. `blocks-curl-delete` — DELETE mutation, expects warn.
-5. `allows-curl-get-supabase-rest` — GET (read), expects allow.
-6. `allows-curl-non-supabase` — POST against `example.com`, expects allow.
-7. `allows-bypass-marker` — POST + bypass comment, expects allow.
+Final tests after Greptile rounds 1+2 (12 cases):
 
-(Test names use the `blocks-*` prefix purely for readability symmetry with
-neighboring rules. Action is `warn`, so `expected_exit` is `0` everywhere
-and we use `expected_stderr_contains` to assert the warning fired.)
+1. `warns-curl-post-supabase-rest` — POST mutation, expects warn.
+2. `warns-curl-patch` — PATCH mutation, expects warn.
+3. `warns-curl-put` — PUT mutation, expects warn.
+4. `warns-curl-delete` — DELETE mutation, expects warn.
+5. `warns-curl-xpost-no-space` — no-space `-XPOST` shorthand, expects warn.
+6. `warns-curl-url-before-flag` — URL precedes `-X POST`, expects warn.
+7. `warns-curl-implicit-post-via-d` — `-d` body without `-X`, expects warn.
+8. `warns-curl-implicit-post-via-data-raw` — `--data-raw` body without `-X`,
+   expects warn.
+9. `warns-curl-supabase-then-d` — URL first then `-d`, expects warn.
+10. `allows-curl-get-supabase-rest` — GET (read), expects allow.
+11. `allows-curl-non-supabase` — POST against `example.com`, expects allow.
+12. `allows-bypass-marker` — POST + bypass comment, expects allow.
+
+Action is `warn`, so `expected_exit` is `0` everywhere and we use
+`expected_stderr_contains` to assert the warning fired.
+
+Round-1 Greptile findings closed: `-XPOST` no-space + URL-before-flag
+ordering. Round-2 finding closed: implicit POST via `-d` / `--data*` is
+also caught.
 
 ## Why warn, not block
 

@@ -991,17 +991,21 @@
   description: Warn when curl issues a mutating HTTP method (POST/PATCH/PUT/DELETE) against the Supabase PostgREST endpoint (drift risk vs versioned migrations + RLS bypass)
   applies_to: [Bash]
   match:
-    # Anchor on the explicit `-X <METHOD>` form. Curl defaults to GET, so any
-    # author issuing a mutation invariably types `-X POST/PATCH/PUT/DELETE`.
-    # `-X[[:space:]]*` covers both `-X POST` and the no-space `-XPOST`
-    # shorthand. The alternation handles both common orderings: the URL
-    # appearing AFTER the -X flag and the URL appearing BEFORE it (very
-    # common in shell scripts that build the URL into a variable). Match
-    # `.supabase.co/rest/v1/` (PostgREST) specifically, so this rule does
-    # NOT fire for Supabase Auth / Storage / Edge Function endpoints —
-    # those have separate guidance and Edge Functions are the intended outlet.
+    # The pattern catches three mutation vectors against Supabase PostgREST:
+    #   1. Explicit `-X METHOD` (with or without space; `-X POST` and the
+    #      no-space `-XPOST` shorthand both fire).
+    #   2. URL-before-flag ordering (`curl <url> -X POST ...`), which is
+    #      common in shell scripts that build the URL into a variable.
+    #   3. Implicit POST via `-d` / `--data` / `--data-raw` / `--data-binary`.
+    #      Curl auto-promotes to POST when these flags are present even
+    #      without `-X`, so a one-liner like `curl -d '...' <url>` is a
+    #      live mutation that would otherwise pass silently.
+    # The match is narrowed to `.supabase.co/rest/v1/` (PostgREST) so this
+    # rule does NOT fire for Supabase Auth / Storage / Edge Function
+    # endpoints — those have separate guidance and Edge Functions are the
+    # intended outlet.
     - field: command
-      pattern: 'curl.*((-X[[:space:]]*(POST|PATCH|PUT|DELETE).*\.supabase\.co/rest/v1/)|(\.supabase\.co/rest/v1/.*-X[[:space:]]*(POST|PATCH|PUT|DELETE)))'
+      pattern: 'curl.*((-X[[:space:]]*(POST|PATCH|PUT|DELETE).*\.supabase\.co/rest/v1/)|(\.supabase\.co/rest/v1/.*-X[[:space:]]*(POST|PATCH|PUT|DELETE))|((-d[[:space:]]|--data([[:space:]]|=|-raw[[:space:]]|-raw=|-binary[[:space:]]|-binary=)).*\.supabase\.co/rest/v1/)|(\.supabase\.co/rest/v1/.*(-d[[:space:]]|--data([[:space:]]|=|-raw[[:space:]]|-raw=|-binary[[:space:]]|-binary=))))'
       flags: i
   action: warn
   bypass_marker: curl-supabase-rest-mutation
@@ -1068,6 +1072,24 @@
         tool_input:
           command: "curl -X POST https://example.com/api/v1/users -d '{\"id\":1}'"
       expected_exit: 0
+    - name: warns-curl-implicit-post-via-d
+      input:
+        tool_input:
+          command: "curl -d '{\"id\":1}' https://example.supabase.co/rest/v1/profiles"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
+    - name: warns-curl-implicit-post-via-data-raw
+      input:
+        tool_input:
+          command: "curl --data-raw '{\"id\":1}' https://example.supabase.co/rest/v1/profiles"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
+    - name: warns-curl-supabase-then-d
+      input:
+        tool_input:
+          command: "curl https://example.supabase.co/rest/v1/profiles -d '{\"id\":1}'"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
     - name: allows-bypass-marker
       input:
         tool_input:
