@@ -985,3 +985,119 @@
         tool_input:
           command: 'supabase db push --linked # hook-bypass: prod-db-push-approved'
       expected_exit: 0
+
+
+- id: warn-curl-mutating-supabase-rest
+  description: Warn when curl issues a mutating HTTP method (POST/PATCH/PUT/DELETE) against the Supabase PostgREST endpoint (drift risk vs versioned migrations + RLS bypass)
+  applies_to: [Bash]
+  match:
+    # The pattern catches three mutation vectors against Supabase PostgREST:
+    #   1. Explicit `-X METHOD` (with or without space; `-X POST` and the
+    #      no-space `-XPOST` shorthand both fire).
+    #   2. URL-before-flag ordering (`curl <url> -X POST ...`), which is
+    #      common in shell scripts that build the URL into a variable.
+    #   3. Implicit POST via `-d` / `--data` / `--data-raw` / `--data-binary`.
+    #      Curl auto-promotes to POST when these flags are present even
+    #      without `-X`, so a one-liner like `curl -d '...' <url>` is a
+    #      live mutation that would otherwise pass silently.
+    # The match is narrowed to `.supabase.co/rest/v1/` (PostgREST) so this
+    # rule does NOT fire for Supabase Auth / Storage / Edge Function
+    # endpoints — those have separate guidance and Edge Functions are the
+    # intended outlet.
+    - field: command
+      pattern: 'curl.*((-X[[:space:]]*(POST|PATCH|PUT|DELETE).*\.supabase\.co/rest/v1/)|(\.supabase\.co/rest/v1/.*-X[[:space:]]*(POST|PATCH|PUT|DELETE))|((-d[[:space:]]|--data([[:space:]]|=|-raw[[:space:]]|-raw=|-binary[[:space:]]|-binary=|-urlencode[[:space:]]|-urlencode=)).*\.supabase\.co/rest/v1/)|(\.supabase\.co/rest/v1/.*(-d[[:space:]]|--data([[:space:]]|=|-raw[[:space:]]|-raw=|-binary[[:space:]]|-binary=|-urlencode[[:space:]]|-urlencode=))))'
+      flags: i
+  action: warn
+  bypass_marker: curl-supabase-rest-mutation
+  memory_ref: feedback_scripts_not_db.md
+  message: |
+    WARNING: mutating curl against the Supabase PostgREST endpoint.
+
+    Direct REST mutations bypass:
+      - the versioned migrations workflow (drift across local DBs / envs),
+      - the RLS + admin-role checks the Supabase clients enforce, and
+      - the access pattern already encapsulated in src/services/api/.
+
+    Correct outlets:
+      - Schema changes      -> supabase/migrations/<timestamp>_<slug>.sql
+      - Data mutations      -> an Edge Function or a committed script
+      - One-shot fixes      -> use the API client from a versioned script
+
+    Use the bypass marker (curl-supabase-rest-mutation) only for documented
+    hotfixes that the team has explicitly approved.
+  tests:
+    - name: warns-curl-post-supabase-rest
+      input:
+        tool_input:
+          command: "curl -X POST https://example.supabase.co/rest/v1/profiles -H 'apikey: x' -d '{\"id\":1}'"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
+    - name: warns-curl-patch
+      input:
+        tool_input:
+          command: "curl -X PATCH https://example.supabase.co/rest/v1/profiles?id=eq.1 -d '{\"name\":\"a\"}'"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
+    - name: warns-curl-put
+      input:
+        tool_input:
+          command: "curl -X PUT https://example.supabase.co/rest/v1/profiles?id=eq.1 -d '{\"name\":\"b\"}'"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
+    - name: warns-curl-delete
+      input:
+        tool_input:
+          command: 'curl -X DELETE https://example.supabase.co/rest/v1/profiles?id=eq.1'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
+    - name: warns-curl-xpost-no-space
+      input:
+        tool_input:
+          command: "curl -XPOST https://example.supabase.co/rest/v1/profiles -d '{\"id\":1}'"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
+    - name: warns-curl-url-before-flag
+      input:
+        tool_input:
+          command: "curl https://example.supabase.co/rest/v1/profiles -X POST -d '{\"id\":1}'"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
+    - name: allows-curl-get-supabase-rest
+      input:
+        tool_input:
+          command: 'curl https://example.supabase.co/rest/v1/profiles?select=id,name'
+      expected_exit: 0
+    - name: allows-curl-non-supabase
+      input:
+        tool_input:
+          command: "curl -X POST https://example.com/api/v1/users -d '{\"id\":1}'"
+      expected_exit: 0
+    - name: warns-curl-implicit-post-via-d
+      input:
+        tool_input:
+          command: "curl -d '{\"id\":1}' https://example.supabase.co/rest/v1/profiles"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
+    - name: warns-curl-implicit-post-via-data-raw
+      input:
+        tool_input:
+          command: "curl --data-raw '{\"id\":1}' https://example.supabase.co/rest/v1/profiles"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
+    - name: warns-curl-supabase-then-d
+      input:
+        tool_input:
+          command: "curl https://example.supabase.co/rest/v1/profiles -d '{\"id\":1}'"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
+    - name: warns-curl-implicit-post-via-data-urlencode
+      input:
+        tool_input:
+          command: "curl --data-urlencode 'name=Alice' https://example.supabase.co/rest/v1/profiles"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-curl-mutating-supabase-rest'
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          command: "curl -X POST https://example.supabase.co/rest/v1/profiles -d '{\"id\":1}' # hook-bypass: curl-supabase-rest-mutation"
+      expected_exit: 0
