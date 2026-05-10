@@ -39,7 +39,58 @@ if (existsSync(forbiddenFile)) {
   );
 }
 
-const source = readFileSync(yamlPath, 'utf8');
+// Optional per-install substitution layer. Lets each consumer of this toolkit
+// specialize project-specific values (e.g., Supabase project refs) without
+// committing them to the public source tree. The file maps UPPER_SNAKE token
+// names to literal replacement strings; for each pair, every "__TOKEN__"
+// occurrence in rules.yaml is replaced before YAML parsing.
+//
+// When the file is absent, "__TOKEN__" remains in the output verbatim. The
+// rule still fires for any command that literally contains "__TOKEN__"
+// (i.e., effectively inert — a marketplace consumer who hasn't configured a
+// substitution gets a documented no-op rule, not a silent broken protection).
+//
+// Token names must be UPPER_SNAKE_CASE so they can't be confused with regex
+// metacharacters or with the existing kebab-case rule / bypass identifiers.
+// See hooks/rules/README.md for the full opt-in workflow.
+const substFile = join(repoRoot, '.private', 'substitutions.json');
+let SUBSTITUTIONS = {};
+if (existsSync(substFile)) {
+  try {
+    SUBSTITUTIONS = JSON.parse(readFileSync(substFile, 'utf8'));
+  } catch (err) {
+    console.error(`Failed to parse ${substFile}: ${err.message}`);
+    process.exit(1);
+  }
+  if (typeof SUBSTITUTIONS !== 'object' || Array.isArray(SUBSTITUTIONS)) {
+    console.error(`${substFile} must be a JSON object of {TOKEN: value} pairs`);
+    process.exit(1);
+  }
+  for (const token of Object.keys(SUBSTITUTIONS)) {
+    if (!/^[A-Z][A-Z0-9_]*$/.test(token)) {
+      console.error(
+        `Invalid substitution token "${token}" in ${substFile}: must be UPPER_SNAKE_CASE`,
+      );
+      process.exit(1);
+    }
+  }
+  console.log(
+    `Substitutions active (${Object.keys(SUBSTITUTIONS).length} token(s) loaded from .private/substitutions.json)`,
+  );
+}
+
+let source = readFileSync(yamlPath, 'utf8');
+for (const [token, value] of Object.entries(SUBSTITUTIONS)) {
+  if (typeof value !== 'string') {
+    console.error(
+      `Substitution value for "${token}" must be a string, got ${typeof value}`,
+    );
+    process.exit(1);
+  }
+  // Use split+join (not regex replace) so the value is treated as a literal
+  // string — no risk of $-backref interpolation in the replacement.
+  source = source.split(`__${token}__`).join(value);
+}
 const rules = yaml.load(source);
 
 if (!Array.isArray(rules)) {
