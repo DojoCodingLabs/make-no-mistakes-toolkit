@@ -1239,7 +1239,7 @@
     "match": [
       {
         "field": "command",
-        "pattern": "curl.*-X[[:space:]]+(POST|PATCH|PUT|DELETE).*\\.supabase\\.co/rest/v1/",
+        "pattern": "curl.*((-X[[:space:]]*(POST|PATCH|PUT|DELETE).*\\.supabase\\.co/rest/v1/)|(\\.supabase\\.co/rest/v1/.*-X[[:space:]]*(POST|PATCH|PUT|DELETE)))",
         "flags": "i"
       }
     ],
@@ -1249,7 +1249,7 @@
     "message": "WARNING: mutating curl against the Supabase PostgREST endpoint.\n\nDirect REST mutations bypass:\n  - the versioned migrations workflow (drift across local DBs / envs),\n  - the RLS + admin-role checks the Supabase clients enforce, and\n  - the access pattern already encapsulated in src/services/api/.\n\nCorrect outlets:\n  - Schema changes      -> supabase/migrations/<timestamp>_<slug>.sql\n  - Data mutations      -> an Edge Function or a committed script\n  - One-shot fixes      -> use the API client from a versioned script\n\nUse the bypass marker (curl-supabase-rest-mutation) only for documented\nhotfixes that the team has explicitly approved.\n",
     "tests": [
       {
-        "name": "blocks-curl-post-supabase-rest",
+        "name": "warns-curl-post-supabase-rest",
         "input": {
           "tool_input": {
             "command": "curl -X POST https://example.supabase.co/rest/v1/profiles -H 'apikey: x' -d '{\"id\":1}'"
@@ -1259,7 +1259,7 @@
         "expected_stderr_contains": "warn-curl-mutating-supabase-rest"
       },
       {
-        "name": "blocks-curl-patch",
+        "name": "warns-curl-patch",
         "input": {
           "tool_input": {
             "command": "curl -X PATCH https://example.supabase.co/rest/v1/profiles?id=eq.1 -d '{\"name\":\"a\"}'"
@@ -1269,7 +1269,7 @@
         "expected_stderr_contains": "warn-curl-mutating-supabase-rest"
       },
       {
-        "name": "blocks-curl-put",
+        "name": "warns-curl-put",
         "input": {
           "tool_input": {
             "command": "curl -X PUT https://example.supabase.co/rest/v1/profiles?id=eq.1 -d '{\"name\":\"b\"}'"
@@ -1279,10 +1279,30 @@
         "expected_stderr_contains": "warn-curl-mutating-supabase-rest"
       },
       {
-        "name": "blocks-curl-delete",
+        "name": "warns-curl-delete",
         "input": {
           "tool_input": {
             "command": "curl -X DELETE https://example.supabase.co/rest/v1/profiles?id=eq.1"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-curl-mutating-supabase-rest"
+      },
+      {
+        "name": "warns-curl-xpost-no-space",
+        "input": {
+          "tool_input": {
+            "command": "curl -XPOST https://example.supabase.co/rest/v1/profiles -d '{\"id\":1}'"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-curl-mutating-supabase-rest"
+      },
+      {
+        "name": "warns-curl-url-before-flag",
+        "input": {
+          "tool_input": {
+            "command": "curl https://example.supabase.co/rest/v1/profiles -X POST -d '{\"id\":1}'"
           }
         },
         "expected_exit": 0,
