@@ -701,7 +701,7 @@
     "match": [
       {
         "field": "file_path",
-        "pattern": "^src/components/ui/"
+        "pattern": "(^|/)src/components/ui/"
       },
       {
         "field": "content",
@@ -729,6 +729,16 @@
           "tool_input": {
             "file_path": "src/components/ui/card.tsx",
             "content": "<div className=\"w-[300px] p-4\">y</div>"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-w-pixel-in-ui-button-absolute-path",
+        "input": {
+          "tool_input": {
+            "file_path": "/home/user/repo/src/components/ui/button.tsx",
+            "content": "<button className=\"w-[120px]\">x</button>"
           }
         },
         "expected_exit": 2
@@ -767,7 +777,7 @@
   },
   {
     "id": "ds-raw-hex-color-in-source",
-    "description": "Block raw hex color literals in TSX/TS source — colors must come from Tailwind tokens (dojo-primary-*, etc.)",
+    "description": "Warn on raw hex color literals in TSX/TS source — colors must come from Tailwind tokens (dojo-primary-*, etc.)",
     "applies_to": [
       "Edit",
       "Write",
@@ -837,6 +847,26 @@
           "tool_input": {
             "file_path": "src/components/foo.test.tsx",
             "content": "expect(color).toBe(\"#FF7151\")"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-design-system-folder",
+        "input": {
+          "tool_input": {
+            "file_path": "src/design-system/tokens.ts",
+            "content": "export const PRIMARY = \"#C980FC\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-design-tokens-file",
+        "input": {
+          "tool_input": {
+            "file_path": "src/lib/design-tokens.ts",
+            "content": "export const LILAC = \"#C980FC\""
           }
         },
         "expected_exit": 0
