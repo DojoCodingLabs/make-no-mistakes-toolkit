@@ -1,23 +1,39 @@
 # Design — `warn-curl-mutating-supabase-rest`
 
-## Pattern
+## Pattern (final, after Greptile rounds 1-3)
 
 ```
-'curl.*-X[[:space:]]+(POST|PATCH|PUT|DELETE).*\.supabase\.co/rest/v1/'
+'curl.*((-X[[:space:]]*(POST|PATCH|PUT|DELETE).*\.supabase\.co/rest/v1/)|(\.supabase\.co/rest/v1/.*-X[[:space:]]*(POST|PATCH|PUT|DELETE))|((-d[[:space:]]|--data([[:space:]]|=|-raw[[:space:]]|-raw=|-binary[[:space:]]|-binary=|-urlencode[[:space:]]|-urlencode=)).*\.supabase\.co/rest/v1/)|(\.supabase\.co/rest/v1/.*(-d[[:space:]]|--data([[:space:]]|=|-raw[[:space:]]|-raw=|-binary[[:space:]]|-binary=|-urlencode[[:space:]]|-urlencode=))))'
 ```
 
-Rationale:
+The pattern is a 4-clause alternation that catches every realistic
+mutation vector against `<project>.supabase.co/rest/v1/`:
 
-- Anchor on the explicit `-X <METHOD>` form. `curl` defaults to `GET`, and
-  any author using a mutating method invariably types it as `-X POST` /
-  `-X PATCH` / `-X PUT` / `-X DELETE`. (Curl also accepts `--request`, but
-  the long form is uncommon enough that we accept the false negative —
-  authors using `--request` can be expected to know the rule and self-flag.)
-- Match `.supabase.co/rest/v1/` rather than just `.supabase.co` so we don't
-  flag mutations against Supabase Auth / Storage endpoints (those have
-  separate guidance) or Edge Functions (which are exempt — they're the
-  intended outlet).
-- Use `i` flag for case-insensitivity on the method names.
+1. **Explicit `-X METHOD`** — `-X[[:space:]]*` covers both `-X POST` and
+   the no-space `-XPOST` shorthand. Methods covered: `POST`, `PATCH`,
+   `PUT`, `DELETE`. (Round 1 fix.)
+2. **URL-before-flag ordering** — `curl <url> -X POST ...` is common in
+   shell scripts that build the URL into a variable. The second
+   alternation clause catches this. (Round 1 fix.)
+3. **Implicit POST via `-d` / `--data` / `--data-raw` / `--data-binary`**
+   — curl auto-promotes to POST when these flags are present even
+   without `-X`. (Round 2 fix.)
+4. **Implicit POST via `--data-urlencode`** — same auto-promotion as
+   `-d`, common for form-style payloads. (Round 3 fix.)
+
+Match is narrowed to `.supabase.co/rest/v1/` (PostgREST) so this rule
+does NOT fire for Supabase Auth / Storage / Edge Function endpoints —
+those have separate guidance and Edge Functions are the intended outlet.
+
+The `i` flag is used for case-insensitivity on the method names.
+
+### Accepted false negatives
+
+- `curl --request POST` — uncommon long form; authors using it are
+  expected to know the rule and self-flag.
+- `curl -G ... -d ...` — `-G` overrides curl's auto-promotion and forces
+  GET; `-d` becomes a query-string. Treating this as a mutation would be
+  incorrect.
 
 ## Action
 
