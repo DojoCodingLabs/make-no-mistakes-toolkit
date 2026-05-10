@@ -1566,6 +1566,19 @@
               new_string: ''
       expected_exit: 0
       expected_stderr_contains: 'warn-deletes-console-log'
+    # Lock in the `| strings` null-guard added to parse-input.sh: the first
+    # edit has no old_string key at all, but the rule must still fire on the
+    # second edit's deletion. Without `| strings`, jq would throw on the
+    # null and the rule would silently miss.
+    - name: warns-on-multiedit-with-null-old-string
+      input:
+        tool_input:
+          edits:
+            - new_string: 'inserted line'
+            - old_string: "console.log('debug:', y)"
+              new_string: ''
+      expected_exit: 0
+      expected_stderr_contains: 'warn-deletes-console-log'
     - name: allows-multiedit-not-touching-logs
       input:
         tool_input:
@@ -1642,6 +1655,15 @@
         tool_input:
           file_path: 'plans/2026-05-feature.md'
           content: '## Plan\n\nPhase 1: spike. Phase 2: implement.'
+      expected_exit: 0
+    # Bare ordinal numbers without a time-unit word must not trigger the rule.
+    # The `[[:space:]]*(days?|sprints?|...)` clause only matches when an actual
+    # unit word follows the digits.
+    - name: allows-numbers-without-time-units
+      input:
+        tool_input:
+          file_path: 'plans/2026-05-feature.md'
+          content: 'Phase 1 and Phase 2 cover the implementation; depends on issue 42 closing first.'
       expected_exit: 0
     - name: allows-non-plan-files
       input:
@@ -1812,6 +1834,15 @@
       input:
         tool_input:
           command: 'supabase storage upload my-bucket/originals/foo.zip ./foo.zip'
+      expected_exit: 0
+    # Both source and destination are clean (no suffix anywhere) — must allow.
+    # This locks in the negative path while the positive
+    # `blocks-gcloud-storage-cp` test confirms the rule fires when a sibling-
+    # suffix appears anywhere in the command.
+    - name: allows-clean-source-and-clean-destination-bucket-prefix
+      input:
+        tool_input:
+          command: 'gcloud storage cp ./foo.zip gs://my-bucket/processed/foo.zip'
       expected_exit: 0
     - name: allows-non-storage-cp
       input:
