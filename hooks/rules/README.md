@@ -105,6 +105,17 @@ Adding a new family is fine — just keep ids unique and follow the schema.
   alongside the runtime hook, pre-commit linter, and Storage upload
   validator. See
   [DOJ-3924](https://linear.app/dojocoding/issue/DOJ-3924).
+- **Database / migration discipline**
+  (`schema-sql-outside-migrations`, `warn-psql-against-supabase-remote`,
+  `pr-create-with-migrations-needs-deploy-note`,
+  `block-supabase-db-push-prod`) — keep schema mutations inside
+  versioned `supabase/migrations/` files, nudge developers away from
+  SQL-Editor-style direct execution against `*.supabase.co` hosts,
+  remind PR authors to document migration deployment, and hard-block
+  `supabase db push` aimed at the production project ref. Added after
+  a Slack discussion surfaced drift between manually-applied SQL and
+  the migrations directory when migrations failed to auto-run on
+  staging after a teammate's PR merged.
 
 ## Tier 2 — decomposing non-deterministic memories
 

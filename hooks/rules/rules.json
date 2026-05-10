@@ -882,5 +882,295 @@
         "expected_exit": 0
       }
     ]
+  },
+  {
+    "id": "schema-sql-outside-migrations",
+    "description": "Block schema-changing SQL (ALTER/CREATE/DROP/GRANT/REVOKE/CREATE POLICY) in .sql files outside supabase/migrations/",
+    "applies_to": [
+      "Edit",
+      "Write",
+      "MultiEdit"
+    ],
+    "match": [
+      {
+        "field": "file_path",
+        "pattern": "\\.sql$",
+        "not_pattern": "(supabase/migrations/|supabase/tests/|supabase/seed)"
+      },
+      {
+        "field": "content",
+        "pattern": "\\b(ALTER TABLE|CREATE TABLE|DROP TABLE|CREATE POLICY|DROP POLICY|GRANT |REVOKE |CREATE FUNCTION|DROP FUNCTION|CREATE TYPE|ALTER TYPE)\\b",
+        "flags": "i"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "schema-sql-outside-migrations",
+    "memory_ref": "feedback_scripts_not_db.md",
+    "message": "BLOCKED: schema-changing SQL in a file outside supabase/migrations/.\n\nEvery schema mutation (ALTER/CREATE/DROP/GRANT/POLICY) MUST live in a\ntimestamped migration file, never in ad-hoc scripts or runtime queries.\n\nCreate a new file:\n  supabase/migrations/$(date -u +%Y%m%d%H%M%S)_<slug>.sql\n\nLegitimate exceptions (use the bypass marker):\n- Schema docs / examples in READMEs — should not be executable SQL\n- Test fixtures under supabase/tests/ — already exempt via not_pattern\n",
+    "tests": [
+      {
+        "name": "blocks-create-table-in-script",
+        "input": {
+          "tool_input": {
+            "file_path": "scripts/setup.sql",
+            "content": "CREATE TABLE foo (id int primary key);"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-grant-in-edge-function",
+        "input": {
+          "tool_input": {
+            "file_path": "supabase/functions/foo/migrate.sql",
+            "content": "GRANT SELECT ON foo TO authenticated;"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-alter-table-in-readme-example",
+        "input": {
+          "tool_input": {
+            "file_path": "docs/example.sql",
+            "content": "ALTER TABLE foo ADD COLUMN bar text;"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-schema-in-migrations-folder",
+        "input": {
+          "tool_input": {
+            "file_path": "supabase/migrations/20260509000000_foo.sql",
+            "content": "CREATE TABLE foo (id int primary key);"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-schema-in-tests-folder",
+        "input": {
+          "tool_input": {
+            "file_path": "supabase/tests/foo_test.sql",
+            "content": "CREATE TABLE temp_test_t (id int);"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-schema-sql-anywhere",
+        "input": {
+          "tool_input": {
+            "file_path": "scripts/query.sql",
+            "content": "SELECT * FROM foo;"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "file_path": "scripts/oneshot.sql",
+            "content": "-- # hook-bypass: schema-sql-outside-migrations\nCREATE TABLE foo (id int primary key);\n"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "warn-psql-against-supabase-remote",
+    "description": "Warn when psql/SQL is executed directly against a *.supabase.co host (drift risk vs versioned migrations)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "psql.*\\.supabase\\.co",
+        "flags": "i"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": "psql-supabase-remote",
+    "memory_ref": "feedback_scripts_not_db.md",
+    "message": "WARNING: direct psql execution against a Supabase remote host.\n\nSQL Editor / psql-against-remote workflows create drift between the\nversioned migrations directory and other devs' local databases.\n\nCorrect workflow:\n  1. Add a migration in supabase/migrations/<timestamp>_<slug>.sql\n  2. Test locally:  supabase db reset --local\n  3. Push to develop — CI applies the migration to staging automatically\n  4. For production: William runs the create-release SOP\n\nUse the bypass marker only for legitimate hotfixes where the PR cycle\nis too slow.\n",
+    "tests": [
+      {
+        "name": "warns-on-psql-supabase-remote",
+        "input": {
+          "tool_input": {
+            "command": "psql postgresql://user:pass@db.xepaexmpawtpqtilhcpw.supabase.co:5432/postgres -c 'SELECT 1'"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-psql-against-supabase-remote"
+      },
+      {
+        "name": "warns-on-psql-different-supabase-host",
+        "input": {
+          "tool_input": {
+            "command": "psql -h db.ukwovawzehnebuoowcec.supabase.co -d postgres -c 'CREATE INDEX foo_idx ON foo (id)'"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-psql-against-supabase-remote"
+      },
+      {
+        "name": "allows-psql-localhost",
+        "input": {
+          "tool_input": {
+            "command": "psql -h localhost -p 54322 -d postgres -c 'SELECT 1'"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-psql-supabase-references",
+        "input": {
+          "tool_input": {
+            "command": "curl https://xepaexmpawtpqtilhcpw.supabase.co/rest/v1/foo"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "psql -h db.xepaexmpawtpqtilhcpw.supabase.co -c 'SELECT 1' # hook-bypass: psql-supabase-remote"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "pr-create-with-migrations-needs-deploy-note",
+    "description": "Warn when gh pr create body does not mention migrations (caller should verify the PR has no migration files)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "gh[[:space:]]+pr[[:space:]]+create.*--body",
+        "flags": "i"
+      },
+      {
+        "field": "command",
+        "not_pattern": "(migration|db push|supabase db|migration-deployment|requires.*staging|requires.*prod)",
+        "flags": "i"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": "pr-create-no-migration-note",
+    "memory_ref": "feedback_scripts_not_db.md",
+    "message": "WARNING: gh pr create body does not mention migrations.\n\nIf your PR modifies files under supabase/migrations/, the body MUST\ninclude a \"Migration deployment\" section that lists:\n  1. Which envs need supabase db push (staging auto via CI; prod via release)\n  2. Backfill order if the migrations depend on existing data\n  3. Post-merge verification steps\n\nThis rule does NOT inspect the diff — it only reads the command. Use\nthe bypass marker if your PR has no migrations.\n",
+    "tests": [
+      {
+        "name": "warns-on-pr-create-body-without-migration-mention",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --base develop --title \"feat: foo\" --body \"Adds feature X\""
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "pr-create-with-migrations-needs-deploy-note"
+      },
+      {
+        "name": "allows-pr-create-body-mentioning-migration",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --base develop --title \"feat: foo\" --body \"Adds X. Migration deployment: requires supabase db push on staging\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-pr-create-body-mentioning-db-push",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --body \"Use db push to apply\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "gh pr create --body \"release notes only # hook-bypass: pr-create-no-migration-note\""
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "block-supabase-db-push-prod",
+    "description": "Block supabase db push targeting the PRODUCTION project ref without an explicit bypass marker",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "supabase[[:space:]]+db[[:space:]]+push.*ukwovawzehnebuoowcec"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "prod-db-push-approved",
+    "memory_ref": "feedback_never_touch_prod_without_approval.md",
+    "message": "BLOCKED: supabase db push targeting the PRODUCTION project ref\n(ukwovawzehnebuoowcec).\n\nNEVER run against production without explicit user approval — see\nfeedback_never_touch_prod_without_approval.md.\n\nCorrect workflow:\n  1. Merge to main\n  2. William runs the release per the SOP at\n     https://github.com/DojoCodingLabs/dojo-os/blob/develop/.claude/commands/create-release.md\n\nUse the bypass marker ONLY when the user has verbally approved the\noperation.\n",
+    "tests": [
+      {
+        "name": "blocks-supabase-db-push-prod",
+        "input": {
+          "tool_input": {
+            "command": "supabase db push --db-url postgresql://postgres:pwd@db.ukwovawzehnebuoowcec.supabase.co:5432/postgres"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-supabase-db-push-prod-with-project-ref-flag",
+        "input": {
+          "tool_input": {
+            "command": "supabase db push --project-ref ukwovawzehnebuoowcec"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-supabase-db-push-staging",
+        "input": {
+          "tool_input": {
+            "command": "supabase db push --project-ref xepaexmpawtpqtilhcpw"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-supabase-db-push-local",
+        "input": {
+          "tool_input": {
+            "command": "supabase db push"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "supabase db push --project-ref ukwovawzehnebuoowcec # hook-bypass: prod-db-push-approved"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
   }
 ]
