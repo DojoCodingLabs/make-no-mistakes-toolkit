@@ -1376,5 +1376,475 @@
         "expected_exit": 0
       }
     ]
+  },
+  {
+    "id": "block-playwright-headless",
+    "description": "Block `playwright test` invocations that omit --headed / --ui / --debug (memory feedback_no_headless.md — browser must be visible during E2E)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "\\bplaywright[[:space:]]+test\\b"
+      },
+      {
+        "field": "command",
+        "not_pattern": "(--headed|--ui|--debug)"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "playwright-headless-allowed",
+    "memory_ref": "feedback_no_headless.md",
+    "message": "BLOCKED: `playwright test` without --headed / --ui / --debug.\n\nPer feedback_no_headless.md the browser must be visible during E2E:\nheadless runs hide visual regressions and UI race conditions, and\nthe in-focus requirement only holds when a window is up.\n\nUse one of:\n  - --headed   browser visible\n  - --ui       Playwright UI mode (interactive)\n  - --debug    step-through debugger\n\nBypass marker (playwright-headless-allowed) is reserved for\nexplicitly-documented CI runs (e.g. a Vercel preview workflow).\n",
+    "tests": [
+      {
+        "name": "blocks-playwright-test-bare",
+        "input": {
+          "tool_input": {
+            "command": "npx playwright test"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-playwright-test-config",
+        "input": {
+          "tool_input": {
+            "command": "npx playwright test --config=playwright.config.ts"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-playwright-headed",
+        "input": {
+          "tool_input": {
+            "command": "npx playwright test --headed"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-playwright-ui",
+        "input": {
+          "tool_input": {
+            "command": "npx playwright test --ui"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-playwright-debug",
+        "input": {
+          "tool_input": {
+            "command": "npx playwright test --debug"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-playwright-test",
+        "input": {
+          "tool_input": {
+            "command": "npm test"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "blocks-pnpm-dlx-playwright-headless",
+        "input": {
+          "tool_input": {
+            "command": "pnpm dlx playwright test"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-yarn-dlx-playwright-headless",
+        "input": {
+          "tool_input": {
+            "command": "yarn dlx playwright test"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-pnpm-dlx-playwright-headed",
+        "input": {
+          "tool_input": {
+            "command": "pnpm dlx playwright test --headed"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "npx playwright test # hook-bypass: playwright-headless-allowed"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "block-git-force-push-no-lease",
+    "description": "Block `git push --force` / `-f` without `--force-with-lease` (overwrites collaborator pushes silently)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "git[[:space:]]+push.*(-f\\b|--force([[:space:]]|$))"
+      },
+      {
+        "field": "command",
+        "not_pattern": "--force-with-lease"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "git-force-push-bare-allowed",
+    "memory_ref": "feedback_resolve_merge_conflicts.md",
+    "message": "BLOCKED: `git push --force` without --force-with-lease.\n\nBare --force overwrites the remote without verifying that what is\nthere is what you last fetched — it silently destroys collaborator\npushes. --force-with-lease aborts when the remote has advanced since\nyour last fetch, which is the safety net you want.\n\nUse:\n  git push --force-with-lease origin <branch>\n\nBypass marker (git-force-push-bare-allowed) ONLY when you have\nverified that no other contributor has pushed to the branch.\n",
+    "tests": [
+      {
+        "name": "blocks-force-short-flag",
+        "input": {
+          "tool_input": {
+            "command": "git push -f origin feature-x"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-force-long-flag",
+        "input": {
+          "tool_input": {
+            "command": "git push --force origin feature-x"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-force-with-lease",
+        "input": {
+          "tool_input": {
+            "command": "git push --force-with-lease origin feature-x"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-no-force-push",
+        "input": {
+          "tool_input": {
+            "command": "git push origin feature-x"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-force-with-lease-and-force-combined",
+        "input": {
+          "tool_input": {
+            "command": "git push -f origin main --force-with-lease"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "git push --force origin feature-x # hook-bypass: git-force-push-bare-allowed"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "block-git-rebase-skip",
+    "description": "Block `git rebase --skip` (drops the conflicting commit silently)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "git[[:space:]]+rebase[[:space:]]+--skip\\b"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "git-rebase-skip-acknowledged",
+    "memory_ref": "feedback_resolve_merge_conflicts.md",
+    "message": "BLOCKED: `git rebase --skip` drops the conflicting commit silently.\n\nPer feedback_resolve_merge_conflicts.md: never skip; resolve each\nconflict one by one, verify the result, and `git rebase --continue`.\n\nCorrect moves:\n  - Resolve manually, `git add`, `git rebase --continue`\n  - If the commit is genuinely obsolete, `git rebase --abort` and\n    cherry-pick the commits you want\n  - Bypass marker (git-rebase-skip-acknowledged) ONLY with explicit\n    acknowledgement of the data loss\n",
+    "tests": [
+      {
+        "name": "blocks-rebase-skip",
+        "input": {
+          "tool_input": {
+            "command": "git rebase --skip"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-rebase-continue",
+        "input": {
+          "tool_input": {
+            "command": "git rebase --continue"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-rebase-abort",
+        "input": {
+          "tool_input": {
+            "command": "git rebase --abort"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-rebase-command",
+        "input": {
+          "tool_input": {
+            "command": "git status"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "git rebase --skip # hook-bypass: git-rebase-skip-acknowledged"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "block-standup-not-in-escritorio",
+    "description": "Block `daily-standup*.md` writes anywhere outside ~/Escritorio (memory feedback_standup_desktop.md)",
+    "applies_to": [
+      "Edit",
+      "Write",
+      "MultiEdit"
+    ],
+    "match": [
+      {
+        "field": "file_path",
+        "pattern": "daily-standup.*\\.md$",
+        "not_pattern": "(/Escritorio/|/Desktop/)"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "standup-non-desktop-acknowledged",
+    "memory_ref": "feedback_standup_desktop.md",
+    "message": "BLOCKED: daily-standup file being written outside ~/Escritorio.\n\nPer feedback_standup_desktop.md the standup lives in ~/Escritorio,\nNEVER inside a repo (commit-by-accident risk + cross-repo\nfragmentation). The standup-post-slack skill always resolves the\npath from ~/Escritorio.\n\nUse the absolute path:\n  ~/Escritorio/daily-standup.md\n(or ~/Desktop/daily-standup.md on English-locale machines).\n\nBypass marker is intentionally NOT recommended — there is no\nlegitimate path outside the desktop.\n",
+    "tests": [
+      {
+        "name": "blocks-standup-in-repo",
+        "input": {
+          "tool_input": {
+            "file_path": "/home/user/repo/docs/daily-standup.md",
+            "content": "# Standup 2026-05-09"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-standup-in-tmp",
+        "input": {
+          "tool_input": {
+            "file_path": "/tmp/daily-standup.md",
+            "content": "# Standup"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-standup-in-escritorio",
+        "input": {
+          "tool_input": {
+            "file_path": "/home/user/Escritorio/daily-standup.md",
+            "content": "# Standup"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-standup-in-desktop-english",
+        "input": {
+          "tool_input": {
+            "file_path": "/home/user/Desktop/daily-standup.md",
+            "content": "# Standup"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-standup-file",
+        "input": {
+          "tool_input": {
+            "file_path": "/home/user/repo/docs/notes.md",
+            "content": "# Notes"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker-write-tool",
+        "input": {
+          "tool_input": {
+            "file_path": "/tmp/daily-standup.md",
+            "content": "# Standup // hook-bypass: standup-non-desktop-acknowledged"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker-edit-tool",
+        "input": {
+          "tool_input": {
+            "file_path": "/tmp/daily-standup.md",
+            "old_string": "# Old",
+            "new_string": "# Standup // hook-bypass: standup-non-desktop-acknowledged"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker-multiedit-tool",
+        "input": {
+          "tool_input": {
+            "file_path": "/tmp/daily-standup.md",
+            "edits": [
+              {
+                "old_string": "# A",
+                "new_string": "# B // hook-bypass: standup-non-desktop-acknowledged"
+              }
+            ]
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "block-goodnight-not-in-escritorio",
+    "description": "Block /goodnight handoff files (`next-day-*.md` / `goodnight-*.md`) anywhere outside ~/Escritorio (memory feedback_goodnight_desktop.md)",
+    "applies_to": [
+      "Edit",
+      "Write",
+      "MultiEdit"
+    ],
+    "match": [
+      {
+        "field": "file_path",
+        "pattern": "(next-day-|goodnight-).*\\.md$",
+        "not_pattern": "(/Escritorio/|/Desktop/)"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "goodnight-non-desktop-acknowledged",
+    "memory_ref": "feedback_goodnight_desktop.md",
+    "message": "BLOCKED: /goodnight handoff file being written outside ~/Escritorio.\n\nPer feedback_goodnight_desktop.md the /goodnight skill must save\nnext-day handoff files to ~/Escritorio, NOT inside .claude/next-day/\nor any repo path.\n\nUse the absolute path:\n  ~/Escritorio/<filename>.md\n(or ~/Desktop/<filename>.md on English-locale machines).\n\nBypass marker is intentionally NOT recommended.\n",
+    "tests": [
+      {
+        "name": "blocks-next-day-in-claude-dir",
+        "input": {
+          "tool_input": {
+            "file_path": "/home/user/.claude/next-day/next-day-2026-05-09.md",
+            "content": "# Handoff"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-goodnight-in-tmp",
+        "input": {
+          "tool_input": {
+            "file_path": "/tmp/goodnight-context.md",
+            "content": "# Goodnight"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-next-day-in-escritorio",
+        "input": {
+          "tool_input": {
+            "file_path": "/home/user/Escritorio/next-day-2026-05-09.md",
+            "content": "# Handoff"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-goodnight-in-desktop",
+        "input": {
+          "tool_input": {
+            "file_path": "/home/user/Desktop/goodnight-2026-05-09.md",
+            "content": "# Handoff"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-handoff-file",
+        "input": {
+          "tool_input": {
+            "file_path": "/home/user/repo/docs/notes.md",
+            "content": "# Notes"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker-write-tool",
+        "input": {
+          "tool_input": {
+            "file_path": "/tmp/next-day-2026-05-09.md",
+            "content": "# Handoff // hook-bypass: goodnight-non-desktop-acknowledged"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker-edit-tool",
+        "input": {
+          "tool_input": {
+            "file_path": "/tmp/next-day-2026-05-09.md",
+            "old_string": "# Old",
+            "new_string": "# Handoff // hook-bypass: goodnight-non-desktop-acknowledged"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker-multiedit-tool",
+        "input": {
+          "tool_input": {
+            "file_path": "/tmp/next-day-2026-05-09.md",
+            "edits": [
+              {
+                "old_string": "# A",
+                "new_string": "# B // hook-bypass: goodnight-non-desktop-acknowledged"
+              }
+            ]
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
   }
 ]

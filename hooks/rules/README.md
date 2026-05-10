@@ -161,6 +161,21 @@ Adding a new family is fine — just keep ids unique and follow the schema.
   migrations directory when migrations failed to auto-run after a
   teammate's PR merged.
 
+- **Anti foot-shoot (Tier 1)** (`block-playwright-headless`,
+  `block-git-force-push-no-lease`, `block-git-rebase-skip`,
+  `block-standup-not-in-escritorio`, `block-goodnight-not-in-escritorio`)
+  — hard stops on the high-cost mistakes that already burned the team:
+  headless E2E runs (a Playwright invocation without `--headed` /
+  `--ui` / `--debug` is blocked per `feedback_no_headless.md`), bare
+  `git push --force` / `-f` without `--force-with-lease` (silent
+  collaborator-push overwrites, per `feedback_resolve_merge_conflicts.md`),
+  `git rebase --skip` (silent commit drop, same memory),
+  and writes of `daily-standup*.md` / `next-day-*.md` / `goodnight-*.md`
+  outside `~/Escritorio` (per the desktop-handoff memories
+  `feedback_standup_desktop.md` and `feedback_goodnight_desktop.md`).
+  Each rule ships a kebab-case bypass marker for the rare cases where
+  the action is intentional and documented.
+
 ## Tier 2 — decomposing non-deterministic memories
 
 Many narrative-style guidelines can be converted to deterministic rules
