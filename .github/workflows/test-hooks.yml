@@ -14,7 +14,9 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Use Blacksmith managed runners (same pattern as dojo-os) to avoid the
+    # GitHub-hosted billing block. Drop-in replacement for ubuntu-latest.
+    runs-on: blacksmith-2vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
 
