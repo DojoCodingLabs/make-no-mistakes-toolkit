@@ -410,3 +410,268 @@
         tool_input:
           text: 'La migración fue exitosa'
       expected_exit: 0
+
+# -----------------------------------------------------------------------------
+# Design System rules (DOJ-3924)
+#
+# These four rules implement AI-write-time enforcement for the Dojo Design
+# System. They are the 4th enforcement layer, complementing the dojo-os
+# repo's existing layers:
+#   1. useDsRules React hook (passive, runtime-only)
+#   2. ds-lint pre-commit hook (post-author, post-write)
+#   3. validate-storage-upload Edge Function (Storage bucket uploads)
+#   4. THIS layer — PreToolUse on Edit/Write/MultiEdit (write-time, blocks
+#      the violation BEFORE the file is touched, tightest feedback loop)
+#
+# Linear: DOJ-3924 (Phase G of DOJ-3439 design-system-linter).
+# -----------------------------------------------------------------------------
+
+- id: ds-arbitrary-breakpoint
+  description: 'Block arbitrary Tailwind breakpoints (min-[Xpx]) in TSX/JSX/TS source — use sm:/md:/lg:/xl:/2xl: preset breakpoints'
+  applies_to: [Edit, Write, MultiEdit]
+  match:
+    - field: file_path
+      pattern: '\.(tsx|jsx|ts|js)$'
+    - field: content
+      pattern: 'min-\[[0-9]+px\]'
+  action: block
+  bypass_marker: ds-arbitrary-breakpoint
+  memory_ref: feedback_design_system_no_arbitrary_breakpoints.md
+  message: |
+    BLOCKED: arbitrary Tailwind breakpoint detected (min-[Xpx]).
+
+    Use Tailwind's preset breakpoints instead: sm: (640px), md: (768px),
+    lg: (1024px), xl: (1280px), 2xl: (1536px). Arbitrary values fragment
+    the responsive design language and break consistency across the app.
+
+    If a non-preset breakpoint is genuinely required, add
+    "// hook-bypass: ds-arbitrary-breakpoint" to the line and justify
+    in the PR description.
+  tests:
+    - name: blocks-min-1200px-in-tsx
+      input:
+        tool_input:
+          file_path: 'src/components/foo.tsx'
+          content: '<div className="min-[1200px]:flex">x</div>'
+      expected_exit: 2
+    - name: blocks-min-768-arbitrary
+      input:
+        tool_input:
+          file_path: 'src/pages/Bar.tsx'
+          content: '<div className="min-[768px]:block">y</div>'
+      expected_exit: 2
+    - name: allows-preset-md
+      input:
+        tool_input:
+          file_path: 'src/components/foo.tsx'
+          content: '<div className="md:flex">x</div>'
+      expected_exit: 0
+    - name: allows-non-tsx-files
+      input:
+        tool_input:
+          file_path: 'docs/example.md'
+          content: 'Use min-[1200px] for ...'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          file_path: 'src/components/foo.tsx'
+          content: '<div className="min-[1380px]:hidden">x</div> // hook-bypass: ds-arbitrary-breakpoint'
+      expected_exit: 0
+
+- id: ds-deep-ui-import
+  description: Block deep imports from @/components/ui/<file> — always import from the barrel @/components/ui
+  applies_to: [Edit, Write, MultiEdit]
+  match:
+    - field: file_path
+      pattern: '\.(tsx|jsx|ts)$'
+    - field: content
+      pattern: 'from[[:space:]]+["'']@/components/ui/[a-zA-Z][a-zA-Z0-9_-]+["'']'
+  action: block
+  bypass_marker: ds-deep-ui-import
+  memory_ref: feedback_design_system_barrel_imports.md
+  message: |
+    BLOCKED: deep import from @/components/ui/<file> detected.
+
+    Always import Design System components from the barrel:
+      import { Button, Card, TextInput } from "@/components/ui"
+
+    Deep imports like @/components/ui/button bypass the barrel-controlled
+    surface and make refactors brittle. The barrel is the public API.
+  tests:
+    - name: blocks-deep-button-import
+      input:
+        tool_input:
+          file_path: 'src/pages/Foo.tsx'
+          content: 'import { Button } from "@/components/ui/button"'
+      expected_exit: 2
+    - name: blocks-deep-textinput-import
+      input:
+        tool_input:
+          file_path: 'src/components/Bar.tsx'
+          content: "import { TextInput } from '@/components/ui/text-input'"
+      expected_exit: 2
+    - name: allows-barrel-import
+      input:
+        tool_input:
+          file_path: 'src/pages/Foo.tsx'
+          content: 'import { Button, Card } from "@/components/ui"'
+      expected_exit: 0
+    - name: allows-non-ds-import
+      input:
+        tool_input:
+          file_path: 'src/pages/Foo.tsx'
+          content: 'import { foo } from "@/lib/utils"'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          file_path: 'src/pages/Foo.tsx'
+          content: 'import { Button } from "@/components/ui/button" // hook-bypass: ds-deep-ui-import'
+      expected_exit: 0
+
+- id: ds-arbitrary-fixed-width-in-ds-component
+  description: Block arbitrary fixed widths (w-[Xpx]) inside DS components — they must be flexible (w-full + max-w)
+  applies_to: [Edit, Write, MultiEdit]
+  match:
+    # Anchor on start-of-string OR a leading "/" so the rule fires for both
+    # relative paths ("src/components/ui/...") and absolute paths
+    # ("/home/user/repo/src/components/ui/..."). Claude Code's Edit/Write
+    # tools may pass either form at runtime.
+    - field: file_path
+      pattern: '(^|/)src/components/ui/'
+    - field: content
+      # Require the `w` to NOT be preceded by a letter/dash so we don't
+      # mis-flag legitimate composite utilities like max-w-[200px] or
+      # min-w-[120px]. ERE has no lookahead, so we anchor on a leading
+      # boundary of "start-of-line OR non-[a-zA-Z-] character".
+      pattern: '(^|[^a-zA-Z-])w-\[[0-9]+px\]'
+  action: block
+  bypass_marker: ds-arbitrary-fixed-width
+  memory_ref: feedback_design_system_no_fixed_pixel_widths.md
+  message: |
+    BLOCKED: arbitrary fixed pixel width in a DS component.
+
+    DS components live under src/components/ui/ and must be flexible.
+    Use w-full + max-w-[Xpx] instead of w-[Xpx], so the component
+    adapts to its container.
+
+    Application-level usage (outside src/components/ui/) is exempt —
+    this rule only fires when editing the DS components themselves.
+  tests:
+    - name: blocks-w-pixel-in-ui-button
+      input:
+        tool_input:
+          file_path: 'src/components/ui/button.tsx'
+          content: '<button className="w-[120px]">x</button>'
+      expected_exit: 2
+    - name: blocks-w-pixel-in-ui-card
+      input:
+        tool_input:
+          file_path: 'src/components/ui/card.tsx'
+          content: '<div className="w-[300px] p-4">y</div>'
+      expected_exit: 2
+    # Regression: Claude Code passes absolute paths to Edit/Write at runtime.
+    # Without the (^|/) anchor the rule would silently allow these (the bug
+    # Greptile flagged in PR #14).
+    - name: blocks-w-pixel-in-ui-button-absolute-path
+      input:
+        tool_input:
+          file_path: '/home/user/repo/src/components/ui/button.tsx'
+          content: '<button className="w-[120px]">x</button>'
+      expected_exit: 2
+    - name: allows-w-pixel-outside-ds
+      input:
+        tool_input:
+          file_path: 'src/pages/Settings.tsx'
+          content: '<div className="w-[300px]">page-specific</div>'
+      expected_exit: 0
+    - name: allows-w-full-max-w
+      input:
+        tool_input:
+          file_path: 'src/components/ui/button.tsx'
+          content: '<button className="w-full max-w-[200px]">x</button>'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          file_path: 'src/components/ui/special.tsx'
+          content: '<div className="w-[42px]">px-perfect-icon</div> // hook-bypass: ds-arbitrary-fixed-width'
+      expected_exit: 0
+
+- id: ds-raw-hex-color-in-source
+  description: Warn on raw hex color literals in TSX/TS source — colors must come from Tailwind tokens (dojo-primary-*, etc.)
+  applies_to: [Edit, Write, MultiEdit]
+  match:
+    - field: file_path
+      pattern: '\.(tsx|jsx|ts|js)$'
+      not_pattern: '(tailwind\.config|theme/|design-system/|design-tokens|\.test\.|\.stories\.)'
+    - field: content
+      pattern: '#[0-9a-fA-F]{6}\b'
+  action: warn
+  bypass_marker: ds-raw-hex-color
+  memory_ref: feedback_design_system_token_only_colors.md
+  message: |
+    WARNING: raw hex color literal found in source.
+
+    Use a Tailwind token instead (e.g., bg-dojo-primary-lilac, text-dojo-foreground).
+    The token system is the single source of truth for color and theming.
+
+    Exempt paths (NOT flagged): tailwind.config.*, theme/, design-system/,
+    design-tokens, .test.*, .stories.*. Use the bypass marker if a hex is
+    genuinely required outside those paths (e.g. embedding a brand color
+    in a logo SVG that the design system doesn't yet expose).
+  tests:
+    - name: warns-on-raw-hex-in-tsx
+      input:
+        tool_input:
+          file_path: 'src/components/foo.tsx'
+          content: '<div style={{ color: "#FF7151" }}>x</div>'
+      expected_exit: 0
+      expected_stderr_contains: 'ds-raw-hex-color-in-source'
+    - name: warns-on-raw-hex-in-ts
+      input:
+        tool_input:
+          file_path: 'src/lib/util.ts'
+          content: 'const PRIMARY = "#C980FC"'
+      expected_exit: 0
+      expected_stderr_contains: 'ds-raw-hex-color-in-source'
+    - name: allows-tailwind-config
+      input:
+        tool_input:
+          file_path: 'tailwind.config.ts'
+          content: 'lilac: "#C980FC"'
+      expected_exit: 0
+    - name: allows-theme-file
+      input:
+        tool_input:
+          file_path: 'src/theme/tokens.ts'
+          content: 'export const PRIMARY = "#C980FC"'
+      expected_exit: 0
+    - name: allows-test-file
+      input:
+        tool_input:
+          file_path: 'src/components/foo.test.tsx'
+          content: 'expect(color).toBe("#FF7151")'
+      expected_exit: 0
+    # Lock in the design-system/ exemption so a future regex tweak that
+    # accidentally narrows not_pattern fails this test.
+    - name: allows-design-system-folder
+      input:
+        tool_input:
+          file_path: 'src/design-system/tokens.ts'
+          content: 'export const PRIMARY = "#C980FC"'
+      expected_exit: 0
+    # Lock in the design-tokens exemption (matches both folder and filename).
+    - name: allows-design-tokens-file
+      input:
+        tool_input:
+          file_path: 'src/lib/design-tokens.ts'
+          content: 'export const LILAC = "#C980FC"'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          file_path: 'src/components/Logo.tsx'
+          content: '<svg fill="#FF7151" /> // hook-bypass: ds-raw-hex-color'
+      expected_exit: 0

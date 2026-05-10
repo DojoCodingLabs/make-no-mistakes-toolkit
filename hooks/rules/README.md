@@ -84,6 +84,28 @@ client-acme
 client-beta
 ```
 
+## Rule families
+
+The manifest groups rules into informal families by prefix / domain.
+Adding a new family is fine — just keep ids unique and follow the schema.
+
+- **Bash safety** (`ssh-db-mutation`, `gcloud-missing-project`,
+  `prod-ops-no-approval`, `destructive-db-ops`, `manual-edge-fn-deploy`)
+  — block / warn on dangerous shell invocations.
+- **File safety** (`minified-build-output`, `secrets-hardcoded`)
+  — block writes of minified build artifacts and hardcoded credentials.
+- **Slack style** (`slack-unicode-bullets`, `slack-tables-no-codeblock`,
+  `slack-spanish-tildes`) — warn-only formatting nudges.
+- **Design System** (`ds-arbitrary-breakpoint`, `ds-deep-ui-import`,
+  `ds-arbitrary-fixed-width-in-ds-component`,
+  `ds-raw-hex-color-in-source`) — block / warn at write-time when AI
+  proposes Edit/Write/MultiEdit changes that violate the Dojo Design
+  System contract (preset breakpoints, barrel imports, flexible widths,
+  token-only colors). Added in DOJ-3924 as the 4th enforcement layer
+  alongside the runtime hook, pre-commit linter, and Storage upload
+  validator. See
+  [DOJ-3924](https://linear.app/dojocoding/issue/DOJ-3924).
+
 ## Tier 2 — decomposing non-deterministic memories
 
 Many narrative-style guidelines can be converted to deterministic rules
