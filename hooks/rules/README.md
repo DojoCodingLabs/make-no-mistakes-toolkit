@@ -145,17 +145,21 @@ Adding a new family is fine — just keep ids unique and follow the schema.
 - **Database / migration discipline**
   (`schema-sql-outside-migrations`, `warn-psql-against-supabase-remote`,
   `pr-create-with-migrations-needs-deploy-note`,
-  `block-supabase-db-push-prod`) — keep schema mutations inside
-  versioned `supabase/migrations/` files, nudge developers away from
-  direct `psql` / `pg_dump` / `pg_restore` execution against
-  `*.supabase.co` hosts, remind PR authors to document migration
-  deployment, and hard-block `supabase db push` aimed at the production
-  project ref or `--linked` (which transparently resolves to whichever
-  project was last linked, possibly production). The production project
-  ref is configured per install via the substitutions mechanism described
-  above (`PROD_SUPABASE_REF` token). Added after a discussion surfaced
-  drift between manually-applied SQL and the migrations directory when
-  migrations failed to auto-run after a teammate's PR merged.
+  `block-supabase-db-push-prod`, `warn-curl-mutating-supabase-rest`) —
+  keep schema mutations inside versioned `supabase/migrations/` files,
+  nudge developers away from direct `psql` / `pg_dump` / `pg_restore`
+  execution against `*.supabase.co` hosts, remind PR authors to document
+  migration deployment, hard-block `supabase db push` aimed at the
+  production project ref or `--linked` (which transparently resolves to
+  whichever project was last linked, possibly production), and warn on
+  ad-hoc mutating `curl` (`POST` / `PATCH` / `PUT` / `DELETE`) against
+  the Supabase PostgREST endpoint (drift risk equivalent to direct `psql`
+  + RLS bypass — same memory ref `feedback_scripts_not_db.md`). The
+  production project ref is configured per install via the substitutions
+  mechanism described above (`PROD_SUPABASE_REF` token). Added after a
+  discussion surfaced drift between manually-applied SQL and the
+  migrations directory when migrations failed to auto-run after a
+  teammate's PR merged.
 
 ## Tier 2 — decomposing non-deterministic memories
 
