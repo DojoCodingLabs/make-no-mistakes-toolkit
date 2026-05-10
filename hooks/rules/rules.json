@@ -2405,18 +2405,18 @@
   },
   {
     "id": "warn-bash-mutation-without-leading-cd",
-    "description": "Warn when bash mutation commands (git commit/push/mv/rm/reset/merge/revert, sed -i, gh pr create/merge) don't start with explicit `cd /<path>` — prevents commits landing on the wrong branch when working across multiple parallel worktrees",
+    "description": "Warn when bash mutation commands (git commit/push/mv/rm/reset/merge/revert, sed -i / sed --in-place, gh pr create/merge/edit) don't start with an absolute-path `cd /<...>` (or `pushd /<...>`, `cd ~/<...>`, `cd $VAR/<...>`) — prevents commits landing on the wrong branch when working across multiple parallel worktrees",
     "applies_to": [
       "Bash"
     ],
     "match": [
       {
         "field": "command",
-        "pattern": "git[[:space:]]+(commit|push|mv|rm[[:space:]]|reset|revert|merge)|sed[[:space:]]+-i[[:space:]]|gh[[:space:]]+pr[[:space:]]+(create|merge|edit)"
+        "pattern": "git[[:space:]]+(commit|push|mv|rm[[:space:]]|reset|revert|merge)|sed[[:space:]]+-i([[:space:]]|[^[:space:]-])|sed[[:space:]]+--in-place[[:space:]]|gh[[:space:]]+pr[[:space:]]+(create|merge|edit)"
       },
       {
         "field": "command",
-        "not_pattern": "^[[:space:]]*(cd|pushd)[[:space:]]+"
+        "not_pattern": "^[[:space:]]*(cd|pushd)[[:space:]]+(/|~|\\$)"
       }
     ],
     "action": "warn",
@@ -2458,10 +2458,60 @@
         "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
       },
       {
+        "name": "warns-on-git-rm-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "git rm path/to/file.md"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
         "name": "warns-on-sed-i-no-cd",
         "input": {
           "tool_input": {
             "command": "sed -i s/foo/bar/g content/file.md"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-sed-i-bak-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "sed -i.bak s/foo/bar/g content/file.md"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-sed-in-place-long-form-no-cd",
+        "input": {
+          "tool_input": {
+            "command": "sed --in-place s/foo/bar/g content/file.md"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-git-commit-with-relative-cd",
+        "input": {
+          "tool_input": {
+            "command": "cd worktree-dir && git commit -m \"fix\""
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-bash-mutation-without-leading-cd"
+      },
+      {
+        "name": "warns-on-git-push-with-dotdot-cd",
+        "input": {
+          "tool_input": {
+            "command": "cd ../sibling-dir && git push"
           }
         },
         "expected_exit": 0,
@@ -2511,6 +2561,24 @@
         "input": {
           "tool_input": {
             "command": "pushd /home/user/repo && git commit -m fix"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "passes-with-tilde-cd-prefix",
+        "input": {
+          "tool_input": {
+            "command": "cd ~/repo && git commit -m fix"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "passes-with-env-var-cd-prefix",
+        "input": {
+          "tool_input": {
+            "command": "cd $WORKTREE && git push"
           }
         },
         "expected_exit": 0

@@ -1921,15 +1921,19 @@
       expected_exit: 0
 
 - id: warn-bash-mutation-without-leading-cd
-  description: Warn when bash mutation commands (git commit/push/mv/rm/reset/merge/revert, sed -i, gh pr create/merge) don't start with explicit `cd /<path>` — prevents commits landing on the wrong branch when working across multiple parallel worktrees
+  description: Warn when bash mutation commands (git commit/push/mv/rm/reset/merge/revert, sed -i / sed --in-place, gh pr create/merge/edit) don't start with an absolute-path `cd /<...>` (or `pushd /<...>`, `cd ~/<...>`, `cd $VAR/<...>`) — prevents commits landing on the wrong branch when working across multiple parallel worktrees
   applies_to: [Bash]
   match:
-    # Positive: command contains a state-mutating op
+    # Positive: command contains a state-mutating op.
+    # sed pattern covers: `sed -i `, `sed -i.bak`, `sed -ibackup`, and long form `sed --in-place`.
     - field: command
-      pattern: 'git[[:space:]]+(commit|push|mv|rm[[:space:]]|reset|revert|merge)|sed[[:space:]]+-i[[:space:]]|gh[[:space:]]+pr[[:space:]]+(create|merge|edit)'
-    # Negative: command does NOT begin with `cd ` or `pushd `
+      pattern: 'git[[:space:]]+(commit|push|mv|rm[[:space:]]|reset|revert|merge)|sed[[:space:]]+-i([[:space:]]|[^[:space:]-])|sed[[:space:]]+--in-place[[:space:]]|gh[[:space:]]+pr[[:space:]]+(create|merge|edit)'
+    # Negative: command must START with `cd <absolute-path>` or `pushd <absolute-path>`.
+    # Accepts: cd /full/path, pushd /full/path, cd ~/path, cd $VAR/path (env vars assumed absolute).
+    # Rejects: cd worktree-dir (relative path — DOESN'T fix the cwd-confusion bug because if
+    # cwd is already in the wrong worktree, `cd relative-dir` resolves to the wrong place).
     - field: command
-      not_pattern: '^[[:space:]]*(cd|pushd)[[:space:]]+'
+      not_pattern: '^[[:space:]]*(cd|pushd)[[:space:]]+(/|~|\$)'
   action: warn
   bypass_marker: cd-worktree-rule
   memory_ref: feedback_cd_between_worktrees.md
@@ -1975,10 +1979,40 @@
           command: 'git mv content/old content/new'
       expected_exit: 0
       expected_stderr_contains: 'warn-bash-mutation-without-leading-cd'
+    - name: warns-on-git-rm-no-cd
+      input:
+        tool_input:
+          command: 'git rm path/to/file.md'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-bash-mutation-without-leading-cd'
     - name: warns-on-sed-i-no-cd
       input:
         tool_input:
           command: 'sed -i s/foo/bar/g content/file.md'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-bash-mutation-without-leading-cd'
+    - name: warns-on-sed-i-bak-no-cd
+      input:
+        tool_input:
+          command: 'sed -i.bak s/foo/bar/g content/file.md'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-bash-mutation-without-leading-cd'
+    - name: warns-on-sed-in-place-long-form-no-cd
+      input:
+        tool_input:
+          command: 'sed --in-place s/foo/bar/g content/file.md'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-bash-mutation-without-leading-cd'
+    - name: warns-on-git-commit-with-relative-cd
+      input:
+        tool_input:
+          command: 'cd worktree-dir && git commit -m "fix"'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-bash-mutation-without-leading-cd'
+    - name: warns-on-git-push-with-dotdot-cd
+      input:
+        tool_input:
+          command: 'cd ../sibling-dir && git push'
       expected_exit: 0
       expected_stderr_contains: 'warn-bash-mutation-without-leading-cd'
     - name: warns-on-gh-pr-create-no-cd
@@ -2008,6 +2042,16 @@
       input:
         tool_input:
           command: 'pushd /home/user/repo && git commit -m fix'
+      expected_exit: 0
+    - name: passes-with-tilde-cd-prefix
+      input:
+        tool_input:
+          command: 'cd ~/repo && git commit -m fix'
+      expected_exit: 0
+    - name: passes-with-env-var-cd-prefix
+      input:
+        tool_input:
+          command: 'cd $WORKTREE && git push'
       expected_exit: 0
     - name: passes-on-git-status
       input:
