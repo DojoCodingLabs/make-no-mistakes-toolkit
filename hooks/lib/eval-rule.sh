@@ -96,10 +96,11 @@ while [ "$i" -lt "$N_CONDITIONS" ]; do
 
   # Resolve which input variable to inspect.
   case "$FIELD" in
-    command)   VALUE="$INPUT_COMMAND" ;;
-    file_path) VALUE="$INPUT_FILE_PATH" ;;
-    content)   VALUE="$INPUT_CONTENT" ;;
-    text)      VALUE="$INPUT_TEXT" ;;
+    command)    VALUE="$INPUT_COMMAND" ;;
+    file_path)  VALUE="$INPUT_FILE_PATH" ;;
+    content)    VALUE="$INPUT_CONTENT" ;;
+    text)       VALUE="$INPUT_TEXT" ;;
+    old_string) VALUE="$INPUT_OLD_STRING" ;;
     *)
       # Unknown field — treat as condition failure (rule won't fire).
       exit 0

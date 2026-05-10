@@ -12,7 +12,7 @@
 #       Determines which dispatcher (pre-bash.sh, pre-edit.sh, post-slack.sh)
 #       picks up the rule.
 #   match: array of conditions, ALL must hold (AND-chain)
-#     - field: command | file_path | content | text
+#     - field: command | file_path | content | text | old_string
 #       pattern: ERE regex; if present, field must match
 #       not_pattern: ERE regex; if present, field must NOT match
 #       flags: i (case-insensitive) | (omitted, case-sensitive)
@@ -1466,4 +1466,456 @@
           edits:
             - old_string: '# A'
               new_string: '# B // hook-bypass: goodnight-non-desktop-acknowledged'
+      expected_exit: 0
+
+# -----------------------------------------------------------------------------
+# Tier 2 — discipline (warn) rules. Soft guidelines from feedback memories
+# that aren't outright errors but degrade quality if accumulated. Each rule
+# nudges the author toward the documented pattern without blocking the
+# operation. One exception: block-sibling-suffix-storage uses `block` because
+# the storage-layout error is hard to undo once committed.
+#
+# Memory map:
+#   - feedback_never_delete_debug_logs.md   -> warn-deletes-console-log
+#   - feedback_no_time_estimates.md         -> warn-time-estimates-in-plans
+#   - feedback_split_large_prs.md           -> warn-pr-create-many-files
+#   - feedback_no_posthog_nag.md            -> warn-posthog-in-alerts
+#   - feedback_explicit_storage_prefixes.md -> block-sibling-suffix-storage
+#   - feedback_test_on_staging.md           -> warn-localhost-in-pr-body
+#
+# warn-deletes-console-log requires the new `old_string` field exposed by
+# parse-input.sh in this PR — see hooks/lib/parse-input.sh and the README.
+# -----------------------------------------------------------------------------
+
+- id: warn-deletes-console-log
+  description: Warn when an Edit operation removes a line containing a debug-logging call (memory feedback_never_delete_debug_logs.md — gate via env var, never delete)
+  applies_to: [Edit, MultiEdit]
+  match:
+    # `old_string` is the field exposed by parse-input.sh (PR-C). For Edit
+    # it maps to tool_input.old_string; for MultiEdit it is the join of
+    # every edits[].old_string so a single pattern check covers both
+    # tool surfaces.
+    - field: old_string
+      pattern: '(console\.log\(|console\.debug\(|console\.error\(|\bdebug\(|logger\.(debug|info|trace)\()'
+      flags: i
+  action: warn
+  bypass_marker: console-log-deletion-verified
+  memory_ref: feedback_never_delete_debug_logs.md
+  message: |
+    WARNING: Edit removes a line containing a debug-log call.
+
+    Per feedback_never_delete_debug_logs.md NEVER delete debug logs;
+    gate them with an env var (e.g. DEBUG_TOOLS), disable for prod,
+    re-enable when needed.
+
+    Per feedback_never_remove_debug_logs_early.md even when converting
+    to env-gating, NEVER delete before verifying the fix in prod.
+
+    Use the bypass marker (console-log-deletion-verified) ONLY when:
+      - Converting to env-gating (the new gate replaces the log)
+      - The fix has been verified in prod for >24h
+      - The log was a documented debug-temp called out in the original
+        commit message
+  tests:
+    - name: warns-on-edit-deleting-console-log
+      input:
+        tool_input:
+          old_string: "console.log('debug:', x)"
+          new_string: ''
+      expected_exit: 0
+      expected_stderr_contains: 'warn-deletes-console-log'
+    - name: warns-on-edit-deleting-logger-debug
+      input:
+        tool_input:
+          old_string: 'logger.debug("trace", { id })'
+          new_string: ''
+      expected_exit: 0
+      expected_stderr_contains: 'warn-deletes-console-log'
+    - name: warns-on-edit-deleting-console-error
+      input:
+        tool_input:
+          old_string: "if (err) console.error(err)"
+          new_string: 'if (err) reportToSentry(err)'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-deletes-console-log'
+    - name: allows-edit-not-touching-logs
+      input:
+        tool_input:
+          old_string: 'const x = 1'
+          new_string: 'const x = 2'
+      expected_exit: 0
+    # MultiEdit shape: parse-input.sh flattens every edits[].old_string into a
+    # single newline-joined value via jq. These two tests lock in that the
+    # MultiEdit code path fires correctly, and that null old_string entries
+    # (filtered by `| strings` in the jq expression) do not blow up the rule.
+    - name: warns-on-multiedit-deleting-console-log
+      input:
+        tool_input:
+          edits:
+            - old_string: "console.log('debug:', x)"
+              new_string: ''
+      expected_exit: 0
+      expected_stderr_contains: 'warn-deletes-console-log'
+    - name: warns-on-multiedit-second-edit-deletes-logger
+      input:
+        tool_input:
+          edits:
+            - old_string: 'const x = 1'
+              new_string: 'const x = 2'
+            - old_string: 'logger.debug("trace", { id })'
+              new_string: ''
+      expected_exit: 0
+      expected_stderr_contains: 'warn-deletes-console-log'
+    # Lock in the `| strings` null-guard added to parse-input.sh: the first
+    # edit has no old_string key at all, but the rule must still fire on the
+    # second edit's deletion. Without `| strings`, jq would throw on the
+    # null and the rule would silently miss.
+    - name: warns-on-multiedit-with-null-old-string
+      input:
+        tool_input:
+          edits:
+            - new_string: 'inserted line'
+            - old_string: "console.log('debug:', y)"
+              new_string: ''
+      expected_exit: 0
+      expected_stderr_contains: 'warn-deletes-console-log'
+    - name: allows-multiedit-not-touching-logs
+      input:
+        tool_input:
+          edits:
+            - old_string: 'const x = 1'
+              new_string: 'const x = 2'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          old_string: "console.log('debug:', x) // hook-bypass: console-log-deletion-verified"
+          new_string: ''
+      expected_exit: 0
+
+- id: warn-time-estimates-in-plans
+  description: Warn when plan/spec/design files contain time-based estimates (memory feedback_no_time_estimates.md — use sequential ordering, not days/sprints/cycles)
+  applies_to: [Edit, Write, MultiEdit]
+  match:
+    - field: file_path
+      pattern: '(plans?/|specs?/|design/|openspec/|docs/superpowers/).*\.md$'
+    - field: content
+      # Bilingual: English (days/sprints/weeks/cycles) + Spanish
+      # (días/semanas/ciclos). The optional accent on `ía` covers tildeless
+      # writing too.
+      pattern: '\b[0-9]+[[:space:]]*(days?|sprints?|weeks?|d[ií]as?|semanas?|cycles?|ciclos?)\b'
+      flags: i
+  action: warn
+  bypass_marker: time-estimates-allowed
+  memory_ref: feedback_no_time_estimates.md
+  message: |
+    WARNING: time-based estimate (X days/weeks/sprints) in plan/spec.
+
+    Per feedback_no_time_estimates.md never use days/sprints/cycles;
+    use sequential ordering with conceptual milestones.
+
+    Replace with:
+      - "Phase 1, Phase 2, Phase 3"
+      - "After X ships -> Y starts"
+      - "Once Greptile 5/5 + CI green -> merge"
+
+    Bypass marker (time-estimates-allowed) ONLY when the doc is
+    marketing / external-facing (where calendar dates are expected).
+  tests:
+    - name: warns-on-3-days-in-plan
+      input:
+        tool_input:
+          file_path: 'plans/2026-05-feature.md'
+          content: 'Estimate: 3 days for the implementation phase.'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-time-estimates-in-plans'
+    - name: warns-on-2-sprints-in-spec
+      input:
+        tool_input:
+          file_path: 'specs/2026-05-pricing.md'
+          content: 'Will land in 2 sprints.'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-time-estimates-in-plans'
+    - name: warns-on-spanish-dias
+      input:
+        tool_input:
+          file_path: 'openspec/changes/2026-05-foo/design.md'
+          content: 'Listo en 5 dias.'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-time-estimates-in-plans'
+    - name: warns-on-spanish-semanas-with-tilde
+      input:
+        tool_input:
+          file_path: 'docs/superpowers/plans/foo.md'
+          content: 'Tomara 4 semanas mas o menos.'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-time-estimates-in-plans'
+    - name: allows-non-time-content
+      input:
+        tool_input:
+          file_path: 'plans/2026-05-feature.md'
+          content: '## Plan\n\nPhase 1: spike. Phase 2: implement.'
+      expected_exit: 0
+    # Bare ordinal numbers without a time-unit word must not trigger the rule.
+    # The `[[:space:]]*(days?|sprints?|...)` clause only matches when an actual
+    # unit word follows the digits.
+    - name: allows-numbers-without-time-units
+      input:
+        tool_input:
+          file_path: 'plans/2026-05-feature.md'
+          content: 'Phase 1 and Phase 2 cover the implementation; depends on issue 42 closing first.'
+      expected_exit: 0
+    - name: allows-non-plan-files
+      input:
+        tool_input:
+          file_path: 'README.md'
+          content: 'Will land in 2 sprints'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          file_path: 'plans/marketing-launch.md'
+          content: '3 weeks to launch # hook-bypass: time-estimates-allowed'
+      expected_exit: 0
+
+- id: warn-pr-create-many-files
+  description: Warn on `gh pr create` — caller must verify the PR has <=15 files (memory feedback_split_large_prs.md / 15-file rule)
+  applies_to: [Bash]
+  match:
+    - field: command
+      pattern: 'gh[[:space:]]+pr[[:space:]]+create\b'
+  action: warn
+  bypass_marker: pr-file-count-verified
+  memory_ref: feedback_split_large_prs.md
+  message: |
+    WARNING: `gh pr create`.
+
+    Per feedback_split_large_prs.md / the 15-file rule (DOJ-2482):
+    PRs with >15 files get abandoned more easily — split by domain
+    before opening.
+
+    Verify with:
+      git diff --stat <base>..HEAD | tail -1
+
+    If the diff touches <=15 files, use bypass marker
+    `pr-file-count-verified`. If it touches >15 files, abort and split.
+  tests:
+    - name: warns-on-pr-create-bare
+      input:
+        tool_input:
+          command: 'gh pr create --title "feat: foo" --base main'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-pr-create-many-files'
+    - name: warns-on-pr-create-with-body
+      input:
+        tool_input:
+          command: 'gh pr create --base develop --title "feat: foo" --body "Adds X"'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-pr-create-many-files'
+    - name: warns-on-pr-create-with-base
+      input:
+        tool_input:
+          command: 'gh pr create --base develop --head feature-x'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-pr-create-many-files'
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          command: 'gh pr create --title "feat: foo" --base main # hook-bypass: pr-file-count-verified'
+      expected_exit: 0
+    - name: allows-non-pr-create-gh-commands
+      input:
+        tool_input:
+          command: 'gh pr list'
+      expected_exit: 0
+    - name: allows-gh-pr-edit
+      input:
+        tool_input:
+          command: 'gh pr edit 16 --add-label foo'
+      expected_exit: 0
+
+- id: warn-posthog-in-alerts
+  description: Warn when Slack messages mention PostHog / dashboard / instrumentation (memory feedback_no_posthog_nag.md — Juan owns; out of scope for other POs)
+  applies_to: [Slack]
+  match:
+    - field: text
+      pattern: '\b(posthog|dashboard|instrumentation)\b'
+      flags: i
+  action: warn
+  bypass_marker: posthog-mention-approved
+  memory_ref: feedback_no_posthog_nag.md
+  message: |
+    WARNING: PostHog / dashboard / instrumentation mention in Slack.
+
+    Per feedback_no_posthog_nag.md the agent / automation must EXCLUDE
+    PostHog / dashboards / instrumentation from alerts; Juan owns that
+    surface, other POs explicitly told it is out of scope.
+
+    Use the bypass marker (posthog-mention-approved) ONLY when:
+      - The alert is addressed to Juan directly (his Slack user-id)
+      - You confirmed with Juan that the alert is welcome
+  tests:
+    - name: warns-posthog-in-slack
+      input:
+        tool_input:
+          text: 'Vi una metrica rara en PostHog ayer, podemos revisar?'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-posthog-in-alerts'
+    - name: warns-dashboard-in-slack
+      input:
+        tool_input:
+          text: 'El dashboard de Sentry esta en rojo'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-posthog-in-alerts'
+    - name: warns-instrumentation-in-slack
+      input:
+        tool_input:
+          text: 'Falta instrumentation en el endpoint /foo'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-posthog-in-alerts'
+    - name: allows-non-posthog-text
+      input:
+        tool_input:
+          text: 'PR #16 listo para review'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          text: 'Subi un evento nuevo a PostHog # hook-bypass: posthog-mention-approved'
+      expected_exit: 0
+
+- id: block-sibling-suffix-storage
+  description: Block storage uploads that use a sibling-suffix layout (memory feedback_explicit_storage_prefixes.md — use originals/ + processed/ subdirs instead)
+  applies_to: [Bash]
+  match:
+    # CLI surface only — `supabase storage upload`, `gcloud storage cp`,
+    # `gsutil cp`. The application-layer storage-uploader code paths are
+    # covered by review; this rule is a defense-in-depth guard against
+    # ad-hoc CLI uploads with the discouraged layout. Match common
+    # transformation suffixes (`processed`, `original`, `raw`, `optimized`)
+    # paired with common artefact extensions.
+    - field: command
+      pattern: '(supabase[[:space:]]+storage[[:space:]]+upload|gcloud[[:space:]]+storage[[:space:]]+cp|gsutil[[:space:]]+cp).*\.(processed|original|raw|optimized)\.(zip|tar|gz|bin|jpg|jpeg|png|pdf|mp4)\b'
+      flags: i
+  action: block
+  bypass_marker: sibling-suffix-storage-allowed
+  memory_ref: feedback_explicit_storage_prefixes.md
+  message: |
+    BLOCKED: storage upload with a sibling-suffix layout.
+
+    Per feedback_explicit_storage_prefixes.md pipelines that transform
+    artefacts must use <bucket>/originals/ + <bucket>/processed/
+    (or stage-specific names), never siblings like foo.zip +
+    foo.processed.zip in the same folder.
+
+    Use:
+      <bucket>/originals/foo.zip
+      <bucket>/processed/foo.zip
+
+    Bypass marker (sibling-suffix-storage-allowed) ONLY for legacy
+    buckets in active migration.
+  tests:
+    - name: blocks-supabase-storage-processed-suffix
+      input:
+        tool_input:
+          command: 'supabase storage upload my-bucket/foo.processed.zip ./foo.processed.zip'
+      expected_exit: 2
+    - name: blocks-gcloud-storage-cp
+      input:
+        tool_input:
+          command: 'gcloud storage cp ./foo.processed.zip gs://my-bucket/foo.processed.zip'
+      expected_exit: 2
+    - name: blocks-gsutil-original-suffix
+      input:
+        tool_input:
+          command: 'gsutil cp ./foo.original.mp4 gs://my-bucket/foo.original.mp4'
+      expected_exit: 2
+    - name: allows-clean-paths
+      input:
+        tool_input:
+          command: 'supabase storage upload my-bucket/originals/foo.zip ./foo.zip'
+      expected_exit: 0
+    # Both source and destination are clean (no suffix anywhere) — must allow.
+    # This locks in the negative path while the positive
+    # `blocks-gcloud-storage-cp` test confirms the rule fires when a sibling-
+    # suffix appears anywhere in the command.
+    - name: allows-clean-source-and-clean-destination-bucket-prefix
+      input:
+        tool_input:
+          command: 'gcloud storage cp ./foo.zip gs://my-bucket/processed/foo.zip'
+      expected_exit: 0
+    - name: allows-non-storage-cp
+      input:
+        tool_input:
+          command: 'cp ./foo.processed.zip /tmp/foo.processed.zip'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          command: 'gcloud storage cp ./foo.processed.zip gs://my-bucket/foo.processed.zip # hook-bypass: sibling-suffix-storage-allowed'
+      expected_exit: 0
+
+- id: warn-localhost-in-pr-body
+  description: Warn when `gh pr create` / `gh pr edit` body contains a localhost reference (memory feedback_test_on_staging.md — QA target is dev.dojocoding.io, not localhost)
+  applies_to: [Bash]
+  match:
+    # Two AND-chained conditions on `command`: the gh subcommand uses
+    # --body inline AND the same command line contains localhost or
+    # 127.0.0.1. The --body-file form is naturally excluded — the rule
+    # cannot read the body file content, and --body-file does not contain
+    # the literal "localhost" itself.
+    - field: command
+      pattern: 'gh[[:space:]]+pr[[:space:]]+(create|edit).*--body([[:space:]]|=|$)'
+    - field: command
+      pattern: '(localhost|127\.0\.0\.1)'
+  action: warn
+  bypass_marker: localhost-in-pr-body-allowed
+  memory_ref: feedback_test_on_staging.md
+  message: |
+    WARNING: localhost reference in PR body.
+
+    Per feedback_test_on_staging.md the QA testing target is
+    dev.dojocoding.io (staging), not localhost. Any reviewer who tries
+    to verify against localhost will hit env mismatches:
+      - Local DB differs from staging
+      - Edge Functions missing local secrets
+      - Different feature flags
+
+    Replace localhost links with dev.dojocoding.io equivalents.
+
+    Bypass marker (localhost-in-pr-body-allowed) ONLY for steps that
+    legitimately require an explicit local build (e.g. asking the
+    reviewer to run `bun run dev` before pushing).
+  tests:
+    - name: warns-pr-create-with-localhost
+      input:
+        tool_input:
+          command: 'gh pr create --base develop --title "feat: foo" --body "Test on http://localhost:5173/foo"'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-localhost-in-pr-body'
+    - name: warns-pr-edit-with-127
+      input:
+        tool_input:
+          command: 'gh pr edit 16 --body "Hit http://127.0.0.1:54321/health"'
+      expected_exit: 0
+      expected_stderr_contains: 'warn-localhost-in-pr-body'
+    - name: allows-pr-create-with-staging-url
+      input:
+        tool_input:
+          command: 'gh pr create --base develop --title "feat: foo" --body "Test on https://dev.dojocoding.io/foo"'
+      expected_exit: 0
+    - name: allows-non-pr-localhost
+      input:
+        tool_input:
+          command: 'curl http://localhost:5173/foo'
+      expected_exit: 0
+    - name: allows-pr-create-no-body
+      input:
+        tool_input:
+          command: 'gh pr create --base develop --title "feat: foo"'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          command: 'gh pr create --body "Run bun run dev on localhost:5173 # hook-bypass: localhost-in-pr-body-allowed"'
       expected_exit: 0
