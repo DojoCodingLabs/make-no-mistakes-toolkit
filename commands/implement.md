@@ -208,7 +208,7 @@ If any check fails, STOP and resolve before proceeding.
 
 1. **PR open state (runtime question, every PR)** — right before `gh pr create`, the agent MUST call `AskUserQuestion` with:
 
-   > **"¿Cómo abrimos el PR?"**
+   > **"How should we open the PR? / ¿Cómo abrimos el PR?"**
    >
    > - **Draft**: Opens as a draft PR. Agent stops immediately after creation. User flips to Ready themselves when satisfied. No reviewer pings.
    > - **In Review**: Opens ready-for-review. Agent tags Greptile / CodeRabbit / Graphite, addresses feedback by pushing fix commits, then STOPS at the merge boundary for user approval.
@@ -362,7 +362,7 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
 
    Call `AskUserQuestion`:
 
-   > Question: **"¿Cómo abrimos el PR?"**
+   > Question: **"How should we open the PR? / ¿Cómo abrimos el PR?"**
    >
    > Options:
    > - **Draft** — opens as a draft, no reviewer pings, agent STOPS immediately after PR creation. User flips to Ready themselves.
