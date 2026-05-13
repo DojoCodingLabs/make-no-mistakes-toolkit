@@ -18,7 +18,7 @@ Every rule is one YAML row with these fields:
   description: <one-line>           # required, shown in stderr on match
   applies_to: [Bash | Edit | Write | MultiEdit | Slack]   # required, non-empty
   match:                            # required, non-empty array (AND-chain)
-    - field: command | file_path | content | text
+    - field: command | file_path | content | text | old_string
       pattern: '<ERE regex>'        # optional; if present, field MUST match
       not_pattern: '<ERE regex>'    # optional; if present, field must NOT match
       flags: i                      # optional; only "i" (case-insensitive) supported
@@ -145,17 +145,72 @@ Adding a new family is fine — just keep ids unique and follow the schema.
 - **Database / migration discipline**
   (`schema-sql-outside-migrations`, `warn-psql-against-supabase-remote`,
   `pr-create-with-migrations-needs-deploy-note`,
-  `block-supabase-db-push-prod`) — keep schema mutations inside
-  versioned `supabase/migrations/` files, nudge developers away from
-  direct `psql` / `pg_dump` / `pg_restore` execution against
-  `*.supabase.co` hosts, remind PR authors to document migration
-  deployment, and hard-block `supabase db push` aimed at the production
-  project ref or `--linked` (which transparently resolves to whichever
-  project was last linked, possibly production). The production project
-  ref is configured per install via the substitutions mechanism described
-  above (`PROD_SUPABASE_REF` token). Added after a discussion surfaced
-  drift between manually-applied SQL and the migrations directory when
-  migrations failed to auto-run after a teammate's PR merged.
+  `block-supabase-db-push-prod`, `warn-curl-mutating-supabase-rest`) —
+  keep schema mutations inside versioned `supabase/migrations/` files,
+  nudge developers away from direct `psql` / `pg_dump` / `pg_restore`
+  execution against `*.supabase.co` hosts, remind PR authors to document
+  migration deployment, hard-block `supabase db push` aimed at the
+  production project ref or `--linked` (which transparently resolves to
+  whichever project was last linked, possibly production), and warn on
+  ad-hoc mutating `curl` (`POST` / `PATCH` / `PUT` / `DELETE`) against
+  the Supabase PostgREST endpoint (drift risk equivalent to direct `psql`
+  + RLS bypass — same memory ref `feedback_scripts_not_db.md`). The
+  production project ref is configured per install via the substitutions
+  mechanism described above (`PROD_SUPABASE_REF` token). Added after a
+  discussion surfaced drift between manually-applied SQL and the
+  migrations directory when migrations failed to auto-run after a
+  teammate's PR merged.
+
+- **Anti foot-shoot (Tier 1)** (`block-playwright-headless`,
+  `block-git-force-push-no-lease`, `block-git-rebase-skip`,
+  `block-standup-not-in-escritorio`, `block-goodnight-not-in-escritorio`)
+  — hard stops on the high-cost mistakes that already burned the team:
+  headless E2E runs (a Playwright invocation without `--headed` /
+  `--ui` / `--debug` is blocked per `feedback_no_headless.md`), bare
+  `git push --force` / `-f` without `--force-with-lease` (silent
+  collaborator-push overwrites, per `feedback_resolve_merge_conflicts.md`),
+  `git rebase --skip` (silent commit drop, same memory),
+  and writes of `daily-standup*.md` / `next-day-*.md` / `goodnight-*.md`
+  outside `~/Escritorio` (per the desktop-handoff memories
+  `feedback_standup_desktop.md` and `feedback_goodnight_desktop.md`).
+  Each rule ships a kebab-case bypass marker for the rare cases where
+  the action is intentional and documented.
+
+- **Tier 2 — discipline (warn)**
+  (`warn-deletes-console-log`, `warn-time-estimates-in-plans`,
+  `warn-pr-create-many-files`, `warn-posthog-in-alerts`,
+  `block-sibling-suffix-storage`, `warn-localhost-in-pr-body`) — soft
+  guidelines from feedback memories that aren't outright errors but
+  degrade quality if accumulated. Each rule nudges the author toward
+  the documented pattern without blocking the operation. One exception:
+  `block-sibling-suffix-storage` uses `block` because the storage-layout
+  error is hard to undo once committed.
+  - `warn-deletes-console-log` flags Edits whose `old_string` removes a
+    debug-log call (`console.log(`, `console.debug(`, `console.error(`,
+    `debug(`, `logger.debug/info/trace(`) per
+    `feedback_never_delete_debug_logs.md` — gate via env var, never
+    delete.
+  - `warn-time-estimates-in-plans` flags writes to plan/spec/design files
+    that contain `X days/sprints/weeks/cycles` or their Spanish
+    equivalents per `feedback_no_time_estimates.md` — use sequential
+    ordering, not calendar dates.
+  - `warn-pr-create-many-files` is a heuristic on `gh pr create` that
+    nudges the caller to verify the diff has <=15 files before opening
+    (`feedback_split_large_prs.md` / DOJ-2482).
+  - `warn-posthog-in-alerts` (Slack `applies_to`) flags messages
+    mentioning `posthog`, `dashboard`, or `instrumentation` —
+    `feedback_no_posthog_nag.md` (Juan owns; out of scope for other POs).
+  - `block-sibling-suffix-storage` blocks CLI uploads that use the
+    discouraged sibling-suffix layout (`foo.processed.zip` next to
+    `foo.zip`); the documented layout uses `originals/` + `processed/`
+    subdirs (`feedback_explicit_storage_prefixes.md`).
+  - `warn-localhost-in-pr-body` flags `gh pr create` / `gh pr edit`
+    invocations whose inline `--body` mentions `localhost` or
+    `127.0.0.1` — staging at `dev.dojocoding.io` is the correct QA
+    target (`feedback_test_on_staging.md`).
+
+  `warn-deletes-console-log` is the first rule to use the new
+  `old_string` field exposed by `parse-input.sh` (see Schema below).
 
 ## Tier 2 — decomposing non-deterministic memories
 

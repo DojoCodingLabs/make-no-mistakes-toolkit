@@ -29,6 +29,7 @@ INPUT_COMMAND=""
 INPUT_FILE_PATH=""
 INPUT_CONTENT=""
 INPUT_TEXT=""
+INPUT_OLD_STRING=""
 
 if command -v jq >/dev/null 2>&1; then
   INPUT_COMMAND="$(printf '%s' "$INPUT_RAW" \
@@ -39,6 +40,12 @@ if command -v jq >/dev/null 2>&1; then
     | jq -r '.tool_input.content // .tool_input.new_string // empty' 2>/dev/null || true)"
   INPUT_TEXT="$(printf '%s' "$INPUT_RAW" \
     | jq -r '.tool_input.text // .tool_input.message // .tool_input.content // empty' 2>/dev/null || true)"
+  # Edit / MultiEdit: expose tool_input.old_string. For MultiEdit, where
+  # old_string lives inside an `edits[]` array, flatten every old_string
+  # into a single newline-joined value so a single regex check covers
+  # both shapes. Empty for non-Edit tool calls.
+  INPUT_OLD_STRING="$(printf '%s' "$INPUT_RAW" \
+    | jq -r '.tool_input.old_string // ([.tool_input.edits[]?.old_string | strings] | join("\n")) // empty' 2>/dev/null || true)"
 fi
 
-export INPUT_RAW INPUT_COMMAND INPUT_FILE_PATH INPUT_CONTENT INPUT_TEXT
+export INPUT_RAW INPUT_COMMAND INPUT_FILE_PATH INPUT_CONTENT INPUT_TEXT INPUT_OLD_STRING
