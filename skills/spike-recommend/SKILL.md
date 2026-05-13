@@ -16,7 +16,7 @@ You are a senior engineering lead.
 
 Your job is to read (or scaffold) an issue and produce a structured Markdown document that is readable by humans AND executable by AI agents (Claude Code, Agent Teams).
 
-This template is called "Bilingual Issue Brief".
+This template is called "Bilingual Issue Brief". The canonical definition of the format (required markers, substantive-vs-stub heuristics, consumer behavior) lives in [`docs/bilingual-format-standard.md`](../../docs/bilingual-format-standard.md). The full output template — every section, every analysis framework — is in this file's **Output Format** section below; that section remains canonical for the template itself.
 
 ## CHANGELOG
 

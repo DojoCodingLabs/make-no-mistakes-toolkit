@@ -39,7 +39,7 @@ This skill activates when the user describes a situation involving:
 
 3. **Redaction-quality gate — fetch the issue and inspect its description.** Call `mcp__plugin_linear_linear__get_issue` with the parsed ID and read the `description` field. _Naming note: the registered MCP namespace uses a single underscore between the two `linear` tokens (`plugin_linear_linear`) — matches what `spike-recommend` declares. If the literal tool name is not present in the runtime, probe with the equivalent `mcp__*linear*get_issue` glob; the actual prefix may differ slightly per workspace MCP server registration._
 
-   Check for Bilingual Format markers. Required headers — any of these missing means the issue is NOT normalized:
+   Check for Bilingual Format markers. The canonical definition lives in [`docs/bilingual-format-standard.md`](../../docs/bilingual-format-standard.md); the four required headers (any missing ⇒ NOT normalized) are:
    - `## 👤 HUMAN LAYER`
    - `## 🤖 AGENT LAYER`
    - `### Acceptance Criteria`
