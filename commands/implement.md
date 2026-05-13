@@ -345,11 +345,11 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
    > - **In Review** — opens ready-for-review, agent tags Greptile / CodeRabbit / Graphite, addresses feedback by pushing fix commits, then STOPS at the merge boundary for explicit user OK.
    > - **Ready to Merge** — same as In Review through the reviewer loop, plus auto-merges once all CI gates are green (no extra approval at the merge boundary, but the agent still surfaces merge intent in chat 1–2 lines before triggering).
 
-   Store the answer as `{pr-open-state}`. It drives downstream behavior in steps 8, 9, 10, 13, and Phase 4:
+   Store the answer as `{pr-open-state}`. It drives downstream behavior in steps 8, 9, 10, 13, 14, and 15:
 
-   - **Draft** → step 8 uses `--draft`; steps 9, 10, 11, 12, and ALL of Phase 4 are skipped. After PR creation, report the PR URL and STOP.
-   - **In Review** → step 8 opens ready-for-review; proceed through steps 9–12, then STOP at step 13 and ask for explicit go-ahead before merging.
-   - **Ready to Merge** → step 8 opens ready-for-review; proceed through steps 9–12, surface merge intent at step 13 (1–2 lines), then merge without extra approval.
+   - **Draft** → step 8 uses `--draft`; steps 9–13 are skipped; **steps 14 and 15 always run** (the Linear → Done and worktree-cleanup HITL gates apply regardless of mode). After PR creation, report the PR URL, then proceed straight to step 14.
+   - **In Review** → step 8 opens ready-for-review; proceed through steps 9–12, then STOP at step 13 and ask for explicit go-ahead before merging. Steps 14 and 15 follow.
+   - **Ready to Merge** → step 8 opens ready-for-review; proceed through steps 9–12, surface merge intent at step 13 (1–2 lines), then merge without extra approval. Steps 14 and 15 follow.
 
    Do not skip 8a. Do not infer the mode from context. Do not pick a default. Always ask, every PR.
 
@@ -362,7 +362,7 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
    ```
    - Link the Linear issue in the PR body
    - Add "Created by Claude Code on behalf of @{user}"
-   - If Draft mode: report the PR URL to the user and STOP. Phase 3 ends here.
+   - If Draft mode: report the PR URL to the user, then jump directly to step 14 (the Linear → Done and worktree-cleanup HITL gates apply regardless of mode). Phase 3's review-and-merge body (steps 9–13) is skipped.
 
 9. **Tag ALL reviewers** (SKIP this step for Draft mode):
    - Comment `@greptile review` on the PR
@@ -392,23 +392,25 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
 
 ### Phase 4: Merge + Cleanup
 
-> **Mode-gating reminder:** Phase 4 only runs for **In Review** and **Ready to Merge** PRs. **Draft** mode terminates at step 8 — do not enter Phase 4. The HITL gates below apply per the mode chosen in step 8a.
+> **Mode-gating reminder:** Step 13 (`gh pr merge`) only runs for **In Review** and **Ready to Merge** PRs. **Draft mode skips step 13 but still runs steps 14 and 15** — the Linear → Done and worktree-cleanup HITL gates are inviolable and fire regardless of mode (see "Hard STOP #3" and "Hard STOP #4"). For Draft PRs, jump from step 8 directly to step 14.
 
-13. **Merge the PR** (HITL gate per "Hard STOP #2"):
+13. **Merge the PR** (HITL gate per "Hard STOP #2") — **In Review + Ready to Merge only; skipped for Draft**:
     - **In Review mode** → STOP and ask the user: "Ready to merge? CI is green: `<one-line summary of checks + reviewer states>`." Wait for an explicit OK before running `gh pr merge`.
     - **Ready to Merge mode** → Surface merge intent in chat (1–2 lines, e.g., "All checks green; merging squash with branch delete in 5s.") then proceed without an additional approval prompt.
-    - **Draft mode** → This step does not run.
+    - **Draft mode** → This step does not run; proceed to step 14.
     ```bash
     gh pr merge {pr-number} --squash --delete-branch
     ```
 
 14. **Update Linear** (HITL gate per "Hard STOP #3" — applies regardless of mode):
-    - STOP and ask the user: "Merge done. Mark `{issue-id}` as **Done** in Linear, or leave it **In Review** for your verification?"
-    - Only flip the status to **Done** on explicit OK. If the user opts to leave it In Review, post the merge comment anyway and move on.
-    - Merge comment (in either case): "Merged via PR #{pr-number}"
+    - **In Review / Ready to Merge** → STOP and ask: "Merge done. Mark `{issue-id}` as **Done** in Linear, or leave it **In Review** for your verification?"
+    - **Draft** → STOP and ask: "Draft PR opened at `<URL>`. Keep `{issue-id}` as **In Progress** in Linear, or move it to **In Review** for visibility?" (Draft PRs never auto-flip to Done — they're explicitly held open by the user.)
+    - Only flip the status on explicit OK. If the user opts to leave the current status, post the status comment anyway and move on.
+    - Status comment: "Merged via PR #{pr-number}" (In Review / Ready to Merge) or "Draft PR opened: #{pr-number}" (Draft).
 
 15. **Clean up worktrees** (HITL gate per "Hard STOP #4" — applies regardless of mode):
-    - STOP and ask the user: "Merge done. Remove the worktree at `.claude/worktrees/{issue-id}`, or keep it for inspection?"
+    - **In Review / Ready to Merge** → STOP and ask: "Merge done. Remove the worktree at `.claude/worktrees/{issue-id}`, or keep it for inspection?"
+    - **Draft** → STOP and ask: "Draft PR opened at `<URL>`. The worktree at `.claude/worktrees/{issue-id}` is still live so you can iterate. Remove it now, or keep it until you flip the PR to Ready?" Default expectation: keep it.
     - Only run the removal on explicit OK.
     ```bash
     git worktree remove .claude/worktrees/{issue-id} --force
