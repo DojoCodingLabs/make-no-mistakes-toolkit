@@ -63,7 +63,18 @@ Detect availability at runtime in this order of preference:
 4. **ClickUp** — **stub only**. Same behavior as Jira above.
 5. **Print-only fallback** — if no tracker is reachable (or only stubs are available), print the full brief to the conversation with a one-line note explaining why no issue was written: e.g. `No supported tracker detected (Linear/GitHub) — printing brief only. Re-run with --save-local to persist locally.`
 
-For an `update` call where the URL's tracker disagrees with what's available, abort with a clear message — never write the brief to the wrong tracker.
+### Tracker precedence in `update` mode (tiebreaker)
+
+When the URL points at a tracker the skill cannot write to, two rules collide: the per-tracker stub fallback (Jira/ClickUp → print-only) and the "URL-vs-available mismatch ⇒ abort" rule. The stub print-only fallback **wins** — it produces useful output to the user instead of a hard abort.
+
+Explicit precedence, in order:
+
+1. **URL is Linear or GitHub, and that tracker is available** → write the brief there normally.
+2. **URL is Linear or GitHub, but that tracker is NOT available** (e.g. Linear URL but Linear MCP not configured, or GitHub URL but `gh` not authenticated) → abort with a clear message: `Cannot update <URL> — <tracker> is not available in this runtime. Configure it or pass a URL for an available tracker.` Never silently write to a different tracker.
+3. **URL is Jira or ClickUp** (stubs) → DO NOT attempt to write to that tracker, DO NOT abort. Fall back to print-only: render the full brief to the conversation, AND include an explicit one-line note stating that the Jira / ClickUp issue was NOT updated. Example: `Jira issue <KEY> was NOT updated — spike-recommend does not yet support Jira writes. The brief above is print-only; copy it into the issue manually, or re-run with --save-local to keep a local copy.` This rule wins over rule (2)'s mismatch-abort because the user gets useful output instead of an error.
+4. **URL is malformed or for an unknown tracker** → fall through to print-only with a similar "not updated" note.
+
+The print-only note is mandatory in case (3) so the user is never under the false impression that the Jira/ClickUp issue was updated.
 
 ## Step 2 — Gather context
 
