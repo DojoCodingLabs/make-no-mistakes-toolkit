@@ -3,6 +3,11 @@ description: Execute Linear issues with full discipline -- sequential branches, 
 priority: 100
 ---
 
+<!--
+CHANGELOG
+* 2026-05-13: bake HITL boundaries — ask user for PR open state (Draft / In Review / Ready to Merge); stop at merge / Linear-Done / worktree-cleanup
+-->
+
 # /implement — Disciplined Execution Protocol
 
 You are a senior engineering lead executing Linear issues with zero tolerance for process shortcuts.
@@ -60,6 +65,7 @@ A background sub-agent starts with zero conversation context. Its prompt must be
 - **Hard constraints**: never-touch-prod rules, file-count limit (`15-File Rule`), sensitive-table blocklists, CLAUDE.md rules that apply.
 - **Known parallel work**: other agents running concurrently and what they own, so the agent doesn't collide on files or open conflicting PRs.
 - **Deliverable shape**: final report format expected back (Linear state, PR link, Sentry state, Slack channel).
+- **PR state question**: at the push/PR boundary, the sub-agent must report back to the orchestrator (NOT ask the user directly — only the orchestrator has the `AskUserQuestion` surface in the main conversation). The orchestrator then asks the user the Draft / In Review / Ready to Merge question and relays the answer to the sub-agent via `SendMessage`. The sub-agent halts at the PR-creation step until that relay arrives. Same hand-off applies to the Phase 4 HITL gates (merge, Linear → Done, worktree cleanup).
 
 Terse prompts produce shallow, generic work. Assume you won't be able to clarify mid-run — brief the agent like a smart colleague who just walked in.
 
@@ -139,6 +145,16 @@ If `linear-setup.json` doesn't exist, the command uses sensible defaults (`main`
    - Otherwise, process in the order given
 4. If `$ARGUMENTS` is empty, ask the user which issue(s) to work on
 
+### Redaction-quality sanity guard
+
+Before continuing past Input Resolution, inspect each fetched issue's `description` for Bilingual Format markers (`## 👤 HUMAN LAYER`, `## 🤖 AGENT LAYER`, `### Acceptance Criteria`, `### Context Files`; or at minimum both literal strings `HUMAN LAYER` and `AGENT LAYER`). If the description is missing those markers — or is empty, a 1-liner, or pure stubs ("TBD", "N/A everywhere") — STOP and tell the user:
+
+> Issue `{ID}` isn't in Bilingual Format. Implementation agents produce shallow work against un-redacted briefs. Run `/make-no-mistakes:spike-recommend {ID}` first to normalize the description in Linear, then re-run `/make-no-mistakes:implement {ID}`.
+>
+> If you've already redacted it manually and want to proceed anyway, say so explicitly and I'll continue.
+
+Do not silently proceed. This is a one-paragraph sanity guard, not a redesign — the rest of the protocol below is unchanged.
+
 ## Pre-Flight Checks
 
 Before touching any code, verify:
@@ -176,6 +192,59 @@ If any check fails, STOP and resolve before proceeding.
   3. Default: `feat/` if no clear signal
 
 **Branch naming**: `{type}/{issue-id}-{short-description}` (e.g., `feat/APP-1234-course-content-serializer`)
+
+## Authorization & Human-in-the-Loop Boundaries
+
+`/implement` is authorized to drive local work end-to-end **without per-action approval**, but every shared-state mutation that materially affects others (a PR's review surface, a merge to `{baseBranch}`, an issue-tracker status flip, a local workspace deletion) requires an **explicit user OK at that exact step**. The protocol below treats these as hard STOP gates: surface the action, ask, wait for an explicit answer, then proceed.
+
+### Autonomous (no per-action approval needed)
+
+- All Phase 0–2 work: OpenSpec drafting, claiming the issue, creating the branch + worktree, the OpenSpec commit, implementation, local tests / lint / build.
+- `git push` to `origin` in Phase 3.
+- `gh pr create` — **but ONLY after the user has answered the PR open-state question** (see hard STOP #1 below).
+- Re-pushing fix commits to address reviewer feedback on an already-open PR (the PR exists and the user already chose its mode).
+
+### Hard STOP — must ask the user explicitly
+
+1. **PR open state (runtime question, every PR)** — right before `gh pr create`, the agent MUST call `AskUserQuestion` with:
+
+   > **"How should we open the PR? / ¿Cómo abrimos el PR?"**
+   >
+   > - **Draft**: Opens as a draft PR. Agent stops immediately after creation. User flips to Ready themselves when satisfied. No reviewer pings.
+   > - **In Review**: Opens ready-for-review. Agent tags Greptile / CodeRabbit / Graphite, addresses feedback by pushing fix commits, then STOPS at the merge boundary for user approval.
+   > - **Ready to Merge**: Opens ready-for-review, runs through the reviewer loop, AND auto-merges once all CI gates are green. No further user approval at the merge boundary.
+
+   Store the answer — it drives Phase 3 + Phase 4 downstream behavior.
+
+2. **`gh pr merge`** — STOP unless the user pre-authorized "Ready to Merge" mode at PR creation. Even in "Ready to Merge" mode, surface the merge attempt's expected outcome before triggering it (e.g., "all checks green; merging squash with branch delete in 5s").
+
+3. **Linear status → Done** — STOP, always. Even after a successful auto-merge, ask the user before flipping Linear from In Review to Done. The user reserves the right to keep an issue in "In Review" until they personally verify the deploy or staging.
+
+4. **`git worktree remove`** — STOP, always. The worktree is the user's local workspace state; they may want to inspect or salvage something before cleanup.
+
+### Sub-agent exception (applies to all four hard STOP gates above)
+
+`AskUserQuestion` is an **orchestrator-only** surface — it renders inside the user's main conversation and is not available to background sub-agents dispatched via the `Agent` tool. At every hard STOP gate listed above (and every `AskUserQuestion` / "STOP and ask the user" call site in the protocol below):
+
+- **If running as the orchestrator**: call `AskUserQuestion` directly (or its equivalent), wait for the answer, then continue.
+- **If running as a sub-agent**: do NOT attempt `AskUserQuestion`. Instead, emit a structured pause signal in your final report and halt. Use this exact shape so the orchestrator can detect and relay:
+
+  ```json
+  {
+    "pause": {
+      "gate": "pr-open-state" | "merge" | "linear-done" | "worktree-cleanup",
+      "issue_id": "<issue-id>",
+      "reason": "<one-sentence explanation>",
+      "question": "<the exact question to surface to the user>",
+      "options": ["<option-1>", "<option-2>", "..."],
+      "context": { "pr_url": "...", "branch": "...", "worktree_path": "..." }
+    }
+  }
+  ```
+
+  The orchestrator then calls `AskUserQuestion` on the sub-agent's behalf, captures the user's choice, and relays it back via `SendMessage`. The sub-agent resumes from where it halted. Attempting `AskUserQuestion` from a sub-agent results in a silent hang or runtime error — never do it.
+
+Default posture: when uncertain whether an action is local or shared-state, treat it as shared-state and ask.
 
 ## Execution Protocol — Per Issue
 
@@ -287,19 +356,44 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
 
 ### Phase 3: PR + Review Loop
 
-8. **Create the PR:**
+8a. **HARD STOP — ask the user the PR open state** (see "Authorization & Human-in-the-Loop Boundaries" → hard STOP #1):
+
+   > **Sub-agent note:** If you are running as a background sub-agent, do NOT call `AskUserQuestion`. Emit the `pause` JSON signal documented under "Sub-agent exception" (gate: `"pr-open-state"`) and halt. The orchestrator will relay the answer back. Orchestrators continue:
+
+   Call `AskUserQuestion`:
+
+   > Question: **"How should we open the PR? / ¿Cómo abrimos el PR?"**
+   >
+   > Options:
+   > - **Draft** — opens as a draft, no reviewer pings, agent STOPS immediately after PR creation. User flips to Ready themselves.
+   > - **In Review** — opens ready-for-review, agent tags Greptile / CodeRabbit / Graphite, addresses feedback by pushing fix commits, then STOPS at the merge boundary for explicit user OK.
+   > - **Ready to Merge** — same as In Review through the reviewer loop, plus auto-merges once all CI gates are green (no extra approval at the merge boundary, but the agent still surfaces merge intent in chat 1–2 lines before triggering).
+
+   Store the answer as `{pr-open-state}`. It drives downstream behavior in steps 8, 9, 10, 13, 14, and 15:
+
+   - **Draft** → step 8 uses `--draft`; steps 9–13 are skipped; **steps 14 and 15 always run** (the Linear → Done and worktree-cleanup HITL gates apply regardless of mode). After PR creation, report the PR URL, then proceed straight to step 14.
+   - **In Review** → step 8 opens ready-for-review; proceed through steps 9–12, then STOP at step 13 and ask for explicit go-ahead before merging. Steps 14 and 15 follow.
+   - **Ready to Merge** → step 8 opens ready-for-review; proceed through steps 9–12, surface merge intent at step 13 (1–2 lines), then merge without extra approval. Steps 14 and 15 follow.
+
+   Do not skip 8a. Do not infer the mode from context. Do not pick a default. Always ask for every **new** PR (one-time, at creation — not on subsequent fix-commit re-pushes to an already-open PR, where the user already chose its mode).
+
+8. **Create the PR** (using the mode chosen in 8a):
    ```bash
+   # Draft mode:
+   gh pr create --base {baseBranch} --draft --title "{issue-id}: {concise title}" --body "..."
+   # In Review / Ready to Merge mode:
    gh pr create --base {baseBranch} --title "{issue-id}: {concise title}" --body "..."
    ```
    - Link the Linear issue in the PR body
    - Add "Created by Claude Code on behalf of @{user}"
+   - If Draft mode: report the PR URL to the user, then jump directly to step 14 (the Linear → Done and worktree-cleanup HITL gates apply regardless of mode). Phase 3's review-and-merge body (steps 9–13) is skipped.
 
-9. **Tag ALL reviewers:**
+9. **Tag ALL reviewers** (SKIP this step for Draft mode):
    - Comment `@greptile review` on the PR
    - Wait for automated reviews from **Greptile**, **CodeRabbit**, and **Graphite**
    - All three reviewers are configured in the project — check all of them
 
-10. **Fix reviewer feedback:**
+10. **Fix reviewer feedback** (applies to In Review + Ready to Merge only; SKIP for Draft):
     - Address ALL insights from Greptile, CodeRabbit, AND Graphite
     - Commit fixes to the same branch
     - Re-tag: `@greptile review` again if needed
@@ -322,16 +416,28 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
 
 ### Phase 4: Merge + Cleanup
 
-13. **Merge the PR:**
+> **Mode-gating reminder:** Step 13 (`gh pr merge`) only runs for **In Review** and **Ready to Merge** PRs. **Draft mode skips step 13 but still runs steps 14 and 15** — the Linear → Done and worktree-cleanup HITL gates are inviolable and fire regardless of mode (see "Hard STOP #3" and "Hard STOP #4"). For Draft PRs, jump from step 8 directly to step 14.
+
+13. **Merge the PR** (HITL gate per "Hard STOP #2") — **In Review + Ready to Merge only; skipped for Draft**:
+    - **In Review mode** → STOP and ask the user: "Ready to merge? CI is green: `<one-line summary of checks + reviewer states>`." Wait for an explicit OK before running `gh pr merge`. _Sub-agents: emit a `pause` signal with gate `"merge"` instead — see "Sub-agent exception"._
+    - **Ready to Merge mode** → Surface merge intent in chat (1–2 lines, e.g., "All checks green; merging squash with branch delete in 5s.") then proceed without an additional approval prompt.
+    - **Draft mode** → This step does not run; proceed to step 14.
     ```bash
     gh pr merge {pr-number} --squash --delete-branch
     ```
 
-14. **Update Linear:**
-    - Set status to **Done**
-    - Comment: "Merged via PR #{pr-number}"
+14. **Update Linear** (HITL gate per "Hard STOP #3" — applies regardless of mode):
+    - **In Review / Ready to Merge** → STOP and ask: "Merge done. Mark `{issue-id}` as **Done** in Linear, or leave it **In Review** for your verification?"
+    - **Draft** → STOP and ask: "Draft PR opened at `<URL>`. Keep `{issue-id}` as **In Progress** in Linear, or move it to **In Review** for visibility?" (Draft PRs never auto-flip to Done — they're explicitly held open by the user.)
+    - Only flip the status on explicit OK. If the user opts to leave the current status, post the status comment anyway and move on.
+    - Status comment: "Merged via PR #{pr-number}" (In Review / Ready to Merge) or "Draft PR opened: #{pr-number}" (Draft).
+    - _Sub-agents: emit a `pause` signal with gate `"linear-done"` instead of calling `AskUserQuestion`. See "Sub-agent exception"._
 
-15. **Clean up worktrees:**
+15. **Clean up worktrees** (HITL gate per "Hard STOP #4" — applies regardless of mode):
+    - **In Review / Ready to Merge** → STOP and ask: "Merge done. Remove the worktree at `.claude/worktrees/{issue-id}`, or keep it for inspection?"
+    - **Draft** → STOP and ask: "Draft PR opened at `<URL>`. The worktree at `.claude/worktrees/{issue-id}` is still live so you can iterate. Remove it now, or keep it until you flip the PR to Ready?" Default expectation: keep it.
+    - Only run the removal on explicit OK.
+    - _Sub-agents: emit a `pause` signal with gate `"worktree-cleanup"` instead of calling `AskUserQuestion`. See "Sub-agent exception"._
     ```bash
     git worktree remove .claude/worktrees/{issue-id} --force
     # Verify ALL worktrees for this issue are removed
@@ -370,17 +476,19 @@ When processing multiple issues:
 | Skipping rebase between issues | Merge conflicts compound |
 | Running E2E headless | Tests pass locally, fail in real browser — false confidence |
 | Putting all work in one giant PR | Unreviewable. >15 files = split by domain. |
+| Merging / cleaning up without explicit user OK | Even when CI is green and the PR is approved, shared-state mutations (merge, Linear status, worktree removal) require explicit per-action user approval. The protocol authorizes file edits + commits + push + PR creation — not the destructive end of the lifecycle. |
 
 ## Completion Checklist
 
 Before declaring ALL issues complete:
 
-- [ ] Every issue is **Done** in Linear with merge comment
-- [ ] Every PR is merged and branch deleted
-- [ ] Every worktree is removed from disk (`git worktree list` shows only main)
+- [ ] Every issue is **Done** in Linear with merge comment (or explicitly left In Review by user)
+- [ ] Every PR is merged and branch deleted (or explicitly left as Draft / open per user instruction)
+- [ ] Every worktree is removed from disk (`git worktree list` shows only main) — or explicitly preserved per user instruction
 - [ ] `{baseBranch}` is up to date (`git pull origin {baseBranch}`)
 - [ ] No orphaned branches locally (`git branch --list` is clean)
 - [ ] CI is green on {baseBranch} after all merges
+- [ ] User explicitly approved each shared-state mutation (PR creation mode, merge, Linear → Done, worktree cleanup)
 
 ## Slack Notification
 
