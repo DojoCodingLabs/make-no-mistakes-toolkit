@@ -375,7 +375,7 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
    - **In Review** → step 8 opens ready-for-review; proceed through steps 9–12, then STOP at step 13 and ask for explicit go-ahead before merging. Steps 14 and 15 follow.
    - **Ready to Merge** → step 8 opens ready-for-review; proceed through steps 9–12, surface merge intent at step 13 (1–2 lines), then merge without extra approval. Steps 14 and 15 follow.
 
-   Do not skip 8a. Do not infer the mode from context. Do not pick a default. Always ask, every PR.
+   Do not skip 8a. Do not infer the mode from context. Do not pick a default. Always ask for every **new** PR (one-time, at creation — not on subsequent fix-commit re-pushes to an already-open PR, where the user already chose its mode).
 
 8. **Create the PR** (using the mode chosen in 8a):
    ```bash
