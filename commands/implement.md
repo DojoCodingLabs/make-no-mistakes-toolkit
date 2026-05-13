@@ -222,6 +222,28 @@ If any check fails, STOP and resolve before proceeding.
 
 4. **`git worktree remove`** — STOP, always. The worktree is the user's local workspace state; they may want to inspect or salvage something before cleanup.
 
+### Sub-agent exception (applies to all four hard STOP gates above)
+
+`AskUserQuestion` is an **orchestrator-only** surface — it renders inside the user's main conversation and is not available to background sub-agents dispatched via the `Agent` tool. At every hard STOP gate listed above (and every `AskUserQuestion` / "STOP and ask the user" call site in the protocol below):
+
+- **If running as the orchestrator**: call `AskUserQuestion` directly (or its equivalent), wait for the answer, then continue.
+- **If running as a sub-agent**: do NOT attempt `AskUserQuestion`. Instead, emit a structured pause signal in your final report and halt. Use this exact shape so the orchestrator can detect and relay:
+
+  ```json
+  {
+    "pause": {
+      "gate": "pr-open-state" | "merge" | "linear-done" | "worktree-cleanup",
+      "issue_id": "<issue-id>",
+      "reason": "<one-sentence explanation>",
+      "question": "<the exact question to surface to the user>",
+      "options": ["<option-1>", "<option-2>", "..."],
+      "context": { "pr_url": "...", "branch": "...", "worktree_path": "..." }
+    }
+  }
+  ```
+
+  The orchestrator then calls `AskUserQuestion` on the sub-agent's behalf, captures the user's choice, and relays it back via `SendMessage`. The sub-agent resumes from where it halted. Attempting `AskUserQuestion` from a sub-agent results in a silent hang or runtime error — never do it.
+
 Default posture: when uncertain whether an action is local or shared-state, treat it as shared-state and ask.
 
 ## Execution Protocol — Per Issue
@@ -336,6 +358,8 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
 
 8a. **HARD STOP — ask the user the PR open state** (see "Authorization & Human-in-the-Loop Boundaries" → hard STOP #1):
 
+   > **Sub-agent note:** If you are running as a background sub-agent, do NOT call `AskUserQuestion`. Emit the `pause` JSON signal documented under "Sub-agent exception" (gate: `"pr-open-state"`) and halt. The orchestrator will relay the answer back. Orchestrators continue:
+
    Call `AskUserQuestion`:
 
    > Question: **"¿Cómo abrimos el PR?"**
@@ -395,7 +419,7 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
 > **Mode-gating reminder:** Step 13 (`gh pr merge`) only runs for **In Review** and **Ready to Merge** PRs. **Draft mode skips step 13 but still runs steps 14 and 15** — the Linear → Done and worktree-cleanup HITL gates are inviolable and fire regardless of mode (see "Hard STOP #3" and "Hard STOP #4"). For Draft PRs, jump from step 8 directly to step 14.
 
 13. **Merge the PR** (HITL gate per "Hard STOP #2") — **In Review + Ready to Merge only; skipped for Draft**:
-    - **In Review mode** → STOP and ask the user: "Ready to merge? CI is green: `<one-line summary of checks + reviewer states>`." Wait for an explicit OK before running `gh pr merge`.
+    - **In Review mode** → STOP and ask the user: "Ready to merge? CI is green: `<one-line summary of checks + reviewer states>`." Wait for an explicit OK before running `gh pr merge`. _Sub-agents: emit a `pause` signal with gate `"merge"` instead — see "Sub-agent exception"._
     - **Ready to Merge mode** → Surface merge intent in chat (1–2 lines, e.g., "All checks green; merging squash with branch delete in 5s.") then proceed without an additional approval prompt.
     - **Draft mode** → This step does not run; proceed to step 14.
     ```bash
@@ -407,11 +431,13 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
     - **Draft** → STOP and ask: "Draft PR opened at `<URL>`. Keep `{issue-id}` as **In Progress** in Linear, or move it to **In Review** for visibility?" (Draft PRs never auto-flip to Done — they're explicitly held open by the user.)
     - Only flip the status on explicit OK. If the user opts to leave the current status, post the status comment anyway and move on.
     - Status comment: "Merged via PR #{pr-number}" (In Review / Ready to Merge) or "Draft PR opened: #{pr-number}" (Draft).
+    - _Sub-agents: emit a `pause` signal with gate `"linear-done"` instead of calling `AskUserQuestion`. See "Sub-agent exception"._
 
 15. **Clean up worktrees** (HITL gate per "Hard STOP #4" — applies regardless of mode):
     - **In Review / Ready to Merge** → STOP and ask: "Merge done. Remove the worktree at `.claude/worktrees/{issue-id}`, or keep it for inspection?"
     - **Draft** → STOP and ask: "Draft PR opened at `<URL>`. The worktree at `.claude/worktrees/{issue-id}` is still live so you can iterate. Remove it now, or keep it until you flip the PR to Ready?" Default expectation: keep it.
     - Only run the removal on explicit OK.
+    - _Sub-agents: emit a `pause` signal with gate `"worktree-cleanup"` instead of calling `AskUserQuestion`. See "Sub-agent exception"._
     ```bash
     git worktree remove .claude/worktrees/{issue-id} --force
     # Verify ALL worktrees for this issue are removed
