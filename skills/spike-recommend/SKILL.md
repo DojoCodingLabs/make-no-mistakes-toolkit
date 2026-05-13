@@ -92,13 +92,23 @@ Use the **Output Format** below verbatim. The content rules, label taxonomy, val
 ### If mode = `update`
 
 - **Linear**: call `save_issue` with the existing `id`, the new `title`, and the new `description` (full brief as Markdown). Do NOT touch labels, assignee, priority, project, comments — those are independent user-set state.
-- **GitHub**: `gh issue edit <N> --title "<title>" --body-file -` piping the brief. Do NOT pass `--add-label`, `--add-assignee`, `--milestone` — leave those alone.
+- **GitHub**: render the brief to a temp file first, then `gh issue edit <N> --title "<title>" --body-file "$BRIEF_FILE"`. Using a temp file (rather than `--body-file -` with stdin) keeps the brief portable across `gh` versions and lets Step 5 re-use the same file for the optional local copy. Do NOT pass `--add-label`, `--add-assignee`, `--milestone` — leave those alone.
+  ```bash
+  BRIEF_FILE=$(mktemp /tmp/brief-XXXXXX.md)
+  # render brief into "$BRIEF_FILE"
+  gh issue edit <N> --title "<title>" --body-file "$BRIEF_FILE"
+  ```
 - **Replace, not append.** The brief is the new canonical description. If the user had prior description content they want preserved, they should have asked for it explicitly.
 
 ### If mode = `create`
 
-- **Linear**: call `save_issue` without `id`, supplying `team`, `title`, `description`, plus whatever the user answered in Step 2 (assignee, priority, project, milestone).
-- **GitHub**: `gh issue create --repo <owner/repo> --title "<title>" --body-file - --assignee <user> [--label ...] [--milestone ...]`.
+- **Linear**: call `save_issue` without `id`, supplying `team`, `title`, `description`, plus whatever the user answered in Step 2 (assignee, priority, project, milestone). Capture the returned `identifier` for Step 5.
+- **GitHub**: render the brief to a temp file first, then create the issue. Capture the returned issue number / URL for Step 5.
+  ```bash
+  BRIEF_FILE=$(mktemp /tmp/brief-XXXXXX.md)
+  # render brief into "$BRIEF_FILE"
+  ISSUE_URL=$(gh issue create --repo <owner/repo> --title "<title>" --body-file "$BRIEF_FILE" --assignee <user> [--label ...] [--milestone ...])
+  ```
 
 After write, **echo the issue URL** back to the user as the final line so they can click through. Format: `Updated: <URL>` or `Created: <URL>`.
 
@@ -112,6 +122,24 @@ If `--save-local` was passed, ALSO write `./issue-briefs/{ISSUE-ID}.md` containi
 ```
 
 Otherwise do **not** create any files. Do not silently leave behind stale local files.
+
+### Ordering — Step 5 runs AFTER Step 4, always
+
+In **update** mode the `{ISSUE-ID}` is known up-front (it was parsed from the URL in Step 0). The local write can happen at any point.
+
+In **create** mode the `{ISSUE-ID}` does **not exist** until Step 4 writes the issue to the tracker and the tracker returns it. The skill MUST therefore:
+
+1. Generate the brief body in Step 3 (no ID yet — leave any `{ISSUE-ID}` placeholders in the body as literal placeholders for now, or render the body without them).
+2. Optionally stage the body to a scratch file so it can be re-used without re-rendering:
+   ```bash
+   BRIEF_FILE=$(mktemp /tmp/brief-XXXXXX.md)
+   # write the rendered brief to "$BRIEF_FILE"
+   ```
+3. Call the tracker in Step 4 (`save_issue` / `gh issue create`) using `$BRIEF_FILE` as the body source. Capture the returned identifier (Linear `identifier`, GitHub issue number, etc.).
+4. ONLY THEN, if `--save-local` was passed, copy `$BRIEF_FILE` to `./issue-briefs/{ISSUE-ID}.md`, replacing any in-body placeholders with the resolved ID and prepending the canonical-URL banner.
+5. `rm -f "$BRIEF_FILE"` (the scratch file is no longer needed once the canonical and local copies exist).
+
+Never attempt the local write before Step 4 completes in create mode — the filename is unresolvable and the operation will silently no-op or write to a nonsense path like `./issue-briefs/{ISSUE-ID}.md` (with the literal placeholder string).
 
 ## Linear Issue Input
 
