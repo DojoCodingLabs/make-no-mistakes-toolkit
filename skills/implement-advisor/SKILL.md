@@ -37,7 +37,7 @@ This skill activates when the user describes a situation involving:
 
 2. **Parse the issue ID** from the user's message ($ARGUMENTS, the pasted URL, or the most recent conversation context). Format: `{PREFIX}-{NNN}` (e.g., `DOJ-4058`, `ALT-13`).
 
-3. **Redaction-quality gate — fetch the issue and inspect its description.** Call `mcp__plugin_linear_linear__get_issue` (or the workspace-equivalent Linear MCP `get_issue` tool) with the parsed ID and read the `description` field.
+3. **Redaction-quality gate — fetch the issue and inspect its description.** Call `mcp__plugin_linear_linear__get_issue` with the parsed ID and read the `description` field. _Naming note: the registered MCP namespace uses a single underscore between the two `linear` tokens (`plugin_linear_linear`) — matches what `spike-recommend` declares. If the literal tool name is not present in the runtime, probe with the equivalent `mcp__*linear*get_issue` glob; the actual prefix may differ slightly per workspace MCP server registration._
 
    Check for Bilingual Format markers. Required headers — any of these missing means the issue is NOT normalized:
    - `## 👤 HUMAN LAYER`

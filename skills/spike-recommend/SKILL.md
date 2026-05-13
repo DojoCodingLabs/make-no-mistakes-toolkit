@@ -57,7 +57,7 @@ Before doing anything else:
 
 Detect availability at runtime in this order of preference:
 
-1. **Linear** — primary. Available if `mcp__plugin_linear__linear__*` tools (or equivalent `mcp__*linear*save_issue`) are exposed. Use `save_issue` (with `id` → update, without `id` → create).
+1. **Linear** — primary. Available if `mcp__plugin_linear_linear__*` tools (or equivalent `mcp__*linear*save_issue`) are exposed. Use `save_issue` (with `id` → update, without `id` → create). _Naming note: the registered MCP namespace uses a single underscore between the two `linear` tokens (`plugin_linear_linear`). Always probe the actual tool name in your runtime if a literal call fails — workspace MCP servers may register under a slightly different prefix._
 2. **GitHub Issues** — fallback. Available if `gh` CLI is on PATH (`gh auth status` succeeds). Use `gh issue create` / `gh issue edit`.
 3. **Jira** — **stub only**. If a Jira MCP is detected, print: `Jira tracker detected but not implemented in spike-recommend yet — falling back to print-only.` Then continue with the print-only fallback. Do NOT attempt a partial implementation.
 4. **ClickUp** — **stub only**. Same behavior as Jira above.
