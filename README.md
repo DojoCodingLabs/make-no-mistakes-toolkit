@@ -1,5 +1,7 @@
 # make-no-mistakes
 
+**Version: 1.14.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
+
 The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.
 
 A Claude Code plugin by [Luis Andres Pena Castillo](https://github.com/lapc506).
