@@ -2638,5 +2638,152 @@
         "expected_exit": 0
       }
     ]
+  },
+  {
+    "id": "warn-version-readme-changelog-sync",
+    "description": "Warn when a version manifest (package.json, plugin.json, marketplace.json) is being bumped without a parallel update to README.md + CHANGELOG.md — the visible-version surface drifts silently otherwise (DOJ-4064 defense-in-depth, sister rule to dojo-os repo-local post-write-version-readme-sync.sh)",
+    "applies_to": [
+      "Edit",
+      "Write",
+      "MultiEdit"
+    ],
+    "match": [
+      {
+        "field": "file_path",
+        "pattern": "(^|/)(package\\.json|plugin\\.json|marketplace\\.json|\\.claude-plugin/plugin\\.json|\\.claude-plugin/marketplace\\.json)$"
+      },
+      {
+        "field": "content",
+        "pattern": "\"version\"[[:space:]]*:[[:space:]]*\"[0-9]"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": "version-readme-changelog-sync",
+    "memory_ref": "feedback_version_readme_changelog_sync.md",
+    "references": [
+      "DOJ-4064 — three-layer drift thesis (Cure 4: PreToolUse/PostToolUse hooks)",
+      "Sister hook in dojo-os: .claude/hooks/post-write-version-readme-sync.sh",
+      "make-no-mistakes-toolkit PR #21 — visible README version + reconstructed CHANGELOG"
+    ],
+    "message": "WARN: a version manifest (package.json / plugin.json / marketplace.json)\nis being written with a \"version\": \"X.Y.Z\" field, but this hook cannot\nsee whether README.md and CHANGELOG.md were updated in the same change.\n\nWhen you bump the version in any manifest, also update in the same PR:\n  1. README.md — the \"Version: X.Y.Z\" line at the top\n  2. CHANGELOG.md — add a new entry under ## [X.Y.Z] - YYYY-MM-DD\n\nWhy this rule exists (DOJ-4064 three-layer drift thesis):\n- The repo shipped 1.1.0 → 1.14.0 with NO visible version anywhere a\n  human would look (README, CHANGELOG, or git tags). PR #21 closed that\n  gap by reconstructing the CHANGELOG and adding a header version line.\n- Without this rule, the same drift will reappear on the next bump.\n- Defense-in-depth: the dojo-os repo has a sister PostToolUse hook\n  (.claude/hooks/post-write-version-readme-sync.sh) that catches the\n  same drift locally even if this toolkit isn't installed.\n\nSuggested workflow:\n  bump version in manifest(s) → update README.md \"Version: ...\" line →\n  append CHANGELOG.md entry → commit all four files together.\n\nIf you're intentionally splitting the bump from the README/CHANGELOG\nupdate (e.g., bumping a vendored sub-manifest's version that isn't user-\nvisible), add \"# hook-bypass: version-readme-changelog-sync\" inline in\na comment near the version field or pass it on the Write call.\n",
+    "tests": [
+      {
+        "name": "warns-on-package-json-version-bump",
+        "input": {
+          "tool_input": {
+            "file_path": "package.json",
+            "content": "{\n  \"name\": \"@example/pkg\",\n  \"version\": \"1.15.0\"\n}\n"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-version-readme-changelog-sync"
+      },
+      {
+        "name": "warns-on-plugin-json-version-bump",
+        "input": {
+          "tool_input": {
+            "file_path": ".claude-plugin/plugin.json",
+            "content": "{\n  \"name\": \"make-no-mistakes\",\n  \"version\": \"1.15.0\"\n}\n"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-version-readme-changelog-sync"
+      },
+      {
+        "name": "warns-on-marketplace-json-version-bump",
+        "input": {
+          "tool_input": {
+            "file_path": ".claude-plugin/marketplace.json",
+            "content": "{\n  \"name\": \"marketplace\",\n  \"version\": \"1.15.0\",\n  \"plugins\": [{\"version\": \"1.15.0\"}]\n}\n"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-version-readme-changelog-sync"
+      },
+      {
+        "name": "warns-on-absolute-path-package-json",
+        "input": {
+          "tool_input": {
+            "file_path": "/home/user/repo/package.json",
+            "content": "{\"version\": \"2.0.0\"}"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-version-readme-changelog-sync"
+      },
+      {
+        "name": "warns-on-root-plugin-json",
+        "input": {
+          "tool_input": {
+            "file_path": "plugin.json",
+            "content": "{\"version\": \"1.0.1\"}"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-version-readme-changelog-sync"
+      },
+      {
+        "name": "warns-on-edit-of-package-json",
+        "input": {
+          "tool_input": {
+            "file_path": "package.json",
+            "old_string": "\"version\": \"1.14.0\"",
+            "new_string": "\"version\": \"1.15.0\""
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-version-readme-changelog-sync"
+      },
+      {
+        "name": "allows-package-json-write-without-version-field",
+        "input": {
+          "tool_input": {
+            "file_path": "package.json",
+            "content": "{\n  \"name\": \"@example/pkg\",\n  \"description\": \"no version field touched\"\n}\n"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-unrelated-json-file",
+        "input": {
+          "tool_input": {
+            "file_path": "tsconfig.json",
+            "content": "{\"version\": \"1.0.0\"}"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-readme-write",
+        "input": {
+          "tool_input": {
+            "file_path": "README.md",
+            "content": "**Version: 1.15.0**"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-changelog-write",
+        "input": {
+          "tool_input": {
+            "file_path": "CHANGELOG.md",
+            "content": "## [1.15.0] - 2026-05-14"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "file_path": "package.json",
+            "content": "{\n  \"version\": \"1.15.0\"\n  // hook-bypass: version-readme-changelog-sync\n}\n"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
   }
 ]
