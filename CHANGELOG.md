@@ -18,6 +18,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-05-14
+
+### Added
+- New rule: `warn-version-readme-changelog-sync` (Tier 2 — warn). Fires on
+  `Write` / `Edit` / `MultiEdit` to `package.json`, `plugin.json`,
+  `marketplace.json`, `.claude-plugin/plugin.json`, or
+  `.claude-plugin/marketplace.json` when the written content includes a
+  `"version": "X.Y.Z"` field, and warns the agent to also update `README.md`
+  (the visible `Version:` line) and `CHANGELOG.md` in the same change. Closes
+  the gap PR #21 exposed: the toolkit shipped 1.1.0 → 1.14.0 with no visible
+  version surface (no README line, no CHANGELOG, no git tags); without this
+  rule the same drift would reappear on every future bump. Bypass marker:
+  `version-readme-changelog-sync`.
+
+### Notes
+- Defense-in-depth (DOJ-4064 three-layer drift thesis, Cure 4):
+  - **Toolkit level (this PR)** — cross-repo enforcement; any consumer of
+    the toolkit inherits the rule and gets the warning on every manifest bump.
+  - **Repo level (parallel `dojo-os` PR)** — local `PostToolUse` hook
+    `.claude/hooks/post-write-version-readme-sync.sh` enforces the same
+    invariant in the dojo-os repo even if this toolkit isn't installed.
+- Dogfooding: this version itself is being shipped via the rule it adds —
+  `README.md` "Version" line and `CHANGELOG.md` entry are updated alongside
+  the manifest bumps in the parent commits. If the rule were not warning,
+  the 1.15.0 release would already have re-introduced the same drift PR #21
+  fixed.
+- 32 rules total (was 31). 210 / 210 tests pass.
+
 ## [1.14.0] - 2026-05-14
 
 ### Added
