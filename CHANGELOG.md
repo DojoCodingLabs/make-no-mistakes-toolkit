@@ -18,6 +18,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-05-26
+
+### Added
+- New hook: `hooks/pre-bash-stale-push.sh` (warn-only). Fires when a Bash
+  tool call is a force-push (`git push --force-with-lease`, `--force`, or
+  `-f`) AND the current `HEAD` is more than 5 commits behind the resolved
+  base (preferring `origin/HEAD`, falling back to `develop` → `main` →
+  `master`). Emits a multi-line stderr warning with a copy-pasteable
+  three-line rebase recipe. Never blocks — the hook always exits 0.
+  Threshold tunable via `MAKE_NO_MISTAKES_STALE_THRESHOLD` env var. Wired
+  into `hooks/pre-bash.sh` after the kill-switch check so
+  `CLAUDE_DISABLE_PLUGIN_HOOKS=1` disables it alongside everything else.
+- New section in `skills/review-open-prs/SKILL.md`: **My PRs — Stale
+  Branches (Drift Risk)**. Surfaces PRs that are >5 commits behind base
+  AND have failing CI checks, separately from real CI bugs. Includes a
+  matching **Action 2a** in the report's Suggested Course of Action that
+  proposes a batched rebase before drilling into the failures —
+  drift-induced failures often resolve themselves on rebase, and isolating
+  them up front prevents wasted investigation cycles.
+- 6 new hook tests in `hooks/test-hooks.sh` covering the stale-push hook
+  (non-push silent, in-threshold silent, stale warns, --dry-run skipped,
+  -f short form detected, non-force-push silent). Tests are hermetic —
+  each spins up a throwaway upstream + local clone in `mktemp -d`.
+
+### Motivation
+- **2026-05-20 incident**: DOJ-4134 atomic migration moved
+  `src/components/agent/ChatWidget.tsx` → `src/components/agent/organisms/ChatWidget.tsx`
+  and updated a Vitest fixture in the same atomic merge. PRs in `dojo-os`
+  that were cut from `develop` BEFORE that merge (#2105 DOJ-4135 accordion,
+  #2107 VerificationBanner /home suppression, #1713 welcome flow) each kept
+  the old test path, so their next CI run failed with
+  `ENOENT: src/components/agent/ChatWidget.tsx`. Diagnosis took ~10 minutes
+  per PR. Fix was always the same 30-second rebase + force-push-with-lease.
+  This release surfaces that drift proactively (hook) and retroactively
+  (skill section) so the pattern never has to be diagnosed again.
+
 ## [1.18.0] - 2026-05-26
 
 ### Added

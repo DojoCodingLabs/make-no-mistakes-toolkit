@@ -33,6 +33,14 @@ fi
 # Capture stdin once. Each rule invocation re-pipes this same payload.
 INPUT_RAW="$(cat)"
 
+# Stale-push warning hook — runs alongside the manifest rule loop and shares
+# the same stdin payload. It is warn-only by contract (never exits non-zero
+# in a way that should abort the dispatcher), but we also guard with `|| true`
+# so a future bug in that script cannot turn into a hard block here.
+if [ -x "$HOOKS_DIR/pre-bash-stale-push.sh" ]; then
+  printf '%s' "$INPUT_RAW" | "$HOOKS_DIR/pre-bash-stale-push.sh" || true
+fi
+
 EXIT_CODE=0
 while IFS= read -r RULE_ID; do
   [ -z "$RULE_ID" ] && continue
