@@ -21,6 +21,7 @@ You detected that the user wants to **implement a Linear issue or start developm
 
 ## CHANGELOG
 
+- **2026-05-20 — Surface canonical-URL drift gates from spike-recommend.** When the issue under analysis is a URL canonical migration (touches `<Route>` mounts, `buildXxxUrl` helpers, or `aliases_redirect_only` in a routes map) AND there's an in-flight PR overlap, the redaction-quality gate is no longer sufficient on its own. Even a Bilingual-formatted brief is "soft" if it doesn't enumerate the SEMANTIC contracts both PRs touch (Rule 11 in `spike-recommend`) and assert URL-builder ↔ Route reachability (Rule 12). Recommend re-running `/make-no-mistakes:spike-recommend {ISSUE-ID}` first to refresh the brief against the v1.16.0+ ruleset, THEN `/make-no-mistakes:implement`. Background: DOJ-4200 + DOJ-4075 lessons (`dojo-os`, 2026-05-20).
 - **2026-05-13 — Gate on issue redaction quality.** Before recommending `/make-no-mistakes:implement`, fetch the Linear issue and check whether its description is in Bilingual Format (Human Layer + Agent Layer + ACs + Context Files). If not, recommend `/make-no-mistakes:spike-recommend {ISSUE-ID}` first to normalize the description in place, THEN `/make-no-mistakes:implement`. Implementation agents work much better against a normalized brief.
 
 ## When This Applies

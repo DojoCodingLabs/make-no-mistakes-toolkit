@@ -18,6 +18,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-05-20
+
+### Added
+- **Three new rules in `spike-recommend` (Rules 11, 12, 13) from the
+  DOJ-4200 + DOJ-4075 canonical-URL migration session in `dojo-os`
+  (2026-05-20).** Briefs touching URL canonical migrations or coexisting
+  with an in-flight PR must now satisfy:
+  - **Rule 11 — Predict semantic conflicts, not just file conflicts.**
+    When a brief references an in-flight PR, the "Known Pitfalls" /
+    "Technical Constraints" sections must enumerate the SEMANTIC contracts
+    both PRs touch (URL shapes, type signatures, state schemas, edge
+    function payload shapes, event names) — not just file paths. The
+    motivating bug: a subagent on DOJ-4075 predicted "7 shared files will
+    conflict" with DOJ-4200; the actual file conflict count was close (6),
+    but the real drift was semantic — DOJ-4200's canonical URL shape vs
+    DOJ-4075's forum URL builders silently diverged with zero file overlap.
+  - **Rule 12 — Verify URL-builder output matches the declared Route mount.**
+    When a brief covers a URL canonical migration, Acceptance Criteria must
+    include an explicit `matchPath` check that `buildXxxUrl(...)` output is
+    reachable via its declared `ROUTES.X` template. Reference test:
+    `src/utils/__tests__/url-builders-match-routes.test.ts` in `dojo-os`.
+    The motivating bug: Greptile P1 on DOJ-4200 (commit `dbd8a1d04`) —
+    `courseBasePath = '/pathways/:slug'` produced URLs like
+    `/pathways/X/Y/workbook` that had NO matching `<Route>` mount.
+  - **Rule 13 — Use `useAuth().isAuthenticated` for chrome decisions, not
+    URL-prefix string detection.** Briefs that propose auth-aware page
+    chrome must require `useAuth()` branching inside a single wrapper
+    component (the PathwaysPage / PathwayDetailPage pattern), not a
+    `PUBLIC_*_ROUTE_PREFIXES` string list. The motivating bug: DOJ-4200's
+    first attempt put `/pathways` in `PUBLIC_COURSE_ROUTE_PREFIXES` and
+    made every visitor — authed and anon — see the public layout, losing
+    the app shell for authed users on the canonical pathway-course URL.
+    Fix in `dojo-os` commit `dbd8a1d04`.
+- **`implement-advisor` CHANGELOG note** flagging that the redaction-quality
+  gate is no longer sufficient on its own for canonical-URL migration
+  issues with in-flight overlap — the brief must also satisfy spike-recommend
+  Rules 11 + 12 to be considered "implementation-ready".
+
+### Notes
+- These rules complement the parallel `dojo-os` PR
+  (`andres/canonical-url-lessons-hooks`) which adds:
+  - `.claude/hooks/pre-write-routes-yaml-canonical.sh` — pre-write hook
+    blocking `content_types.<X>.canonical: /app/...` (the canonical URL
+    must never carry the legacy `/app/` prefix per the DOJ-4064 thesis).
+  - `src/utils/__tests__/url-builders-match-routes.test.ts` — Vitest test
+    asserting every `buildXxxUrl` reaches its declared route template via
+    `matchPath`. This is the reference implementation cited by Rule 12.
+- Defense-in-depth (DOJ-4064 three-layer drift thesis, Cure 4):
+  - **Toolkit level (this PR)** — cross-repo enforcement; any toolkit
+    consumer that runs `/spike-recommend` for a canonical-URL migration
+    gets the gates above embedded in the brief.
+  - **Repo level (parallel `dojo-os` PR)** — local hook + Vitest test
+    enforce the same contracts in the dojo-os repo even if this toolkit
+    isn't installed.
+
 ## [1.15.0] - 2026-05-14
 
 ### Added
