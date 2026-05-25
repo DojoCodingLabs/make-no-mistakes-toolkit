@@ -18,6 +18,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-05-25
+
+### Added
+- **New PreToolUse rule `warn-greptile-review-extraction-by-created-at`
+  (Bash).** Warns when a command extracts Greptile review state from
+  `gh api .../comments` using chronology-based patterns that silently
+  return stale data on re-reviews. The motivating bug (verified twice,
+  most recently CIV-728 PR #114 forensic 2026-05-25): Greptile App
+  EDITS the same review comment in-place on each re-review, so
+  `comment.created_at` is frozen at original posting and only
+  `comment.updated_at` moves. Three buggy patterns now trigger the
+  warning:
+  - `sort_by(.created_at)` / `select` on `.created_at` inside a jq
+    expression over Greptile comments.
+  - `greptile` + `head -N` / `tail -N` on the same command (implicit
+    chronology assumption — "first match wins").
+  - `capture("/commit/(?<sha>[0-9a-f]+)")` over a Greptile body — grabs
+    the FIRST `/commit/` URL anywhere in the body (often a permalink
+    quoted inside a finding), not the authoritative
+    `<sub>Last reviewed commit: ...(commit/HASH)</sub>` footer hash.
+
+  The rule's warning message paste-includes the corrective pattern:
+  pull HEAD via `gh pr view --json headRefOid`, filter Greptile
+  comments to those whose `Last reviewed commit:` footer matches HEAD,
+  then `sort_by(.updated_at) | last`. Action is `warn` (not `block`)
+  — there are legitimate reasons to look at creation order (e.g.
+  auditing posting cadence). Bypass marker:
+  `greptile-extraction-acknowledged`.
+
+  Memories: `feedback_greptile_match_head_not_chronology.md`,
+  `feedback_tail_with_desc_ordering.md`.
+
 ## [1.16.0] - 2026-05-20
 
 ### Added
