@@ -2234,3 +2234,184 @@
               // hook-bypass: version-readme-changelog-sync
             }
       expected_exit: 0
+
+# -----------------------------------------------------------------------------
+# Greptile review extraction discipline
+#
+# Greptile App on GitHub EDITS the same review comment in-place on each
+# re-review, instead of posting a fresh comment per analysis pass. So:
+#   - comment.created_at stays fixed at original creation (DOES NOT change on
+#     re-review).
+#   - comment.updated_at is what changes when Greptile re-analyzes.
+#   - The HTML <sub>Last reviewed commit: [...](https://.../commit/HASH)</sub>
+#     footer is the authoritative source for "which commit this review covers".
+#
+# Recurring buggy patterns Claude writes (seen in CIV-728 PR #114 forensic
+# 2026-05-25 and earlier sessions — see memory feedback_greptile_match_head_
+# not_chronology.md):
+#   1. `gh api .../comments --jq '... | sort_by(.created_at) ...'` — uses
+#      creation order, returns stale state on re-reviews.
+#   2. `gh api .../comments | grep "Confidence Score" | head -1` — grabs
+#      first-by-creation, not latest-by-update.
+#   3. `(.body | capture("/commit/(?<sha>[0-9a-f]+)"))` — captures the FIRST
+#      commit URL anywhere in the body (often a code-permalink quoted in a
+#      finding, NOT the "Last reviewed commit" footer hash).
+#
+# The corrective pattern uses updated_at AND extracts the commit hash from
+# the "Last reviewed commit:" prefix specifically:
+#   gh api "repos/<o>/<r>/issues/<N>/comments" --jq '
+#     [.[] | select(.user.login | test("greptile";"i")) | {
+#       updated: .updated_at,
+#       commit: ((.body | split("Last reviewed commit:")[1] // "" |
+#                 split("commit/")[1] // "" | split(")")[0])[0:10]),
+#       score: ((.body | capture("<h3>Confidence Score: (?<s>[0-9]/5)</h3>").s) // "?")
+#     }] | map(select(.commit == env.SHORT)) | sort_by(.updated) | last'
+#
+# Memory: feedback_greptile_match_head_not_chronology.md +
+#         feedback_tail_with_desc_ordering.md
+# -----------------------------------------------------------------------------
+
+- id: warn-greptile-review-extraction-by-created-at
+  description: 'Warn when a Bash command extracts Greptile review state but uses created_at / chronology / first-commit-URL capture — Greptile edits the same comment in-place, so updated_at + the "Last reviewed commit:" footer hash are the authoritative signals (memory feedback_greptile_match_head_not_chronology.md)'
+  applies_to: [Bash]
+  match:
+    # Condition A: a comments API call AND a "greptile" reference must both
+    # be present in the same command line. Reading anything else from gh api
+    # comments is fine; warning fires only when the consumer is looking for
+    # Greptile state. The user.login filter usually appears as
+    # `select(.user.login | test("greptile";"i"))` or `grep -i greptile`.
+    - field: command
+      pattern: 'gh[[:space:]]+api\b.*\bcomments\b'
+    - field: command
+      pattern: 'greptile'
+      flags: i
+    # Condition B: at least one of three buggy patterns is present.
+    #   B1. `created_at` referenced inside jq (sort_by, select, the projection
+    #       itself). On re-review Greptile leaves created_at untouched, so any
+    #       use of it to find "the latest review" returns a stale snapshot.
+    #   B2. A `head -N` / `tail -N` after greptile match — implicit chronology
+    #       assumption ("first match is the right one") that the in-place edit
+    #       behavior silently breaks.
+    #   B3. A jq `capture("/commit/...sha...")` near greptile — grabs the
+    #       first commit hash anywhere in the body (often a permalink quoted
+    #       inside a finding), not the authoritative "Last reviewed commit:"
+    #       footer hash.
+    - field: command
+      pattern: '(\bcreated_at\b|\b(head|tail)[[:space:]]+-n?[[:space:]]*[0-9]+|capture\([^)]*/commit/)'
+    # Negative: if the command ALREADY uses updated_at or extracts via "Last
+    # reviewed commit:", it is on the correct path and the warning would be
+    # pure noise. Allow it through.
+    - field: command
+      not_pattern: '(Last reviewed commit|\bupdated_at\b)'
+  action: warn
+  bypass_marker: greptile-extraction-acknowledged
+  memory_ref: feedback_greptile_match_head_not_chronology.md
+  references:
+    - 'feedback_tail_with_desc_ordering.md — sister rule on DESC|tail bug'
+    - 'CIV-728 PR #114 forensic 2026-05-25 — stale 3/5 review picked over 5/5 HEAD review'
+  message: |
+    WARN: Bash command extracts Greptile review state with a chronology-based
+    pattern (created_at / head -N / tail -N / capture(.../commit/...)).
+
+    Greptile App on GitHub EDITS the same review comment in-place on each
+    re-review. As a result:
+      - comment.created_at is FROZEN at original posting; it DOES NOT
+        change when Greptile re-analyzes a new commit.
+      - comment.updated_at IS what moves with each re-review.
+      - The "<sub>Last reviewed commit: ...(commit/HASH)</sub>" footer in
+        the body is the authoritative source for "which commit this review
+        is about" — NOT the first /commit/ URL captured anywhere in the
+        body (which is often a permalink quoted inside a finding).
+
+    Use this pattern instead (copy-paste-able):
+
+      HEAD=$(gh pr view <N> --json headRefOid --jq '.headRefOid')
+      export SHORT=${HEAD:0:10}
+      gh api "repos/<owner>/<repo>/issues/<N>/comments" --jq '
+        [.[] | select(.user.login | test("greptile";"i")) | {
+          updated: .updated_at,
+          commit: ((.body | split("Last reviewed commit:")[1] // "" |
+                    split("commit/")[1] // "" | split(")")[0])[0:10]),
+          score: ((.body | capture("<h3>Confidence Score: (?<s>[0-9]/5)</h3>").s) // "?")
+        }] | map(select(.commit == env.SHORT)) | sort_by(.updated) | last'
+
+    This:
+      1. Pulls the PR's actual HEAD SHA up front.
+      2. Filters Greptile comments to ONLY those whose "Last reviewed
+         commit:" footer matches HEAD (so a stale older review can't win).
+      3. Among the matching reviews, picks the latest by updated_at.
+
+    Per feedback_greptile_match_head_not_chronology.md: out-of-order parallel
+    re-runs make creation order misleading. Per feedback_tail_with_desc_
+    ordering.md: same failure mode (trust an implicit order without
+    validating it).
+
+    Bypass marker (greptile-extraction-acknowledged) ONLY for legitimate
+    cases (e.g., you explicitly WANT the creation order to audit posting
+    cadence, not the latest state).
+  tests:
+    # B1: sort_by(.created_at) is the canonical buggy form.
+    - name: warns-on-sort-by-created-at-greptile-comments
+      input:
+        tool_input:
+          command: "gh api repos/o/r/issues/1/comments --jq '[.[] | select(.user.login | test(\"greptile\";\"i\"))] | sort_by(.created_at) | last'"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-greptile-review-extraction-by-created-at'
+    # B2a: greptile + tail -N — implicit "tail of chronological listing".
+    - name: warns-on-greptile-grep-then-tail
+      input:
+        tool_input:
+          command: "gh api repos/o/r/issues/1/comments --jq '.[].body' | grep -i greptile | tail -1"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-greptile-review-extraction-by-created-at'
+    # B2b: greptile + head -N — implicit "first match wins".
+    - name: warns-on-greptile-grep-then-head
+      input:
+        tool_input:
+          command: "gh api repos/o/r/issues/1/comments --jq '.[] | select(.body | test(\"greptile\";\"i\"))' | grep 'Confidence Score' | head -1"
+      expected_exit: 0
+      expected_stderr_contains: 'warn-greptile-review-extraction-by-created-at'
+    # B3: capture on /commit/<sha> grabs the first /commit/ URL in the body,
+    # not the Last reviewed commit footer. Common buggy form.
+    - name: warns-on-capture-commit-sha-from-greptile-body
+      input:
+        tool_input:
+          command: 'gh api repos/o/r/issues/1/comments --jq ''[.[] | select(.user.login | test("greptile";"i")) | {commit: (.body | capture("/commit/(?<sha>[0-9a-f]+)").sha)}]'''
+      expected_exit: 0
+      expected_stderr_contains: 'warn-greptile-review-extraction-by-created-at'
+    # Correct pattern — uses updated_at + "Last reviewed commit:" — MUST PASS.
+    - name: allows-correct-pattern-updated-at-and-last-reviewed-commit
+      input:
+        tool_input:
+          command: |
+            gh api "repos/o/r/issues/1/comments" --jq '
+              [.[] | select(.user.login | test("greptile";"i")) | {
+                updated: .updated_at,
+                commit: ((.body | split("Last reviewed commit:")[1] // "" | split("commit/")[1] // "" | split(")")[0])[0:10]),
+                score: ((.body | capture("<h3>Confidence Score: (?<s>[0-9]/5)</h3>").s) // "?")
+              }] | sort_by(.updated) | last'
+      expected_exit: 0
+    # Generic gh api comments call WITHOUT greptile — out of scope.
+    - name: allows-non-greptile-comments-call
+      input:
+        tool_input:
+          command: "gh api repos/o/r/issues/1/comments --jq '[.[] | .body] | sort_by(.created_at)'"
+      expected_exit: 0
+    # Greptile-aware call that uses updated_at — correct, no buggy pattern.
+    - name: allows-greptile-with-updated-at-and-sort
+      input:
+        tool_input:
+          command: "gh api repos/o/r/issues/1/comments --jq '[.[] | select(.user.login | test(\"greptile\";\"i\"))] | sort_by(.updated_at) | last'"
+      expected_exit: 0
+    # Non-gh-api commands that mention greptile — out of scope (e.g. listing
+    # PR labels containing the word, gh search code, etc.).
+    - name: allows-gh-search-greptile-not-api-comments
+      input:
+        tool_input:
+          command: 'gh search prs --label greptile-approved'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          command: "gh api repos/o/r/issues/1/comments --jq '[.[] | select(.user.login | test(\"greptile\";\"i\"))] | sort_by(.created_at) | last' # hook-bypass: greptile-extraction-acknowledged"
+      expected_exit: 0

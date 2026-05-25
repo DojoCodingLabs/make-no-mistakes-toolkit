@@ -2785,5 +2785,126 @@
         "expected_exit": 0
       }
     ]
+  },
+  {
+    "id": "warn-greptile-review-extraction-by-created-at",
+    "description": "Warn when a Bash command extracts Greptile review state but uses created_at / chronology / first-commit-URL capture — Greptile edits the same comment in-place, so updated_at + the \"Last reviewed commit:\" footer hash are the authoritative signals (memory feedback_greptile_match_head_not_chronology.md)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "gh[[:space:]]+api\\b.*\\bcomments\\b"
+      },
+      {
+        "field": "command",
+        "pattern": "greptile",
+        "flags": "i"
+      },
+      {
+        "field": "command",
+        "pattern": "(\\bcreated_at\\b|\\b(head|tail)[[:space:]]+-n?[[:space:]]*[0-9]+|capture\\([^)]*/commit/)"
+      },
+      {
+        "field": "command",
+        "not_pattern": "(Last reviewed commit|\\bupdated_at\\b)"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": "greptile-extraction-acknowledged",
+    "memory_ref": "feedback_greptile_match_head_not_chronology.md",
+    "references": [
+      "feedback_tail_with_desc_ordering.md — sister rule on DESC|tail bug",
+      "CIV-728 PR #114 forensic 2026-05-25 — stale 3/5 review picked over 5/5 HEAD review"
+    ],
+    "message": "WARN: Bash command extracts Greptile review state with a chronology-based\npattern (created_at / head -N / tail -N / capture(.../commit/...)).\n\nGreptile App on GitHub EDITS the same review comment in-place on each\nre-review. As a result:\n  - comment.created_at is FROZEN at original posting; it DOES NOT\n    change when Greptile re-analyzes a new commit.\n  - comment.updated_at IS what moves with each re-review.\n  - The \"<sub>Last reviewed commit: ...(commit/HASH)</sub>\" footer in\n    the body is the authoritative source for \"which commit this review\n    is about\" — NOT the first /commit/ URL captured anywhere in the\n    body (which is often a permalink quoted inside a finding).\n\nUse this pattern instead (copy-paste-able):\n\n  HEAD=$(gh pr view <N> --json headRefOid --jq '.headRefOid')\n  export SHORT=${HEAD:0:10}\n  gh api \"repos/<owner>/<repo>/issues/<N>/comments\" --jq '\n    [.[] | select(.user.login | test(\"greptile\";\"i\")) | {\n      updated: .updated_at,\n      commit: ((.body | split(\"Last reviewed commit:\")[1] // \"\" |\n                split(\"commit/\")[1] // \"\" | split(\")\")[0])[0:10]),\n      score: ((.body | capture(\"<h3>Confidence Score: (?<s>[0-9]/5)</h3>\").s) // \"?\")\n    }] | map(select(.commit == env.SHORT)) | sort_by(.updated) | last'\n\nThis:\n  1. Pulls the PR's actual HEAD SHA up front.\n  2. Filters Greptile comments to ONLY those whose \"Last reviewed\n     commit:\" footer matches HEAD (so a stale older review can't win).\n  3. Among the matching reviews, picks the latest by updated_at.\n\nPer feedback_greptile_match_head_not_chronology.md: out-of-order parallel\nre-runs make creation order misleading. Per feedback_tail_with_desc_\nordering.md: same failure mode (trust an implicit order without\nvalidating it).\n\nBypass marker (greptile-extraction-acknowledged) ONLY for legitimate\ncases (e.g., you explicitly WANT the creation order to audit posting\ncadence, not the latest state).\n",
+    "tests": [
+      {
+        "name": "warns-on-sort-by-created-at-greptile-comments",
+        "input": {
+          "tool_input": {
+            "command": "gh api repos/o/r/issues/1/comments --jq '[.[] | select(.user.login | test(\"greptile\";\"i\"))] | sort_by(.created_at) | last'"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-greptile-review-extraction-by-created-at"
+      },
+      {
+        "name": "warns-on-greptile-grep-then-tail",
+        "input": {
+          "tool_input": {
+            "command": "gh api repos/o/r/issues/1/comments --jq '.[].body' | grep -i greptile | tail -1"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-greptile-review-extraction-by-created-at"
+      },
+      {
+        "name": "warns-on-greptile-grep-then-head",
+        "input": {
+          "tool_input": {
+            "command": "gh api repos/o/r/issues/1/comments --jq '.[] | select(.body | test(\"greptile\";\"i\"))' | grep 'Confidence Score' | head -1"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-greptile-review-extraction-by-created-at"
+      },
+      {
+        "name": "warns-on-capture-commit-sha-from-greptile-body",
+        "input": {
+          "tool_input": {
+            "command": "gh api repos/o/r/issues/1/comments --jq '[.[] | select(.user.login | test(\"greptile\";\"i\")) | {commit: (.body | capture(\"/commit/(?<sha>[0-9a-f]+)\").sha)}]'"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "warn-greptile-review-extraction-by-created-at"
+      },
+      {
+        "name": "allows-correct-pattern-updated-at-and-last-reviewed-commit",
+        "input": {
+          "tool_input": {
+            "command": "gh api \"repos/o/r/issues/1/comments\" --jq '\n  [.[] | select(.user.login | test(\"greptile\";\"i\")) | {\n    updated: .updated_at,\n    commit: ((.body | split(\"Last reviewed commit:\")[1] // \"\" | split(\"commit/\")[1] // \"\" | split(\")\")[0])[0:10]),\n    score: ((.body | capture(\"<h3>Confidence Score: (?<s>[0-9]/5)</h3>\").s) // \"?\")\n  }] | sort_by(.updated) | last'\n"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-greptile-comments-call",
+        "input": {
+          "tool_input": {
+            "command": "gh api repos/o/r/issues/1/comments --jq '[.[] | .body] | sort_by(.created_at)'"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-greptile-with-updated-at-and-sort",
+        "input": {
+          "tool_input": {
+            "command": "gh api repos/o/r/issues/1/comments --jq '[.[] | select(.user.login | test(\"greptile\";\"i\"))] | sort_by(.updated_at) | last'"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-gh-search-greptile-not-api-comments",
+        "input": {
+          "tool_input": {
+            "command": "gh search prs --label greptile-approved"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "gh api repos/o/r/issues/1/comments --jq '[.[] | select(.user.login | test(\"greptile\";\"i\"))] | sort_by(.created_at) | last' # hook-bypass: greptile-extraction-acknowledged"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
   }
 ]
