@@ -18,6 +18,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-05-26
+
+### Added
+- **New command `/make-no-mistakes:gemini-code-review`** + worker
+  `scripts/gemini-code-review.sh`. A cost-optimized first-pass code review: the
+  heavy diff-reading runs on **Gemini 3.5 Flash** (one-shot via a transient
+  liteLLM proxy), then the orchestrator (on a Claude model) curates the findings
+  against the local repo's `CLAUDE.md`. **Design B** — no nested Claude Code
+  agent runs on Gemini, so there is no tool-call-translation fragility. Repo-
+  agnostic: base branch auto-detected (`origin/HEAD` → `develop`/`main`/`master`),
+  the rubric is generic, and the curation layer adds repo specifics. Secret
+  handling via the plugin's own `/secret-input` + `/secret-use` so
+  `GEMINI_API_KEY` never leaks into logs.
+
+### Notes
+- **Parallel-version coordination:** the `andres/stale-push-hook` branch also
+  claims `1.18.0`. Whichever merges first keeps `1.18.0`; the other rebases onto
+  the updated `main` and bumps to `1.19.0`.
+
 ## [1.17.0] - 2026-05-25
 
 ### Added
