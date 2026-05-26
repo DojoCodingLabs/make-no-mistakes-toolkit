@@ -198,8 +198,36 @@ PR #number — Title
   URL
 ```
 
+### My PRs — Stale Branches (Drift Risk)
+PRs where the branch is >5 commits behind base AND has ANY failing CI check. These are likely failing because the base moved (e.g., a test file was moved/renamed in a merged PR but this branch still has the old path). Recommend a preventive rebase BEFORE more CI cycles burn.
+
+**Investigate this section BEFORE the "CI Failures" section below** — stale-with-CI-fail is a likely false positive that can be resolved with a 30-second rebase. Pulling apart real test bugs from drift-induced failures is much faster when you've already ruled out drift.
+
+For each candidate PR, collect the behind-by count using the GitHub Compare API (one call per PR; do this inside the per-PR loop in Step 5):
+
+```bash
+# Inside the per-PR loop in Step 5 — after fetching CI status:
+base_branch=$(gh pr view "$pr_number" --repo "$ORG/<repo>" --json baseRefName --jq '.baseRefName')
+head_sha=$(gh pr view "$pr_number" --repo "$ORG/<repo>" --json headRefOid --jq '.headRefOid')
+behind=$(gh api "repos/$ORG/<repo>/compare/${base_branch}...${head_sha}" --jq '.behind_by' 2>/dev/null)
+```
+
+A PR qualifies for this section if:
+- `behind` > 5, AND
+- At least one CI check has `conclusion=FAILURE`
+
+Format:
+```
+PR #number — Title — {behind} commits behind {base}
+  Failed checks: list of failed check names
+  Suggested: git fetch && git rebase origin/{base} && git push --force-with-lease
+  URL
+```
+
+If you can pattern-match the failing test path against files renamed in recent commits to `{base}` (e.g., `gh api repos/$ORG/<repo>/compare/${head_sha}...origin/${base_branch}` and grep `.files[].previous_filename`), call that out as "Likely cause: file renamed in merged PR #X".
+
 ### My PRs — CI Failures
-PRs with any check conclusion=FAILURE:
+PRs with any check conclusion=FAILURE that are NOT already listed under "Stale Branches" above:
 ```
 PR #number — Title
   Failed checks: list of failed check names
@@ -280,6 +308,28 @@ Rules:
 - Link Linear issues when available: `<https://linear.app/{LINEAR_WORKSPACE}/issue/{ISSUE_ID}|{ISSUE_ID}>`
 - If unsure who to CC, ask the user
 - Do NOT use unicode bullet points (no `•`, `◦`, `▪`) — use `-` at all levels
+
+### Action 2a: Rebase stale branches (drift risk)
+
+List every PR from "Stale Branches (Drift Risk)". These should be addressed BEFORE Action 3 (CI Failures) because the rebase often resolves the failures for free:
+
+```
+The following PRs are >5 commits behind base AND have failing CI. The failures
+are likely caused by the base moving (e.g., a test file was renamed in a merged
+PR). A rebase will likely make them go green:
+
+  repo#number — Title — {N} commits behind {base}
+  ...
+
+Shall I rebase them against the base branch? (yes/no/pick)
+```
+
+If the user says "yes", for each stale PR:
+1. Check out the branch locally or in a worktree
+2. `git fetch origin <base>`
+3. `git rebase origin/<base>` (auto-resolve trivial conflicts; flag manual ones)
+4. `git push --force-with-lease` (with user confirmation)
+5. Re-poll CI after a few minutes — if it's now green, the failure was drift; if it's still red, escalate to Action 3.
 
 ### Action 2: Fix merge conflicts / rebase
 
