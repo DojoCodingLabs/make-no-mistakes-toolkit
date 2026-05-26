@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/schemas/atomic-design-rules.schema.json",
+  "title": "Atomic Design Rules",
+  "description": "Per-repo configuration consumed by the make-no-mistakes atomic-design hooks (PreToolUse: ownership enforcement; PostToolUse: drift telemetry). Drop this file at consumer repo root as .atomic-design-rules.json. If absent, the atomic-design hooks are a no-op.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "components_root", "pillars"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Schema version. Current schema is version 1.",
+      "const": 1
+    },
+    "components_root": {
+      "type": "string",
+      "description": "Path to the root of the components tree, repo-relative (e.g. 'src/components'). Used to detect pillar boundaries and atomic-level subfolders.",
+      "minLength": 1
+    },
+    "pillars": {
+      "type": "array",
+      "description": "Authoritative pillar list. Each pillar names a subfolder under components_root and the owner responsible for it. Cross-pillar imports must go through the platform pillar (or shared).",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["slug", "folder", "owner"],
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "Kebab-case identifier used in error messages and Linear refs (e.g. 'dojo-score').",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "folder": {
+            "type": "string",
+            "description": "Folder name under components_root (e.g. 'dojo-score'). Must be the CANONICAL form — see canonical_folders for plural/singular disambiguation.",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "owner": {
+            "type": "string",
+            "description": "Owner identifier (Slack handle, Linear team, or person). Surfaced in violation messages so reviewers know who to ping."
+          },
+          "max_organisms": {
+            "type": "integer",
+            "description": "PostToolUse drift threshold — warn when this pillar exceeds N organisms. Default 100 if omitted.",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "shared_pillars": {
+      "type": "array",
+      "description": "Pillars that are allowed to be imported from any other pillar (cross-pillar imports). Typically ['platform', 'shared', 'ui'].",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "default": []
+    },
+    "atomic_levels": {
+      "type": "object",
+      "description": "Atomic-design taxonomy. Each level lists the folder name and the constraints that apply when writing into it. The 'atoms' level enforces statelessness per Brad Frost 2013 + atomic-methodology.md.",
+      "additionalProperties": false,
+      "properties": {
+        "atoms": {
+          "$ref": "#/$defs/atomicLevel"
+        },
+        "molecules": {
+          "$ref": "#/$defs/atomicLevel"
+        },
+        "organisms": {
+          "$ref": "#/$defs/atomicLevel"
+        },
+        "templates": {
+          "$ref": "#/$defs/atomicLevel"
+        }
+      },
+      "default": {
+        "atoms": {
+          "folder": "atoms",
+          "forbid_content_patterns": [
+            "use(State|Reducer|Effect|LayoutEffect|Query|Mutation|InfiniteQuery)\\b",
+            "useContext\\b"
+          ],
+          "forbid_message": "Atoms must be stateless. Move stateful logic to a molecule or organism."
+        }
+      }
+    },
+    "canonical_folders": {
+      "type": "array",
+      "description": "Plural/singular canonical-form pairs. For each entry, the 'wrong' form is blocked and the user is pointed at 'canonical'. Helps prevent the 'courses/' vs 'course/' drift documented in DOJ-3946.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["wrong", "canonical"],
+        "properties": {
+          "wrong": {
+            "type": "string",
+            "description": "Path segment (relative to components_root) that is NOT canonical. Block writes here.",
+            "minLength": 1
+          },
+          "canonical": {
+            "type": "string",
+            "description": "Path segment that IS canonical. Show this in the error message.",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "description": "Short rationale shown in the error (e.g. 'singular per DOJ-3946')."
+          }
+        }
+      },
+      "default": []
+    },
+    "junk_drawers": {
+      "type": "array",
+      "description": "Folders known to accumulate misplaced files. Writes to these paths are blocked unless they specify a deeper sub-pillar. Each entry can require a sub-folder to be specified.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["folder"],
+        "properties": {
+          "folder": {
+            "type": "string",
+            "description": "Junk-drawer path (e.g. 'src/components/dashboard'). Writes to FILE.tsx directly under this folder are blocked; writes to sub-folders are allowed.",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "description": "Custom message shown to the user explaining which pillar the file likely belongs in."
+          }
+        }
+      },
+      "default": []
+    },
+    "drift_thresholds": {
+      "type": "object",
+      "description": "PostToolUse drift thresholds. The post-hook scans the filesystem and emits warnings when exceeded — never blocks.",
+      "additionalProperties": false,
+      "properties": {
+        "max_organisms_per_pillar": {
+          "type": "integer",
+          "description": "Per-pillar organism cap. Default 100.",
+          "default": 100,
+          "minimum": 1
+        },
+        "max_root_files_per_pillar": {
+          "type": "integer",
+          "description": "Max files directly at the root of a pillar folder (must use atoms/molecules/organisms/templates subdirs). Default 5.",
+          "default": 5,
+          "minimum": 0
+        },
+        "public_prefix_stale_days": {
+          "type": "integer",
+          "description": "Warn when a file with the Public* prefix has existed > N days without consolidation (per the canonical-URL principle from DOJ-4064). Default 30.",
+          "default": 30,
+          "minimum": 1
+        }
+      }
+    },
+    "exempt_markers": {
+      "type": "array",
+      "description": "In-file comment markers that exempt a write from atomic-design enforcement. Default '@atomic-exempt'. The hook scans for '// @atomic-exempt: <reason>' or '# @atomic-exempt: <reason>' in the content payload.",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z@][a-z0-9_-]*$"
+      },
+      "default": ["@atomic-exempt"]
+    },
+    "rules_doc_url": {
+      "type": "string",
+      "description": "Optional URL to the consumer's rules documentation (e.g. PROJECTS_BIBLE.md or DOJ-3946 spike). Surfaced in violation messages so the user can read the full rationale.",
+      "format": "uri"
+    }
+  },
+  "$defs": {
+    "atomicLevel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["folder"],
+      "properties": {
+        "folder": {
+          "type": "string",
+          "description": "Folder name for this atomic level (e.g. 'atoms', 'molecules').",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "forbid_content_patterns": {
+          "type": "array",
+          "description": "ERE regex patterns. If ANY pattern matches the content of a file being written to this atomic level, the write is blocked.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": []
+        },
+        "forbid_message": {
+          "type": "string",
+          "description": "Custom message shown when a forbidden pattern matches.",
+          "default": "Content violates atomic-design constraints for this level."
+        }
+      }
+    }
+  }
+}

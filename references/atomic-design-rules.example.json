@@ -1,0 +1,86 @@
+{
+  "$schema": "../schemas/atomic-design-rules.schema.json",
+  "version": 1,
+  "components_root": "src/components",
+  "rules_doc_url": "https://linear.app/dojo-coding/issue/DOJ-3946",
+  "pillars": [
+    {
+      "slug": "platform",
+      "folder": "platform",
+      "owner": "@platform-team",
+      "max_organisms": 50
+    },
+    {
+      "slug": "dojo-score",
+      "folder": "dojo-score",
+      "owner": "@score-team",
+      "max_organisms": 100
+    },
+    {
+      "slug": "pathways",
+      "folder": "pathways",
+      "owner": "@pathways-team",
+      "max_organisms": 100
+    },
+    {
+      "slug": "launchpad",
+      "folder": "launchpad",
+      "owner": "@launchpad-team",
+      "max_organisms": 100
+    },
+    {
+      "slug": "course",
+      "folder": "course",
+      "owner": "@course-team",
+      "max_organisms": 100
+    }
+  ],
+  "shared_pillars": ["platform", "ui"],
+  "atomic_levels": {
+    "atoms": {
+      "folder": "atoms",
+      "forbid_content_patterns": [
+        "use(State|Reducer|Effect|LayoutEffect|Query|Mutation|InfiniteQuery)\\b",
+        "useContext\\b"
+      ],
+      "forbid_message": "Atoms must be stateless (Brad Frost 2013 + atomic-methodology.md). Move state/side-effects to a molecule or organism."
+    },
+    "molecules": {
+      "folder": "molecules"
+    },
+    "organisms": {
+      "folder": "organisms"
+    },
+    "templates": {
+      "folder": "templates"
+    }
+  },
+  "canonical_folders": [
+    {
+      "wrong": "src/components/courses",
+      "canonical": "src/components/course",
+      "reason": "singular per DOJ-3946 pillar mapping"
+    },
+    {
+      "wrong": "src/components/pathway",
+      "canonical": "src/components/pathways",
+      "reason": "plural is canonical for the pathways pillar"
+    }
+  ],
+  "junk_drawers": [
+    {
+      "folder": "src/components/dashboard",
+      "message": "src/components/dashboard/ is a known junk drawer (DOJ-3946). Place the widget under its pillar folder (e.g. src/components/dojo-score/organisms/) and re-export from the dashboard composition if needed."
+    },
+    {
+      "folder": "src/components/shared",
+      "message": "src/components/shared/ accumulates orphans. Decide pillar ownership first; if truly shared, place under src/components/platform/."
+    }
+  ],
+  "drift_thresholds": {
+    "max_organisms_per_pillar": 100,
+    "max_root_files_per_pillar": 5,
+    "public_prefix_stale_days": 30
+  },
+  "exempt_markers": ["@atomic-exempt"]
+}

@@ -35,7 +35,7 @@ if command -v jq >/dev/null 2>&1; then
   INPUT_COMMAND="$(printf '%s' "$INPUT_RAW" \
     | jq -r '.tool_input.command // empty' 2>/dev/null || true)"
   INPUT_FILE_PATH="$(printf '%s' "$INPUT_RAW" \
-    | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null || true)"
+    | jq -r '.tool_input.file_path // .tool_input.path // .tool_input.notebook_path // empty' 2>/dev/null || true)"
   INPUT_CONTENT="$(printf '%s' "$INPUT_RAW" \
     | jq -r '.tool_input.content // .tool_input.new_string // empty' 2>/dev/null || true)"
   INPUT_TEXT="$(printf '%s' "$INPUT_RAW" \

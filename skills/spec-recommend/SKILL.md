@@ -695,6 +695,12 @@ Evaluate the **long-term implications** of this step's implementation:
 18. **Bilingual format is mandatory.**
     - The Human Layer + Agent Layer structure must never be collapsed, merged, or skipped. Both must be present in every brief.
 
+19. **Anti-examples block when correcting categorical examples.**
+    - Whenever a spec lists categorical examples (pillars, routes, files, components, patterns, layers — any "examples that belong here / fit this rule") AND one or more candidate examples were rejected during drafting after verification against the codebase, the rejected items must remain visible in the spec body as an **anti-examples block** — not silently deleted.
+    - Each entry MUST include three fields: WHAT was claimed (the example), WHY it's wrong (the disqualifying property), and FILE:LINE evidence that disproved it. A bullet without file:line evidence is a hunch, not documentation.
+    - The block sits immediately after the main examples list. Heading format: "Anti-examples ([category]s I initially mis-categorized as X, now verified otherwise)". Skip the block entirely if no candidates were rejected — its size is driven by the corrections, not by aspirational completeness.
+    - Full discipline, template, and motivating case (DOJ-4064 routing audit, 2026-05-13): see `skills/spec-recommend/references/anti-examples-block.md`.
+
 ---
 
 ## Requirements
