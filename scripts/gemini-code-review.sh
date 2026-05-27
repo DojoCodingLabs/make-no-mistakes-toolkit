@@ -16,11 +16,17 @@
 #   gemini-code-review.sh my-branch       # git diff <base>...my-branch
 #   gemini-code-review.sh a..b            # git diff a..b
 #   [--base <branch>]                     # override auto-detected base
+#   [--model <litellm-id>]                # default gemini/gemini-3.5-flash; e.g. openai/gpt-5.4-mini, anthropic/claude-...
+#   [--adversarial]                       # devil's-advocate review: challenge design, assumptions, trade-offs
 #
-# Secret: requires GEMINI_API_KEY in the environment. Provide it WITHOUT leaking
-# it into logs via this plugin's own secret helpers:
+# Multi-model: liteLLM routes by the model prefix. The required API-key env is
+# picked from the model: gemini/* -> GEMINI_API_KEY, openai|gpt* -> OPENAI_API_KEY,
+# anthropic|claude-* -> ANTHROPIC_API_KEY.
+#
+# Secret: requires the provider's API key in the environment. Provide it WITHOUT
+# leaking it into logs via this plugin's own secret helpers:
 #   /secret-input                          (stage the key once)
-#   /secret-use GEMINI_API_KEY -- bash <this-script> [args]
+#   /secret-use <KEY_ENV> -- bash <this-script> [args]   # e.g. OPENAI_API_KEY
 #
 # Requires: litellm, jq, curl, git (+ gh for PR mode).
 set -euo pipefail
@@ -29,10 +35,13 @@ PORT="${GEMINI_REVIEW_PORT:-4100}"
 MODEL="gemini/gemini-3.5-flash"
 BASE=""
 TARGET=""
+ADVERSARIAL=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --base) [ -z "${2:-}" ] && { echo "ERROR: --base requiere un valor." >&2; exit 1; }; BASE="$2"; shift 2 ;;
+    --model) [ -z "${2:-}" ] && { echo "ERROR: --model requiere un valor (litellm id, p.ej. openai/gpt-5.4-mini)." >&2; exit 1; }; MODEL="$2"; shift 2 ;;
+    --adversarial) ADVERSARIAL=true; shift ;;
     --uncommitted) TARGET="--uncommitted"; shift ;;
     -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
     *) TARGET="$1"; shift ;;
@@ -42,10 +51,18 @@ done
 for bin in litellm jq curl git; do
   command -v "$bin" >/dev/null 2>&1 || { echo "ERROR: falta '$bin' en PATH." >&2; exit 1; }
 done
-if [ -z "${GEMINI_API_KEY:-}" ]; then
-  echo "ERROR: GEMINI_API_KEY no está en el entorno." >&2
+
+# --- provider -> API-key env (multi-model; liteLLM routes by model prefix) ---
+case "$MODEL" in
+  gemini/*|google/*)              KEY_ENV="GEMINI_API_KEY" ;;
+  openai/*|gpt-*|o[0-9]*|*codex*) KEY_ENV="OPENAI_API_KEY" ;;
+  anthropic/*|claude-*)           KEY_ENV="ANTHROPIC_API_KEY" ;;
+  *)                              KEY_ENV="GEMINI_API_KEY" ;;
+esac
+if [ -z "${!KEY_ENV:-}" ]; then
+  echo "ERROR: ${KEY_ENV} no está en el entorno (requerido para el modelo '${MODEL}')." >&2
   echo "Stage it once with /secret-input, then run via:" >&2
-  echo "  /secret-use GEMINI_API_KEY -- bash \"$0\" $*" >&2
+  echo "  /secret-use ${KEY_ENV} -- bash \"$0\" $*" >&2
   exit 1
 fi
 
@@ -125,6 +142,58 @@ Output EXACTLY this markdown:
 
 If a section is empty, write "None.". Be specific with file:line; no vague advice.
 RUBRIC_EOF
+
+# --- adversarial rubric (--adversarial): challenge design, not approve ---
+if $ADVERSARIAL; then
+read -r -d '' RUBRIC <<'RUBRIC_EOF' || true
+You are an ADVERSARIAL reviewer (devil's advocate). Your job is to CHALLENGE the
+change, not to approve it. Assume the author is competent and the happy path
+works; spend ALL your attention attacking the design itself. You are given ONLY
+the diff — do not ask to run commands; challenge what is shown.
+
+For every meaningful change, attack:
+- Design & assumptions: what unstated assumption does this rely on, and when is
+  it false? What implicit contract does it create, and who can violate it?
+- Trade-offs: what did this choice cost? What simpler/safer/cheaper alternative
+  was rejected or never considered? Premature abstraction or optimization?
+- Failure modes: how does it break under concurrency, partial failure, retries,
+  malicious input, scale, or a flaky dependency? What is the blast radius?
+- Boundaries: is the responsibility in the right layer/module? Does it leak
+  state, invert a dependency, or couple things that should stay independent?
+- Steelman the rejection: what would a senior reviewer who wants to reject this
+  PR say, and is that objection right?
+
+Tie every challenge to a `file:line` and a concrete scenario. Do NOT list style
+nits or restate what the code does. Drop weak challenges; a mere "could be
+better" is Minor at most.
+
+Output EXACTLY this markdown:
+
+## Gemini Adversarial Review — {LABEL}
+
+### Files Reviewed
+| File | +/- | Risk | Notes |
+|------|-----|------|-------|
+
+### Challenges
+#### Critical (design is wrong / will break)
+- **[Category]** `file:line` — challenge -> what to reconsider
+#### Major (defend this before merge)
+- ...
+#### Minor (worth a second thought)
+- ...
+
+### Assumptions This PR Bets On
+- ...
+
+### Verdict: Defensible | Needs Defense | Reconsider Design
+| Critical | Major | Minor |
+|----------|-------|-------|
+| N | N | N |
+
+If a section is empty, write "None.". Be specific; every point tied to file:line.
+RUBRIC_EOF
+fi
 RUBRIC="${RUBRIC/\{LABEL\}/$LABEL}"
 
 # --- transient liteLLM proxy (self-generated config + master key; kill only ours) ---
@@ -136,7 +205,7 @@ model_list:
   - model_name: $MODEL
     litellm_params:
       model: $MODEL
-      api_key: os.environ/GEMINI_API_KEY
+      api_key: os.environ/$KEY_ENV
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
 litellm_settings:
@@ -148,7 +217,7 @@ cleanup() { $STARTED && [ -n "${PID:-}" ] && kill "$PID" 2>/dev/null || true; rm
 trap cleanup EXIT INT TERM
 
 if ! ready; then
-  echo "Levantando liteLLM proxy (gemini-3.5-flash) en 127.0.0.1:${PORT}..." >&2
+  echo "Levantando liteLLM proxy (${MODEL}) en 127.0.0.1:${PORT}..." >&2
   litellm --config "$PROXY_CFG" --host 127.0.0.1 --port "$PORT" >"$PROXY_LOG" 2>&1 &
   PID=$!; STARTED=true
   for _ in $(seq 1 40); do ready && break; sleep 1; done
@@ -175,4 +244,4 @@ fi
 
 OUT="$(mktemp -t gemini-code-review.XXXXXX.md)"
 printf '%s\n' "$CONTENT" | tee "$OUT"
-echo "[saved: $OUT · model: gemini-3.5-flash · diff: $LABEL · ${DIFF_CHARS} chars]" >&2
+echo "[saved: $OUT · model: ${MODEL} · diff: $LABEL · ${DIFF_CHARS} chars]" >&2
