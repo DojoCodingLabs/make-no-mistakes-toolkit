@@ -18,6 +18,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-05-29
+
+### Added
+
+- **Cure 4b cross-cutting PreToolUse hooks (DOJ-4571).** Three generalized
+  hooks distributed via the toolkit so every consumer repo inherits
+  cross-cutting defenses, parametrized via a per-repo opt-in config file at
+  `.claude/config/cross-cutting-hooks.json`. File absence → all three hooks
+  no-op (full backward compatibility). Hooks live in
+  `hooks/cross-cutting/` alongside the existing manifest-driven rules:
+
+  - `pre-write-no-cleartext-secret-in-config.sh` — blocks Write/Edit/
+    MultiEdit of JSON/YAML/TOML/env config files that introduce
+    `${...KEY|SECRET|TOKEN|PASSWORD|...}` placeholders without the
+    cure-shape `_FILE` / `_PATH` suffix. Generalized from DOJ-4554's
+    openclaw.json-specific version (PR #266 in
+    `dojo-agent-openclaw-plugin`).
+  - `pre-write-cross-repo-schema-ownership.sh` — blocks new SQL
+    migrations for tables not owned by this repo, per a config-driven
+    `owned_tables` allowlist + `migration_paths` glob. Empty allowlist
+    blocks every migration in the configured paths (the gateway pattern,
+    where the repo has no migration pipeline). Generalized from
+    DOJ-4554's `pre-write-plugin-side-migration.sh`.
+  - `pre-write-version-bump-discipline.sh` — blocks multi-step version
+    bumps on any pinned dependency by delegating to a per-repo validator
+    script. Each entry in the `version_bumps` array names a file
+    pattern, version-extraction regex, and validator script. Old version
+    is read from the git HEAD blob; new version from the proposed
+    content; both via bash native `=~` matching (avoids sed-delimiter
+    clashes with regexes containing `/`).
+
+- **Per-surface `defer_to_local_hook` flag (belt-and-braces).** Repos
+  that already have a tighter Cure 4a hook for one of these surfaces
+  (currently only `dojo-agent-openclaw-plugin`) set
+  `defer_to_local_hook: true` on the matching config block. The 4b hook
+  emits an info-stderr and fail-opens; the 4a hook owns enforcement.
+  Lets the config block stay live (visible, documented, ready for the
+  day 4a is retired) without firing the looser 4b version.
+
+- **Schema:** `schemas/cross-cutting-hooks.schema.json` (JSON Schema for
+  editor autocomplete + CI validation).
+
+- **Bypass markers:** three comment leaders accepted (`#`, `//`, `--`)
+  so the marker fits whichever syntax the target file uses. Trailing
+  terminator class extended to include backslash so JSON-serialized
+  embedded newlines (`marker\n...`) don't break detection.
+
+- **Tests:** `hooks/cross-cutting/tests/test-cross-cutting.sh` — 23
+  hermetic fixtures (≥7 per hook) spinning up isolated git repos per
+  case; wired into `npm run test-hooks` after the manifest-rules block.
+  Total runner now reports 248/248 passing.
+
+- **Docs:** `hooks/cross-cutting/README.md` — opt-in walkthrough,
+  surface semantics, bypass markers, belt-and-braces with local 4a
+  hooks, three-layer rollback (per-surface disable /
+  `CLAUDE_DISABLE_PLUGIN_HOOKS` / plugin pin), fail-open invariants.
+
+### Changed
+
+- `hooks/hooks.json` description updated to surface the new
+  `hooks/cross-cutting/` directory alongside `hooks/rules/` and
+  `hooks/atomic/`.
+- `hooks/hooks.json` PreToolUse `Write|Edit|MultiEdit|NotebookEdit`
+  block now registers the 3 cross-cutting scripts AFTER `pre-edit.sh`
+  and alongside `hooks/atomic/pre-atomic.sh` (manifest-driven rules run
+  first; atomic-design and cross-cutting hooks layer on as siblings).
+- `package.json` `files[]` adds `schemas/` and `references/` so the
+  JSON Schemas and example configs ship in the npm package (also
+  benefits `schemas/atomic-design-rules.schema.json` and
+  `references/atomic-design-rules.example.json` from 1.21.0).
+
+### Notes
+
+- Originally targeted `1.20.0` (per the parallel-version note in 1.21.0);
+  PR #28 landed first as 1.21.0, so this rebases onto 1.22.0 to preserve
+  monotonic ordering. No semantic content change vs. the originally
+  proposed 1.20.0.
+- Two review fixes from PR #32 (dojo-code-reviewer): replaced GNU-only
+  `sed ... //I` with explicit bracket-class spelling (BSD sed
+  compatibility on macOS); switched HIGH_IMPACT_RE / CURE_RE from
+  quad-backslash escaping to single-quote-plus-interpolation convention.
+- Consumer-repo opt-in (config files in `dojo-os` and
+  `dojo-agent-openclaw-plugin`) lands in sibling PRs after `1.22.0`
+  publishes. Per DOJ-4571 belt-and-braces decision,
+  `dojo-agent-openclaw-plugin` keeps its existing 4a hooks AND opts in
+  with `defer_to_local_hook: true` on all three surfaces; `dojo-os`
+  opts in with the 4b hooks owning enforcement.
+- Refs: DOJ-4571 (this work), DOJ-4554 (Cure 4a foundation), DOJ-4064
+  (4-cure thesis), DOJ-4524 (the persistence-freeze incident the
+  schema-ownership hook prevents), DOJ-4208 (the cleartext-key incident
+  the cleartext-secret hook prevents), DOJ-4061 (the gateway-version-bump
+  chain the version-bump hook prevents).
+
 ## [1.21.0] - 2026-05-29
 
 ### Added
@@ -53,8 +146,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2026-05-14 audit (pathways, launchpad, community, projects, marketplace,
   hackathons, events, agent, dojo-score, plus platform as the shared pillar).
   The example only enumerates a subset; consumers configure their own list.
-- **Parallel-version coordination:** version `1.20.0` is claimed by the
-  DOJ-4571 Cure 4b cross-repo hooks PR. This release follows as `1.21.0`.
+- **Parallel-version coordination:** version `1.20.0` was originally
+  reserved for the DOJ-4571 Cure 4b cross-repo hooks PR. PR #28
+  (this release) landed first as `1.21.0`; DOJ-4571 followed as
+  `1.22.0` to preserve monotonic ordering. See `[1.22.0]` above.
 
 ## [1.19.0] - 2026-05-26
 
