@@ -195,6 +195,35 @@ else
   echo "  SKIP  stale-push (hook not executable at $STALE_HOOK)"
 fi
 
+# =============================================================================
+# Cross-cutting hook tests (DOJ-4571) — Cure 4b
+#
+# These hooks live in hooks/cross-cutting/ and have a richer surface than the
+# manifest rules (consume per-repo config from a synthetic test repo, delegate
+# to validator scripts, etc.). The dedicated runner sets up isolated git
+# repos per case so the tests are hermetic.
+# =============================================================================
+CC_TEST_RUNNER="$HOOKS_DIR/cross-cutting/tests/test-cross-cutting.sh"
+if [ -x "$CC_TEST_RUNNER" ]; then
+  echo ""
+  echo "Running cross-cutting hook tests…"
+  CC_TMP_OUT="$(mktemp)"
+  if bash "$CC_TEST_RUNNER" | tee "$CC_TMP_OUT"; then
+    : # passed, output already shown
+  else
+    FAIL=$((FAIL + 1))
+    FAIL_DETAILS+=("cross-cutting test runner returned non-zero (see output above)")
+  fi
+  # Sum PASS/FAIL into our totals by counting "  PASS  cross-cutting / …"
+  # and "  FAIL  cross-cutting / …" lines.
+  CC_PASS_LINES=$(grep -c "^  PASS  cross-cutting / " "$CC_TMP_OUT" 2>/dev/null || echo 0)
+  CC_FAIL_LINES=$(grep -c "^  FAIL  cross-cutting / " "$CC_TMP_OUT" 2>/dev/null || echo 0)
+  PASS=$((PASS + CC_PASS_LINES - 0))   # already counted FAIL_LINES above as runner exit
+  rm -f "$CC_TMP_OUT"
+else
+  echo "  SKIP  cross-cutting (test runner not executable at $CC_TEST_RUNNER)"
+fi
+
 echo ""
 TOTAL=$((PASS + FAIL))
 echo "Results: ${PASS} / ${TOTAL} passed"

@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/DojoCodingLabs/make-no-mistakes-toolkit/main/schemas/cross-cutting-hooks.schema.json",
+  "title": "make-no-mistakes cross-cutting hooks — per-repo config",
+  "description": "Per-repo configuration for the toolkit's Cure 4b cross-cutting PreToolUse hooks. Lives at the consumer-repo root as .claude/config/cross-cutting-hooks.json. File absence → all 4b hooks no-op (opt-in). DOJ-4571.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Pin the schema version for editor autocomplete and CI validation."
+    },
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version. Mandatory. Hooks fail-open with a stderr warning on unknown versions."
+    },
+    "cleartext_secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configures pre-write-no-cleartext-secret-in-config.sh.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Master switch for this surface. False (or missing) → hook no-ops."
+        },
+        "defer_to_local_hook": {
+          "type": "boolean",
+          "default": false,
+          "description": "Belt-and-braces: when true, this 4b hook fail-opens with an info-stderr message because a tighter local 4a hook owns enforcement for this surface in this repo."
+        },
+        "extra_block_patterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "ERE regexes for additional env-var name patterns to treat as high-impact secrets. Appended to the built-in pattern set."
+        },
+        "extra_cure_suffixes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Additional env-var name suffixes (e.g. _REF, _VOLUME) treated as evidence of the secret-volume cure pattern. Placeholders ending in any of these suffixes are allowed. Built-in defaults: _FILE, _PATH."
+        }
+      }
+    },
+    "schema_ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configures pre-write-cross-repo-schema-ownership.sh.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Master switch. False (or missing) → hook no-ops."
+        },
+        "defer_to_local_hook": {
+          "type": "boolean",
+          "default": false,
+          "description": "Belt-and-braces flag — same semantics as cleartext_secrets."
+        },
+        "owned_tables": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+          },
+          "default": [],
+          "description": "Table names this repo legitimately migrates. Empty array combined with non-empty migration_paths → every write under those paths is blocked (the gateway-plugin pattern, where the repo has no migration pipeline at all)."
+        },
+        "migration_paths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["supabase/migrations"],
+          "description": "Path globs treated as migration directories. A Write/Edit inside any of these triggers ownership checking against owned_tables."
+        }
+      }
+    },
+    "version_bumps": {
+      "type": "array",
+      "default": [],
+      "description": "Configures pre-write-version-bump-discipline.sh. Each entry guards one file pattern + delegates to one validator script.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file_pattern", "version_regex", "validator_script"],
+        "properties": {
+          "file_pattern": {
+            "type": "string",
+            "description": "Basename pattern (case-sensitive). Supports trailing-component glob, e.g. 'Dockerfile', '**/Dockerfile', 'package.json'."
+          },
+          "version_regex": {
+            "type": "string",
+            "description": "ERE regex with a single capturing group that extracts the version literal from a matching line of the file content. Example: 'openclaw/releases/download/(v[0-9]+\\.[0-9]+\\.[0-9]+)/'."
+          },
+          "validator_script": {
+            "type": "string",
+            "description": "Path (relative to the consumer-repo root) of an executable script. Invoked with two arguments: <old_version> <new_version>. Exit 2 → 4b hook blocks. Exit 0 → 4b hook passes. Any other exit code → 4b hook warns and fail-opens."
+          },
+          "validator_args": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": [],
+            "description": "Optional extra args passed after old_version + new_version."
+          },
+          "defer_to_local_hook": {
+            "type": "boolean",
+            "default": false,
+            "description": "Belt-and-braces flag — per-entry. true → this entry's 4b enforcement defers to the local 4a hook."
+          }
+        }
+      }
+    }
+  }
+}
