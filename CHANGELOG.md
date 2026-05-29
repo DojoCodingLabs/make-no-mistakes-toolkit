@@ -18,6 +18,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-05-29
+
+### Added
+- **Recovered atomic-design ownership-drift hooks** — the code listed in the
+  1.14.0 entry was never actually shipped (changelog entry existed without
+  corresponding source). This release lands the real implementation:
+  - `hooks/atomic/pre-atomic.sh` — PreToolUse enforcement for atomic-design
+    pillar ownership: blocks writes to junk-drawer folders, enforces
+    canonical folder names (singular/plural), detects cross-pillar imports
+    that bypass declared `shared_pillars`, and warns when an atom file
+    contains state/effect/query hooks (Brad Frost stateless-atom rule).
+  - `hooks/atomic/post-atomic-drift.sh` — PostToolUse drift telemetry scoped
+    to the pillar of the file just written: organism count cap, root-flat
+    cap, and duplicate-basename detection across pillars.
+  - `schemas/atomic-design-rules.schema.json` — JSON Schema for the
+    per-repo `.atomic-design-rules.json` config (pillars, canonical_folders,
+    junk_drawers, drift_thresholds, exempt_markers).
+  - `references/atomic-design-rules.example.json` — starter config that
+    reflects the post-DOJ-3946 canonical pillar taxonomy (2026-05-14 audit
+    outcome: 9 pillars, `course/` and `courses/` absorbed into `pathways`).
+  - `commands/atomic-rules-init.md` — `/atomic-rules-init` slash command for
+    bootstrapping atomic-design rules in a target repo.
+  - `hooks/atomic/README.md` — operator documentation for both hooks.
+  - Wired into `hooks/hooks.json` so consumers get enforcement on plugin
+    install with no additional setup beyond placing a config at the repo
+    root.
+- New section in `skills/spec-recommend/SKILL.md` + anti-examples block
+  documenting the recovered atomic-design lineage.
+
+### Notes
+- Pillar taxonomy in `references/atomic-design-rules.example.json` matches
+  the canonical 9-pillar list established by the DOJ-3946 council in the
+  2026-05-14 audit (pathways, launchpad, community, projects, marketplace,
+  hackathons, events, agent, dojo-score, plus platform as the shared pillar).
+  The example only enumerates a subset; consumers configure their own list.
+- **Parallel-version coordination:** version `1.20.0` is claimed by the
+  DOJ-4571 Cure 4b cross-repo hooks PR. This release follows as `1.21.0`.
+
 ## [1.19.0] - 2026-05-26
 
 ### Added
@@ -189,6 +227,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 32 rules total (was 31). 210 / 210 tests pass.
 
 ## [1.14.0] - 2026-05-14
+
+> **Note:** The source files described in this entry were never actually
+> committed in 1.14.0 — only the version bump and keyword changes landed.
+> The implementation was recovered and shipped in **1.21.0** (see entry
+> above). Treat this entry as the intent record; treat 1.21.0 as the
+> shipped record.
 
 ### Added
 - Atomic-design enforcement hooks: `hooks/atomic/pre-atomic.sh`,
@@ -367,7 +411,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.14.0...HEAD
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.21.0...HEAD
+[1.21.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.21.0
 [1.14.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.14.0
 [1.12.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.12.0
 [1.11.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.11.0

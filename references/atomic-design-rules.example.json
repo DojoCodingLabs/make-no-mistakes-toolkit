@@ -27,12 +27,6 @@
       "folder": "launchpad",
       "owner": "@launchpad-team",
       "max_organisms": 100
-    },
-    {
-      "slug": "course",
-      "folder": "course",
-      "owner": "@course-team",
-      "max_organisms": 100
     }
   ],
   "shared_pillars": ["platform", "ui"],
@@ -58,8 +52,13 @@
   "canonical_folders": [
     {
       "wrong": "src/components/courses",
-      "canonical": "src/components/course",
-      "reason": "singular per DOJ-3946 pillar mapping"
+      "canonical": "src/components/pathways",
+      "reason": "courses/ is absorbed into the pathways pillar (DOJ-3946 2026-05-14 audit ruling)"
+    },
+    {
+      "wrong": "src/components/course",
+      "canonical": "src/components/pathways",
+      "reason": "course/ is absorbed into the pathways pillar (DOJ-3946 2026-05-14 audit ruling)"
     },
     {
       "wrong": "src/components/pathway",
