@@ -1,6 +1,6 @@
 # make-no-mistakes
 
-**Version: 1.19.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
+**Version: 1.20.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
 
 The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.
 
@@ -245,7 +245,8 @@ the manifest-driven hooks in `hooks/rules/rules.yaml`. The Tier 1 ruleset
 ships 10 rules:
 
 **PreToolUse on `Bash` (block by default):**
-- `ssh-db-mutation` — blocks `gcloud compute ssh ... --command="...php -r/mysql/set_config..."` (forces use of versioned scripts)
+- `ssh-db-mutation` — blocks `gcloud compute ssh ... --command="...php -r/mysql/set_config..."` (Moodle-flavoured SSH payloads)
+- `inline-db-mutation-mysql` / `-psql` / `-sqlite` / `-mongo` / `-redis` / `-gcloud-sql` — blocks inline DB mutations across any CLI (`mysql -e "UPDATE..."`, `psql -c "INSERT..."`, `sqlite3 path "DROP..."`, `mongo --eval "db.x.update(...)"`, `redis-cli SET/DEL/FLUSHALL`, `gcloud sql import/export`). Forces use of a versioned script under `scripts/` or `bin/`. SELECT-only reads are never blocked. Per-rule bypass via `# hook-bypass: db-mutation-rule`; per-repo opt-out via `touch .no-make-no-mistakes-db-mutation` at the root (memory: `feedback_scripts_not_db.md`).
 - `prod-ops-no-approval` — blocks `--project=*-prod` operations without explicit acknowledgement
 - `destructive-db-ops` — blocks `supabase db reset|push|repair` and inline `DROP/TRUNCATE/DELETE FROM`
 - `manual-edge-fn-deploy` — blocks `supabase functions deploy` (forces CI-only deploys)
@@ -274,7 +275,17 @@ command or content to acknowledge the rule and proceed:
 # // hook-bypass: edge-fn-manual
 # // hook-bypass: minified-build
 # // hook-bypass: secret-leak
+
+# Bypass marker shipped in v1.17.0 inline-db-mutation family:
+# // hook-bypass: db-mutation-rule
 ```
+
+Some rules (e.g., the v1.17.0 inline-DB-mutation family) also support a
+per-repo escape hatch: drop a sentinel file at the repo root and the rule
+becomes a no-op in that repo. The current sentinel filenames are:
+
+- `.no-make-no-mistakes-db-mutation` — disables all six
+  `inline-db-mutation-*` rules in the repo
 
 Bypasses are explicit acknowledgements — they sit inside the command/content
 itself, not as silent flags.

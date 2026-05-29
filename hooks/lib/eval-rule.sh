@@ -84,6 +84,64 @@ if [ -n "$BYPASS_MARKER" ]; then
   esac
 fi
 
+# Per-repo escape hatch: if the rule declares `disable_if_repo_file: <name>`
+# and that file exists at the repo root, the rule is a no-op.
+# Use case: a repo explicitly opts out of a class of enforcement because its
+# workflow legitimately requires the otherwise-blocked operation (e.g., a
+# data-migration repo that runs inline DB mutations as part of its job).
+# The filename is validated to be a flat, safe name (no slashes / dots /
+# wildcards) so the lookup can't escape the cwd or pull in unintended files.
+#
+# Lookup strategy (Greptile #25 P1): walk upward from cwd looking for a
+# repo-root marker (`.git` file or dir — `.git` is a file in worktrees) and
+# check the sentinel at that root. If no repo root is found within a
+# bounded ascent, fall back to checking cwd itself (preserves the previous
+# behavior for repos without `.git`, e.g. tarball deploys).
+#
+# The ascent is bounded (32 levels) so an unrooted absolute path can't loop
+# forever — `/` has no parent, so the loop terminates naturally, but the
+# bound is defensive against pathological symlink trees.
+DISABLE_IF_REPO_FILE="$(printf '%s' "$RULE_JSON" | jq -r '.disable_if_repo_file // empty')"
+if [ -n "$DISABLE_IF_REPO_FILE" ]; then
+  # Validate filename: only [a-zA-Z0-9._-], and reject "." / ".." sentinels.
+  # The `/` character falls outside the allowed set so any path-traversal
+  # attempt (e.g. "../foo", "etc/passwd") is rejected by the first arm.
+  case "$DISABLE_IF_REPO_FILE" in
+    *[!a-zA-Z0-9._-]*|.|..)
+      echo "make-no-mistakes: rule ${RULE_ID} has invalid disable_if_repo_file (must be a flat filename of [a-zA-Z0-9._-]); ignoring escape hatch." >&2
+      ;;
+    *)
+      # Walk up looking for a `.git` marker (worktrees use a `.git` *file*,
+      # standard checkouts use a `.git` *directory* — both satisfy `-e`).
+      SENTINEL_DIR=""
+      SEARCH_DIR="$PWD"
+      DEPTH=0
+      while [ "$DEPTH" -lt 32 ]; do
+        if [ -e "${SEARCH_DIR}/.git" ]; then
+          SENTINEL_DIR="$SEARCH_DIR"
+          break
+        fi
+        PARENT="$(dirname "$SEARCH_DIR")"
+        # `dirname /` returns `/` — bail when we stop moving up.
+        if [ "$PARENT" = "$SEARCH_DIR" ]; then
+          break
+        fi
+        SEARCH_DIR="$PARENT"
+        DEPTH=$((DEPTH + 1))
+      done
+
+      # If we found a repo root, check the sentinel there. Otherwise fall
+      # back to cwd so non-git deployments still have an opt-out path.
+      if [ -n "$SENTINEL_DIR" ] && [ -f "${SENTINEL_DIR}/${DISABLE_IF_REPO_FILE}" ]; then
+        exit 0
+      fi
+      if [ -f "./${DISABLE_IF_REPO_FILE}" ]; then
+        exit 0
+      fi
+      ;;
+  esac
+fi
+
 # Iterate match conditions. ALL must hold for the rule to fire.
 N_CONDITIONS="$(printf '%s' "$RULE_JSON" | jq '.match | length')"
 i=0

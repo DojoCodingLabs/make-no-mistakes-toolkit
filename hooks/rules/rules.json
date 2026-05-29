@@ -2906,5 +2906,805 @@
         "expected_exit": 0
       }
     ]
+  },
+  {
+    "id": "inline-db-mutation-mysql",
+    "description": "Block inline mysql / mysqldump mutations (use a versioned script in scripts/ or bin/ instead)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "(\\bmysql[[:space:]][^|<]*(-e|--execute)([[:space:]]*|=)['\"]?[[:space:]]*(UPDATE|DELETE|INSERT|REPLACE|CREATE|ALTER|DROP|GRANT|REVOKE|TRUNCATE|RENAME)\\b)|(\\bmysql[[:space:]][^|]*<[[:space:]]*[^[:space:]]+\\.sql\\b)|(\\bmysqldump\\b[^|]*\\|[[:space:]]*mysql\\b)",
+        "flags": "i"
+      },
+      {
+        "field": "command",
+        "not_pattern": "^[[:space:]]*(\\./scripts/|bash[[:space:]]+scripts/|\\./bin/|bash[[:space:]]+bin/|sh[[:space:]]+scripts/|sh[[:space:]]+bin/)"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "db-mutation-rule",
+    "disable_if_repo_file": ".no-make-no-mistakes-db-mutation",
+    "memory_ref": "feedback_scripts_not_db.md",
+    "message": "BLOCKED: inline mysql / mysqldump DB mutation detected.\n\nPer feedback_scripts_not_db.md: scripts-in-the-repo, not inline.\nMove the SQL into a versioned file under scripts/ or bin/ and invoke\nthat script. The script wrapper makes the change reviewable in git,\nre-runnable across environments, and auditable after the fact.\n\nAllowed patterns:\n  - SELECT / SHOW / DESCRIBE / EXPLAIN — read-only is fine inline\n  - `./scripts/<name>.sh` / `bash scripts/<name>.sh` — versioned wrapper\n  - `# hook-bypass: db-mutation-rule` appended to the command for an\n    explicitly-acknowledged one-shot\n\nPer-repo escape hatch: `touch .no-make-no-mistakes-db-mutation` at the\nrepo root if the entire repo's job is inline DB work.\n",
+    "tests": [
+      {
+        "name": "blocks-mysql-e-update",
+        "input": {
+          "tool_input": {
+            "command": "mysql -u root -e \"UPDATE users SET active=1 WHERE id=42\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mysql-e-delete",
+        "input": {
+          "tool_input": {
+            "command": "mysql -u root mydb -e 'DELETE FROM sessions WHERE expired_at < NOW()'"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mysql-e-drop-table",
+        "input": {
+          "tool_input": {
+            "command": "mysql -h db.example.com -u admin -e \"DROP TABLE legacy_table\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mysql-long-execute-space",
+        "input": {
+          "tool_input": {
+            "command": "mysql --execute \"UPDATE users SET active=1\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mysql-long-execute-equals",
+        "input": {
+          "tool_input": {
+            "command": "mysql --execute=\"DROP TABLE legacy\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mysql-short-e-no-space-quoted",
+        "input": {
+          "tool_input": {
+            "command": "mysql -uroot -e\"DROP TABLE legacy\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mysql-stdin-redirect",
+        "input": {
+          "tool_input": {
+            "command": "mysql -u root mydb < migrations/oneshot.sql"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mysqldump-pipe-mysql",
+        "input": {
+          "tool_input": {
+            "command": "mysqldump -u root prod_db | mysql -u root staging_db"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-mysql-e-select",
+        "input": {
+          "tool_input": {
+            "command": "mysql -u root -e 'SELECT COUNT(*) FROM users'"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-mysql-e-show",
+        "input": {
+          "tool_input": {
+            "command": "mysql -u root -e 'SHOW TABLES'"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-mysql-via-versioned-script",
+        "input": {
+          "tool_input": {
+            "command": "./scripts/seed-users.sh"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-mysql-via-bash-scripts-prefix",
+        "input": {
+          "tool_input": {
+            "command": "bash scripts/migrate-prod.sh --confirm"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "mysql -u root -e 'DROP TABLE foo' # hook-bypass: db-mutation-rule"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "inline-db-mutation-psql",
+    "description": "Block inline psql / pg_restore mutations beyond the destructive ops already caught by destructive-db-ops (use a versioned migration or script instead)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "(\\bpsql\\b[^|]*(-c|--command)([[:space:]]*|=)['\"]?[[:space:]]*(UPDATE|INSERT|REPLACE|CREATE|ALTER|GRANT|REVOKE|RENAME)\\b)|(\\bpg_restore\\b)",
+        "flags": "i"
+      },
+      {
+        "field": "command",
+        "not_pattern": "^[[:space:]]*(\\./scripts/|bash[[:space:]]+scripts/|\\./bin/|bash[[:space:]]+bin/|sh[[:space:]]+scripts/|sh[[:space:]]+bin/)"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "db-mutation-rule",
+    "disable_if_repo_file": ".no-make-no-mistakes-db-mutation",
+    "memory_ref": "feedback_scripts_not_db.md",
+    "message": "BLOCKED: inline psql mutation or pg_restore detected.\n\nPer feedback_scripts_not_db.md: schema and data changes belong in a\nversioned migration (supabase/migrations/<ts>_<slug>.sql or your\nproject's equivalent), not in an ad-hoc `psql -c` one-liner.\n\nFor pg_restore: load the dump from a committed script that documents\ntarget DB, dump version, and the rollback plan — never from a raw\nshell invocation that exists only in the agent's transient history.\n\nSELECT / SHOW / EXPLAIN / DESCRIBE are still allowed inline.\n\nBypass with `# hook-bypass: db-mutation-rule` after explicit team\napproval, or drop `.no-make-no-mistakes-db-mutation` at the repo root.\n",
+    "tests": [
+      {
+        "name": "blocks-psql-c-update",
+        "input": {
+          "tool_input": {
+            "command": "psql -h db.example.com -d mydb -c \"UPDATE users SET active=true\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-psql-c-insert",
+        "input": {
+          "tool_input": {
+            "command": "psql -d mydb -c 'INSERT INTO audit (action) VALUES (''oneshot'')'"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-psql-c-alter-table",
+        "input": {
+          "tool_input": {
+            "command": "psql -d mydb -c \"ALTER TABLE users ADD COLUMN nickname text\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-psql-c-grant",
+        "input": {
+          "tool_input": {
+            "command": "psql -d mydb -c \"GRANT SELECT ON users TO readonly_role\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-psql-c-no-space-quoted",
+        "input": {
+          "tool_input": {
+            "command": "psql -d mydb -c\"UPDATE users SET active=true\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-psql-long-command-equals",
+        "input": {
+          "tool_input": {
+            "command": "psql -d mydb --command=\"UPDATE sessions SET expired=true\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-pg-restore",
+        "input": {
+          "tool_input": {
+            "command": "pg_restore -h db.example.com -d mydb backup.dump"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-psql-c-select",
+        "input": {
+          "tool_input": {
+            "command": "psql -d mydb -c 'SELECT count(*) FROM users'"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-psql-c-explain",
+        "input": {
+          "tool_input": {
+            "command": "psql -d mydb -c 'EXPLAIN ANALYZE SELECT * FROM users'"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-psql-via-versioned-script",
+        "input": {
+          "tool_input": {
+            "command": "./scripts/db-migrate.sh"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "psql -d mydb -c \"UPDATE users SET active=true\" # hook-bypass: db-mutation-rule"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "inline-db-mutation-sqlite",
+    "description": "Block inline sqlite3 mutations (use a versioned script in scripts/ or bin/ instead)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "\\bsqlite3\\b[^|]*\\b(UPDATE|DELETE|INSERT|REPLACE|CREATE|ALTER|DROP|GRANT|REVOKE|TRUNCATE|RENAME)\\b",
+        "flags": "i"
+      },
+      {
+        "field": "command",
+        "not_pattern": "^[[:space:]]*(\\./scripts/|bash[[:space:]]+scripts/|\\./bin/|bash[[:space:]]+bin/|sh[[:space:]]+scripts/|sh[[:space:]]+bin/)"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "db-mutation-rule",
+    "disable_if_repo_file": ".no-make-no-mistakes-db-mutation",
+    "memory_ref": "feedback_scripts_not_db.md",
+    "message": "BLOCKED: inline sqlite3 DB mutation detected.\n\nEven for local SQLite databases, drift between dev machines is a\nreal cost — when one teammate's local DB has the manual change and\nothers' don't, debugging session reproduction degrades silently.\nMove the SQL into scripts/ and commit it.\n\nSELECT / EXPLAIN remain allowed inline. The bypass marker is\n`db-mutation-rule`. Per-repo opt-out:\n`touch .no-make-no-mistakes-db-mutation` at the root.\n",
+    "tests": [
+      {
+        "name": "blocks-sqlite3-update",
+        "input": {
+          "tool_input": {
+            "command": "sqlite3 ./data.db \"UPDATE users SET active=1\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-sqlite3-delete",
+        "input": {
+          "tool_input": {
+            "command": "sqlite3 ./data.db 'DELETE FROM users WHERE id=42'"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-sqlite3-create-table",
+        "input": {
+          "tool_input": {
+            "command": "sqlite3 ./data.db \"CREATE TABLE foo (id integer primary key)\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-sqlite3-alter",
+        "input": {
+          "tool_input": {
+            "command": "sqlite3 ./data.db \"ALTER TABLE users ADD COLUMN x text\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-sqlite3-select",
+        "input": {
+          "tool_input": {
+            "command": "sqlite3 ./data.db \"SELECT count(*) FROM users\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-sqlite3-via-versioned-script",
+        "input": {
+          "tool_input": {
+            "command": "./scripts/seed-sqlite.sh ./data.db"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "sqlite3 ./data.db \"UPDATE users SET active=1\" # hook-bypass: db-mutation-rule"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "inline-db-mutation-mongo",
+    "description": "Block inline mongo / mongorestore mutations (use a versioned script in scripts/ or bin/ instead)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "(\\b(mongo|mongosh)\\b[^|]*--eval[[:space:]=][^|]*\\.(update|insert|delete|drop|createCollection|dropDatabase|replaceOne|save|findAndModify|deleteOne|deleteMany|updateOne|updateMany|insertOne|insertMany)\\b)|(\\bmongorestore\\b)"
+      },
+      {
+        "field": "command",
+        "not_pattern": "^[[:space:]]*(\\./scripts/|bash[[:space:]]+scripts/|\\./bin/|bash[[:space:]]+bin/|sh[[:space:]]+scripts/|sh[[:space:]]+bin/)"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "db-mutation-rule",
+    "disable_if_repo_file": ".no-make-no-mistakes-db-mutation",
+    "memory_ref": "feedback_scripts_not_db.md",
+    "message": "BLOCKED: inline mongo / mongosh / mongorestore mutation detected.\n\nPer feedback_scripts_not_db.md, mongo data changes belong in a\nversioned migration runner script — never in a transient `--eval`\none-liner. The bypass marker is `db-mutation-rule`; the per-repo\nescape hatch is `.no-make-no-mistakes-db-mutation` at the root.\n\nRead methods (.find, .findOne, .aggregate, .countDocuments, etc.)\nremain allowed inline.\n",
+    "tests": [
+      {
+        "name": "blocks-mongo-eval-update",
+        "input": {
+          "tool_input": {
+            "command": "mongo --eval \"db.users.update({_id:42},{$set:{active:true}})\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mongo-eval-update-with-spaces-inside-arg",
+        "input": {
+          "tool_input": {
+            "command": "mongo --eval \"db.users.update({_id: 42}, {$set: {active: true}})\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mongosh-eval-insertOne-spaces",
+        "input": {
+          "tool_input": {
+            "command": "mongosh --eval \"db.audit.insertOne({ event: \\\"oneshot\\\" })\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mongo-eval-equals",
+        "input": {
+          "tool_input": {
+            "command": "mongo --eval=\"db.users.deleteMany({active:false})\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mongo-eval-deleteMany",
+        "input": {
+          "tool_input": {
+            "command": "mongo --eval \"db.sessions.deleteMany({expired:true})\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mongosh-eval-drop",
+        "input": {
+          "tool_input": {
+            "command": "mongosh --eval \"db.legacy_collection.drop()\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mongo-eval-createCollection",
+        "input": {
+          "tool_input": {
+            "command": "mongo --eval \"db.createCollection('audit')\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-mongorestore",
+        "input": {
+          "tool_input": {
+            "command": "mongorestore --db prod --drop ./backup"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-mongo-eval-find",
+        "input": {
+          "tool_input": {
+            "command": "mongo --eval \"db.users.find({active:true}).count()\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-mongo-eval-aggregate",
+        "input": {
+          "tool_input": {
+            "command": "mongo --eval \"db.events.aggregate([{$match:{}}])\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-mongo-via-versioned-script",
+        "input": {
+          "tool_input": {
+            "command": "./scripts/seed-mongo.sh"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "mongo --eval \"db.users.drop()\" # hook-bypass: db-mutation-rule"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "inline-db-mutation-redis",
+    "description": "Block inline redis-cli mutations (use a versioned script in scripts/ or bin/ instead)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "\\bredis-cli\\b[^|]*[[:space:]]+(SET|DEL|FLUSHDB|FLUSHALL|HSET|HDEL|SADD|SREM|LPUSH|RPUSH|ZADD|ZREM|EXPIRE|RENAME|MSET|SETEX|SETNX|INCR|DECR|COPY|MOVE|UNLINK|RESTORE|EVAL)\\b",
+        "flags": "i"
+      },
+      {
+        "field": "command",
+        "not_pattern": "^[[:space:]]*(\\./scripts/|bash[[:space:]]+scripts/|\\./bin/|bash[[:space:]]+bin/|sh[[:space:]]+scripts/|sh[[:space:]]+bin/)"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "db-mutation-rule",
+    "disable_if_repo_file": ".no-make-no-mistakes-db-mutation",
+    "memory_ref": "feedback_scripts_not_db.md",
+    "message": "BLOCKED: inline redis-cli mutation detected.\n\nEven in a cache, manual one-liners create cross-env drift: the value\nyou set is visible to your machine only until eviction, and other\nengineers cannot reproduce. Use a script under scripts/ or bin/.\n\nRead verbs (GET, MGET, HGET, KEYS, SCAN, INFO, PING, EXISTS, TYPE,\nTTL, LLEN, SCARD, ZRANGE, SMEMBERS, ...) remain allowed inline.\n\nBypass marker: `db-mutation-rule`. Per-repo opt-out:\n`touch .no-make-no-mistakes-db-mutation` at the root.\n",
+    "tests": [
+      {
+        "name": "blocks-redis-cli-set",
+        "input": {
+          "tool_input": {
+            "command": "redis-cli SET feature:enabled 1"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-redis-cli-del",
+        "input": {
+          "tool_input": {
+            "command": "redis-cli DEL session:42"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-redis-cli-flushall",
+        "input": {
+          "tool_input": {
+            "command": "redis-cli -h cache.example.com FLUSHALL"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-redis-cli-flushdb",
+        "input": {
+          "tool_input": {
+            "command": "redis-cli -n 3 FLUSHDB"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-redis-cli-hset",
+        "input": {
+          "tool_input": {
+            "command": "redis-cli HSET user:1 name alice"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-redis-cli-get",
+        "input": {
+          "tool_input": {
+            "command": "redis-cli GET feature:enabled"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-redis-cli-keys",
+        "input": {
+          "tool_input": {
+            "command": "redis-cli KEYS \"session:*\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-redis-cli-info",
+        "input": {
+          "tool_input": {
+            "command": "redis-cli INFO memory"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-redis-via-versioned-script",
+        "input": {
+          "tool_input": {
+            "command": "./scripts/flush-cache.sh"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "redis-cli FLUSHALL # hook-bypass: db-mutation-rule"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "inline-db-mutation-gcloud-sql",
+    "description": "Block inline `gcloud sql import` / `gcloud sql export` (use a versioned script in scripts/ or bin/ that documents the source/destination)",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "\\bgcloud[[:space:]]+([^[:space:]]+[[:space:]]+)*sql[[:space:]]+(import|export)[[:space:]]+(sql|csv|bak)\\b",
+        "flags": "i"
+      },
+      {
+        "field": "command",
+        "not_pattern": "^[[:space:]]*(\\./scripts/|bash[[:space:]]+scripts/|\\./bin/|bash[[:space:]]+bin/|sh[[:space:]]+scripts/|sh[[:space:]]+bin/)"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": "db-mutation-rule",
+    "disable_if_repo_file": ".no-make-no-mistakes-db-mutation",
+    "memory_ref": "feedback_scripts_not_db.md",
+    "references": [
+      "feedback_never_touch_prod_without_approval.md (production guardrail)"
+    ],
+    "message": "BLOCKED: inline `gcloud sql import` / `gcloud sql export` detected.\n\nImports overwrite target DB state. Exports against production cost\nIOPS and (when carrying PII) violate the data-handling guidelines.\nBoth belong in a versioned script that documents:\n  - source / destination instance IDs (PROD vs STAGING)\n  - dump version (timestamped GCS URI)\n  - PII-handling approval if any\n  - rollback procedure\n\nBypass marker: `db-mutation-rule`. Per-repo opt-out:\n`touch .no-make-no-mistakes-db-mutation` at the root.\n",
+    "tests": [
+      {
+        "name": "blocks-gcloud-sql-import-sql",
+        "input": {
+          "tool_input": {
+            "command": "gcloud sql import sql my-instance gs://backups/dump.sql --database=mydb"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-sql-export-sql",
+        "input": {
+          "tool_input": {
+            "command": "gcloud sql export sql my-instance gs://backups/dump.sql --database=mydb"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-sql-import-csv",
+        "input": {
+          "tool_input": {
+            "command": "gcloud sql import csv my-instance gs://backups/users.csv --database=mydb --table=users"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-sql-export-bak",
+        "input": {
+          "tool_input": {
+            "command": "gcloud sql export bak my-instance gs://backups/dump.bak --database=mydb"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-global-project-sql-export",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --project=my-prod sql export sql my-instance gs://backups/dump.sql --database=mydb"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-global-quiet-sql-import",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --quiet sql import sql my-instance gs://backups/dump.sql --database=mydb"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-global-account-sql-export-csv",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --account=svc@example.iam.gserviceaccount.com sql export csv my-instance gs://backups/users.csv --database=mydb --query=\"SELECT * FROM users\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-multiple-global-flags-sql-export",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --project=my-prod --quiet sql export sql my-instance gs://backups/dump.sql --database=mydb"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-global-project-space-sql-export",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --project my-prod sql export sql my-instance gs://backups/dump.sql --database=mydb"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-global-configuration-space-sql-import",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --configuration prod sql import sql my-instance gs://backups/dump.sql --database=mydb"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-global-impersonate-space-sql-export",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --impersonate-service-account svc@example.iam.gserviceaccount.com sql export sql my-instance gs://backups/dump.sql --database=mydb"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-global-account-space-sql-export-csv",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --account user@example.com sql export csv my-instance gs://backups/users.csv --database=mydb --query=\"SELECT * FROM users\""
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-global-region-space-sql-import",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --region us-central1 sql import sql my-instance gs://backups/dump.sql --database=mydb"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-gcloud-mixed-space-and-equals-flags-sql-export",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --project my-prod --configuration=prod --quiet sql export bak my-instance gs://backups/dump.bak --database=mydb"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-gcloud-sql-instances-list",
+        "input": {
+          "tool_input": {
+            "command": "gcloud sql instances list --project=myproject"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-gcloud-global-flag-space-sql-databases-describe",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --project my-prod sql databases describe mydb --instance=my-instance"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-gcloud-global-flag-space-sql-instances-list",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --configuration prod sql instances list"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-gcloud-sql-via-versioned-script",
+        "input": {
+          "tool_input": {
+            "command": "./scripts/sql-import.sh my-instance gs://backups/dump.sql"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-bypass-marker",
+        "input": {
+          "tool_input": {
+            "command": "gcloud sql import sql my-instance gs://backups/dump.sql --database=mydb # hook-bypass: db-mutation-rule"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
   }
 ]

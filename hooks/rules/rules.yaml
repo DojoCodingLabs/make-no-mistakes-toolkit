@@ -2415,3 +2415,631 @@
         tool_input:
           command: "gh api repos/o/r/issues/1/comments --jq '[.[] | select(.user.login | test(\"greptile\";\"i\"))] | sort_by(.created_at) | last' # hook-bypass: greptile-extraction-acknowledged"
       expected_exit: 0
+- id: inline-db-mutation-mysql
+  description: Block inline mysql / mysqldump mutations (use a versioned script in scripts/ or bin/ instead)
+  applies_to: [Bash]
+  match:
+    # Positive: three mutation vectors via the mysql CLI:
+    #   1. `mysql ... -e "<SQL with mutation keyword>"` — the canonical
+    #      one-liner. `-e`/`--execute` may be followed by space or `=`.
+    #   2. `mysql ... < file.sql` — feeding a SQL file via stdin. We cannot
+    #      read the file contents, but the discipline is the same: the
+    #      one-shot redirect bypasses the versioned-scripts workflow.
+    #   3. `mysqldump ... | mysql ...` — restore one-liner that overwrites
+    #      target data wholesale.
+    # NOTE: the spacing between `-e`/`--execute` and the SQL keyword is
+    # `[[:space:]]*` (zero-or-more), NOT `[[:space:]]+` — mysql accepts the
+    # short form `-e"DROP TABLE foo"` with no separator. Same logic for the
+    # long form: `--execute="..."` is the documented = shape, and
+    # `--execute "..."` is the documented space shape. Both must match.
+    # Greptile #25 P1: original regex required `[[:space:]]+|=` and missed
+    # `mysql -e"..."` and `mysql --execute="..."` shapes.
+    - field: command
+      pattern: '(\bmysql[[:space:]][^|<]*(-e|--execute)([[:space:]]*|=)[''"]?[[:space:]]*(UPDATE|DELETE|INSERT|REPLACE|CREATE|ALTER|DROP|GRANT|REVOKE|TRUNCATE|RENAME)\b)|(\bmysql[[:space:]][^|]*<[[:space:]]*[^[:space:]]+\.sql\b)|(\bmysqldump\b[^|]*\|[[:space:]]*mysql\b)'
+      flags: i
+    # Negative: do not fire when the command is itself a versioned-script
+    # invocation (the script lives in git, so the discipline is satisfied).
+    - field: command
+      not_pattern: '^[[:space:]]*(\./scripts/|bash[[:space:]]+scripts/|\./bin/|bash[[:space:]]+bin/|sh[[:space:]]+scripts/|sh[[:space:]]+bin/)'
+  action: block
+  bypass_marker: db-mutation-rule
+  disable_if_repo_file: .no-make-no-mistakes-db-mutation
+  memory_ref: feedback_scripts_not_db.md
+  message: |
+    BLOCKED: inline mysql / mysqldump DB mutation detected.
+
+    Per feedback_scripts_not_db.md: scripts-in-the-repo, not inline.
+    Move the SQL into a versioned file under scripts/ or bin/ and invoke
+    that script. The script wrapper makes the change reviewable in git,
+    re-runnable across environments, and auditable after the fact.
+
+    Allowed patterns:
+      - SELECT / SHOW / DESCRIBE / EXPLAIN — read-only is fine inline
+      - `./scripts/<name>.sh` / `bash scripts/<name>.sh` — versioned wrapper
+      - `# hook-bypass: db-mutation-rule` appended to the command for an
+        explicitly-acknowledged one-shot
+
+    Per-repo escape hatch: `touch .no-make-no-mistakes-db-mutation` at the
+    repo root if the entire repo's job is inline DB work.
+  tests:
+    - name: blocks-mysql-e-update
+      input:
+        tool_input:
+          command: "mysql -u root -e \"UPDATE users SET active=1 WHERE id=42\""
+      expected_exit: 2
+    - name: blocks-mysql-e-delete
+      input:
+        tool_input:
+          command: "mysql -u root mydb -e 'DELETE FROM sessions WHERE expired_at < NOW()'"
+      expected_exit: 2
+    - name: blocks-mysql-e-drop-table
+      input:
+        tool_input:
+          command: "mysql -h db.example.com -u admin -e \"DROP TABLE legacy_table\""
+      expected_exit: 2
+    # Greptile finding (P1, PR #25): the `-e` alternative is a prefix of
+    # `--execute`. Earlier patterns that anchored `(-e|--execute)` without
+    # boundary handling, or that required whitespace BEFORE `=`, missed the
+    # long-option form and the `--execute="..."` shape entirely. These cases
+    # exercise both bypasses.
+    - name: blocks-mysql-long-execute-space
+      input:
+        tool_input:
+          command: 'mysql --execute "UPDATE users SET active=1"'
+      expected_exit: 2
+    - name: blocks-mysql-long-execute-equals
+      input:
+        tool_input:
+          command: 'mysql --execute="DROP TABLE legacy"'
+      expected_exit: 2
+    - name: blocks-mysql-short-e-no-space-quoted
+      input:
+        tool_input:
+          command: 'mysql -uroot -e"DROP TABLE legacy"'
+      expected_exit: 2
+    - name: blocks-mysql-stdin-redirect
+      input:
+        tool_input:
+          command: 'mysql -u root mydb < migrations/oneshot.sql'
+      expected_exit: 2
+    - name: blocks-mysqldump-pipe-mysql
+      input:
+        tool_input:
+          command: 'mysqldump -u root prod_db | mysql -u root staging_db'
+      expected_exit: 2
+    - name: allows-mysql-e-select
+      input:
+        tool_input:
+          command: "mysql -u root -e 'SELECT COUNT(*) FROM users'"
+      expected_exit: 0
+    - name: allows-mysql-e-show
+      input:
+        tool_input:
+          command: "mysql -u root -e 'SHOW TABLES'"
+      expected_exit: 0
+    - name: allows-mysql-via-versioned-script
+      input:
+        tool_input:
+          command: "./scripts/seed-users.sh"
+      expected_exit: 0
+    - name: allows-mysql-via-bash-scripts-prefix
+      input:
+        tool_input:
+          command: "bash scripts/migrate-prod.sh --confirm"
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          command: "mysql -u root -e 'DROP TABLE foo' # hook-bypass: db-mutation-rule"
+      expected_exit: 0
+
+- id: inline-db-mutation-psql
+  description: Block inline psql / pg_restore mutations beyond the destructive ops already caught by destructive-db-ops (use a versioned migration or script instead)
+  applies_to: [Bash]
+  match:
+    # Positive: psql -c "<mutation>" with the broader keyword set, plus
+    # pg_restore against any non-localhost host. The `destructive-db-ops`
+    # rule above already blocks DROP TABLE/DATABASE/SCHEMA / TRUNCATE /
+    # DELETE FROM via psql -c; here we extend coverage to UPDATE / INSERT
+    # / REPLACE / CREATE / ALTER / GRANT / REVOKE / RENAME so the full
+    # mutation set is consistently denied at the CLI.
+    # NOTE: spacing between `-c`/`--command` and the SQL keyword is
+    # `[[:space:]]*` (zero-or-more), NOT `[[:space:]]+` — psql accepts the
+    # short form `psql -d mydb -c"UPDATE ..."` with no separator (Greptile
+    # #25 P1).
+    - field: command
+      pattern: '(\bpsql\b[^|]*(-c|--command)([[:space:]]*|=)[''"]?[[:space:]]*(UPDATE|INSERT|REPLACE|CREATE|ALTER|GRANT|REVOKE|RENAME)\b)|(\bpg_restore\b)'
+      flags: i
+    - field: command
+      not_pattern: '^[[:space:]]*(\./scripts/|bash[[:space:]]+scripts/|\./bin/|bash[[:space:]]+bin/|sh[[:space:]]+scripts/|sh[[:space:]]+bin/)'
+  action: block
+  bypass_marker: db-mutation-rule
+  disable_if_repo_file: .no-make-no-mistakes-db-mutation
+  memory_ref: feedback_scripts_not_db.md
+  message: |
+    BLOCKED: inline psql mutation or pg_restore detected.
+
+    Per feedback_scripts_not_db.md: schema and data changes belong in a
+    versioned migration (supabase/migrations/<ts>_<slug>.sql or your
+    project's equivalent), not in an ad-hoc `psql -c` one-liner.
+
+    For pg_restore: load the dump from a committed script that documents
+    target DB, dump version, and the rollback plan — never from a raw
+    shell invocation that exists only in the agent's transient history.
+
+    SELECT / SHOW / EXPLAIN / DESCRIBE are still allowed inline.
+
+    Bypass with `# hook-bypass: db-mutation-rule` after explicit team
+    approval, or drop `.no-make-no-mistakes-db-mutation` at the repo root.
+  tests:
+    - name: blocks-psql-c-update
+      input:
+        tool_input:
+          command: 'psql -h db.example.com -d mydb -c "UPDATE users SET active=true"'
+      expected_exit: 2
+    - name: blocks-psql-c-insert
+      input:
+        tool_input:
+          command: "psql -d mydb -c 'INSERT INTO audit (action) VALUES (''oneshot'')'"
+      expected_exit: 2
+    - name: blocks-psql-c-alter-table
+      input:
+        tool_input:
+          command: 'psql -d mydb -c "ALTER TABLE users ADD COLUMN nickname text"'
+      expected_exit: 2
+    - name: blocks-psql-c-grant
+      input:
+        tool_input:
+          command: 'psql -d mydb -c "GRANT SELECT ON users TO readonly_role"'
+      expected_exit: 2
+    # Greptile finding (P1, PR #25): psql accepts the short-option form where
+    # the SQL follows `-c` immediately, without whitespace or `=`. Original
+    # pattern required `[[:space:]]+|=` after `-c`, missing `-c"..."`.
+    - name: blocks-psql-c-no-space-quoted
+      input:
+        tool_input:
+          command: 'psql -d mydb -c"UPDATE users SET active=true"'
+      expected_exit: 2
+    - name: blocks-psql-long-command-equals
+      input:
+        tool_input:
+          command: 'psql -d mydb --command="UPDATE sessions SET expired=true"'
+      expected_exit: 2
+    - name: blocks-pg-restore
+      input:
+        tool_input:
+          command: 'pg_restore -h db.example.com -d mydb backup.dump'
+      expected_exit: 2
+    - name: allows-psql-c-select
+      input:
+        tool_input:
+          command: "psql -d mydb -c 'SELECT count(*) FROM users'"
+      expected_exit: 0
+    - name: allows-psql-c-explain
+      input:
+        tool_input:
+          command: "psql -d mydb -c 'EXPLAIN ANALYZE SELECT * FROM users'"
+      expected_exit: 0
+    - name: allows-psql-via-versioned-script
+      input:
+        tool_input:
+          command: "./scripts/db-migrate.sh"
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          command: 'psql -d mydb -c "UPDATE users SET active=true" # hook-bypass: db-mutation-rule'
+      expected_exit: 0
+
+- id: inline-db-mutation-sqlite
+  description: Block inline sqlite3 mutations (use a versioned script in scripts/ or bin/ instead)
+  applies_to: [Bash]
+  match:
+    # Positive: `sqlite3 <path-to.db> "<SQL>"` is the canonical shape;
+    # the SQL argument is the positional after the database path. Match
+    # invocations where any mutation keyword appears anywhere on the
+    # command line after `sqlite3 ` (cheaper than parsing positional args
+    # and still effective because the keyword set is unique enough to
+    # mutations).
+    - field: command
+      pattern: '\bsqlite3\b[^|]*\b(UPDATE|DELETE|INSERT|REPLACE|CREATE|ALTER|DROP|GRANT|REVOKE|TRUNCATE|RENAME)\b'
+      flags: i
+    - field: command
+      not_pattern: '^[[:space:]]*(\./scripts/|bash[[:space:]]+scripts/|\./bin/|bash[[:space:]]+bin/|sh[[:space:]]+scripts/|sh[[:space:]]+bin/)'
+  action: block
+  bypass_marker: db-mutation-rule
+  disable_if_repo_file: .no-make-no-mistakes-db-mutation
+  memory_ref: feedback_scripts_not_db.md
+  message: |
+    BLOCKED: inline sqlite3 DB mutation detected.
+
+    Even for local SQLite databases, drift between dev machines is a
+    real cost — when one teammate's local DB has the manual change and
+    others' don't, debugging session reproduction degrades silently.
+    Move the SQL into scripts/ and commit it.
+
+    SELECT / EXPLAIN remain allowed inline. The bypass marker is
+    `db-mutation-rule`. Per-repo opt-out:
+    `touch .no-make-no-mistakes-db-mutation` at the root.
+  tests:
+    - name: blocks-sqlite3-update
+      input:
+        tool_input:
+          command: 'sqlite3 ./data.db "UPDATE users SET active=1"'
+      expected_exit: 2
+    - name: blocks-sqlite3-delete
+      input:
+        tool_input:
+          command: "sqlite3 ./data.db 'DELETE FROM users WHERE id=42'"
+      expected_exit: 2
+    - name: blocks-sqlite3-create-table
+      input:
+        tool_input:
+          command: 'sqlite3 ./data.db "CREATE TABLE foo (id integer primary key)"'
+      expected_exit: 2
+    - name: blocks-sqlite3-alter
+      input:
+        tool_input:
+          command: 'sqlite3 ./data.db "ALTER TABLE users ADD COLUMN x text"'
+      expected_exit: 2
+    - name: allows-sqlite3-select
+      input:
+        tool_input:
+          command: 'sqlite3 ./data.db "SELECT count(*) FROM users"'
+      expected_exit: 0
+    - name: allows-sqlite3-via-versioned-script
+      input:
+        tool_input:
+          command: './scripts/seed-sqlite.sh ./data.db'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          command: 'sqlite3 ./data.db "UPDATE users SET active=1" # hook-bypass: db-mutation-rule'
+      expected_exit: 0
+
+- id: inline-db-mutation-mongo
+  description: Block inline mongo / mongorestore mutations (use a versioned script in scripts/ or bin/ instead)
+  applies_to: [Bash]
+  match:
+    # Positive vectors:
+    #   1. `mongo --eval "<expr with .update/.insert/.delete/...>"` — the
+    #      legacy shell syntax. Mongosh uses the same flag.
+    #   2. `mongosh --eval` — same surface, newer binary name.
+    #   3. `mongorestore ...` — bulk restore one-liner. Block unconditionally
+    #      since by definition it overwrites collections.
+    # Mutation method set is the canonical write surface (.update, .insert,
+    # .delete, .drop, .createCollection, .dropDatabase, .replaceOne, .save,
+    # .findAndModify, .deleteOne, .deleteMany, .updateOne, .updateMany,
+    # .insertOne, .insertMany).
+    # NOTE: scan for the mutation method anywhere up to a pipe after `--eval`,
+    # using `[[:space:]=]` to accept both the space form (`--eval "..."`) and
+    # the equals form (`--eval="..."`). Greptile #25 P1: the previous shape
+    # `[[:space:]]+[^[:space:]]*\.method` only matched if the mutation method
+    # appeared inside a single non-space token immediately after `--eval`,
+    # which fails the moment a quoted JS expression contains a space anywhere
+    # before the `.method` call.
+    - field: command
+      pattern: '(\b(mongo|mongosh)\b[^|]*--eval[[:space:]=][^|]*\.(update|insert|delete|drop|createCollection|dropDatabase|replaceOne|save|findAndModify|deleteOne|deleteMany|updateOne|updateMany|insertOne|insertMany)\b)|(\bmongorestore\b)'
+    - field: command
+      not_pattern: '^[[:space:]]*(\./scripts/|bash[[:space:]]+scripts/|\./bin/|bash[[:space:]]+bin/|sh[[:space:]]+scripts/|sh[[:space:]]+bin/)'
+  action: block
+  bypass_marker: db-mutation-rule
+  disable_if_repo_file: .no-make-no-mistakes-db-mutation
+  memory_ref: feedback_scripts_not_db.md
+  message: |
+    BLOCKED: inline mongo / mongosh / mongorestore mutation detected.
+
+    Per feedback_scripts_not_db.md, mongo data changes belong in a
+    versioned migration runner script — never in a transient `--eval`
+    one-liner. The bypass marker is `db-mutation-rule`; the per-repo
+    escape hatch is `.no-make-no-mistakes-db-mutation` at the root.
+
+    Read methods (.find, .findOne, .aggregate, .countDocuments, etc.)
+    remain allowed inline.
+  tests:
+    - name: blocks-mongo-eval-update
+      input:
+        tool_input:
+          command: 'mongo --eval "db.users.update({_id:42},{$set:{active:true}})"'
+      expected_exit: 2
+    # Greptile finding (P1, PR #25): `--eval` is almost always followed by a
+    # quoted JavaScript expression that contains whitespace. The original
+    # pattern required the mutation method inside the FIRST non-space token
+    # after `--eval`, which the quote+space layout breaks. These cases
+    # exercise the realistic shapes seen in incident-driven one-liners.
+    - name: blocks-mongo-eval-update-with-spaces-inside-arg
+      input:
+        tool_input:
+          command: 'mongo --eval "db.users.update({_id: 42}, {$set: {active: true}})"'
+      expected_exit: 2
+    - name: blocks-mongosh-eval-insertOne-spaces
+      input:
+        tool_input:
+          command: 'mongosh --eval "db.audit.insertOne({ event: \"oneshot\" })"'
+      expected_exit: 2
+    - name: blocks-mongo-eval-equals
+      input:
+        tool_input:
+          command: 'mongo --eval="db.users.deleteMany({active:false})"'
+      expected_exit: 2
+    - name: blocks-mongo-eval-deleteMany
+      input:
+        tool_input:
+          command: 'mongo --eval "db.sessions.deleteMany({expired:true})"'
+      expected_exit: 2
+    - name: blocks-mongosh-eval-drop
+      input:
+        tool_input:
+          command: 'mongosh --eval "db.legacy_collection.drop()"'
+      expected_exit: 2
+    - name: blocks-mongo-eval-createCollection
+      input:
+        tool_input:
+          command: 'mongo --eval "db.createCollection(''audit'')"'
+      expected_exit: 2
+    - name: blocks-mongorestore
+      input:
+        tool_input:
+          command: 'mongorestore --db prod --drop ./backup'
+      expected_exit: 2
+    - name: allows-mongo-eval-find
+      input:
+        tool_input:
+          command: 'mongo --eval "db.users.find({active:true}).count()"'
+      expected_exit: 0
+    - name: allows-mongo-eval-aggregate
+      input:
+        tool_input:
+          command: 'mongo --eval "db.events.aggregate([{$match:{}}])"'
+      expected_exit: 0
+    - name: allows-mongo-via-versioned-script
+      input:
+        tool_input:
+          command: './scripts/seed-mongo.sh'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          command: 'mongo --eval "db.users.drop()" # hook-bypass: db-mutation-rule'
+      expected_exit: 0
+
+- id: inline-db-mutation-redis
+  description: Block inline redis-cli mutations (use a versioned script in scripts/ or bin/ instead)
+  applies_to: [Bash]
+  match:
+    # Positive: `redis-cli ... <MUTATING_VERB> ...`. The Redis command
+    # surface is large — match the common write verbs that show up in
+    # incident-driven one-liners: SET, DEL, FLUSHDB, FLUSHALL, HSET,
+    # HDEL, SADD, SREM, LPUSH, RPUSH, ZADD, ZREM, EXPIRE, RENAME, MSET,
+    # SETEX, SETNX, INCR, DECR, COPY, MOVE, UNLINK, RESTORE, EVAL (EVAL
+    # can mutate via Lua even though it can also read).
+    # Verb must be at command-word boundaries to avoid mis-matching
+    # values that happen to contain those substrings.
+    - field: command
+      pattern: '\bredis-cli\b[^|]*[[:space:]]+(SET|DEL|FLUSHDB|FLUSHALL|HSET|HDEL|SADD|SREM|LPUSH|RPUSH|ZADD|ZREM|EXPIRE|RENAME|MSET|SETEX|SETNX|INCR|DECR|COPY|MOVE|UNLINK|RESTORE|EVAL)\b'
+      flags: i
+    - field: command
+      not_pattern: '^[[:space:]]*(\./scripts/|bash[[:space:]]+scripts/|\./bin/|bash[[:space:]]+bin/|sh[[:space:]]+scripts/|sh[[:space:]]+bin/)'
+  action: block
+  bypass_marker: db-mutation-rule
+  disable_if_repo_file: .no-make-no-mistakes-db-mutation
+  memory_ref: feedback_scripts_not_db.md
+  message: |
+    BLOCKED: inline redis-cli mutation detected.
+
+    Even in a cache, manual one-liners create cross-env drift: the value
+    you set is visible to your machine only until eviction, and other
+    engineers cannot reproduce. Use a script under scripts/ or bin/.
+
+    Read verbs (GET, MGET, HGET, KEYS, SCAN, INFO, PING, EXISTS, TYPE,
+    TTL, LLEN, SCARD, ZRANGE, SMEMBERS, ...) remain allowed inline.
+
+    Bypass marker: `db-mutation-rule`. Per-repo opt-out:
+    `touch .no-make-no-mistakes-db-mutation` at the root.
+  tests:
+    - name: blocks-redis-cli-set
+      input:
+        tool_input:
+          command: 'redis-cli SET feature:enabled 1'
+      expected_exit: 2
+    - name: blocks-redis-cli-del
+      input:
+        tool_input:
+          command: 'redis-cli DEL session:42'
+      expected_exit: 2
+    - name: blocks-redis-cli-flushall
+      input:
+        tool_input:
+          command: 'redis-cli -h cache.example.com FLUSHALL'
+      expected_exit: 2
+    - name: blocks-redis-cli-flushdb
+      input:
+        tool_input:
+          command: 'redis-cli -n 3 FLUSHDB'
+      expected_exit: 2
+    - name: blocks-redis-cli-hset
+      input:
+        tool_input:
+          command: 'redis-cli HSET user:1 name alice'
+      expected_exit: 2
+    - name: allows-redis-cli-get
+      input:
+        tool_input:
+          command: 'redis-cli GET feature:enabled'
+      expected_exit: 0
+    - name: allows-redis-cli-keys
+      input:
+        tool_input:
+          command: 'redis-cli KEYS "session:*"'
+      expected_exit: 0
+    - name: allows-redis-cli-info
+      input:
+        tool_input:
+          command: 'redis-cli INFO memory'
+      expected_exit: 0
+    - name: allows-redis-via-versioned-script
+      input:
+        tool_input:
+          command: './scripts/flush-cache.sh'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          command: 'redis-cli FLUSHALL # hook-bypass: db-mutation-rule'
+      expected_exit: 0
+
+- id: inline-db-mutation-gcloud-sql
+  description: Block inline `gcloud sql import` / `gcloud sql export` (use a versioned script in scripts/ or bin/ that documents the source/destination)
+  applies_to: [Bash]
+  match:
+    # Positive: import/export of SQL or CSV dumps via the gcloud SQL CLI.
+    # Both directions are blocked: import is the obvious mutation surface;
+    # export is included because exports against PRODUCTION leak PII and
+    # consume IOPS, so the discipline (versioned script with documented
+    # purpose) applies equally.
+    # NOTE: gcloud accepts global flags BEFORE the command group, so we must
+    # tolerate zero-or-more arbitrary tokens between `gcloud` and `sql`.
+    # The `([^[:space:]]+[[:space:]]+)*` group matches any token-then-space
+    # repetition, which covers BOTH shapes that gcloud accepts for global
+    # flags taking a value:
+    #   --flag=value       (one token)        e.g. `--project=my-prod`
+    #   --flag value       (two tokens)       e.g. `--project my-prod`
+    # ...plus bare bool flags (`--quiet`, `-q`), `--account user@host`,
+    # `--configuration prod`, `--impersonate-service-account svc@example.com`,
+    # `--region us-central1`, `--zone us-central1-a`, etc. Greptile re-review
+    # on PR #25 surfaced that the prior `(--?[a-zA-Z0-9_-]+(=[^[:space:]]*)?[[:space:]]+)*`
+    # shape only matched the `=`-bound form and missed every space-separated
+    # global flag value. The looser tokens-then-space loop closes that gap.
+    # False-positive risk is bounded: the pattern still anchors on the
+    # literal `sql[[:space:]]+(import|export)[[:space:]]+(sql|csv|bak)` tail,
+    # so legitimate read-only verbs (`sql instances list`, `sql databases
+    # describe`, ...) cannot match.
+    - field: command
+      pattern: '\bgcloud[[:space:]]+([^[:space:]]+[[:space:]]+)*sql[[:space:]]+(import|export)[[:space:]]+(sql|csv|bak)\b'
+      flags: i
+    - field: command
+      not_pattern: '^[[:space:]]*(\./scripts/|bash[[:space:]]+scripts/|\./bin/|bash[[:space:]]+bin/|sh[[:space:]]+scripts/|sh[[:space:]]+bin/)'
+  action: block
+  bypass_marker: db-mutation-rule
+  disable_if_repo_file: .no-make-no-mistakes-db-mutation
+  memory_ref: feedback_scripts_not_db.md
+  references:
+    - "feedback_never_touch_prod_without_approval.md (production guardrail)"
+  message: |
+    BLOCKED: inline `gcloud sql import` / `gcloud sql export` detected.
+
+    Imports overwrite target DB state. Exports against production cost
+    IOPS and (when carrying PII) violate the data-handling guidelines.
+    Both belong in a versioned script that documents:
+      - source / destination instance IDs (PROD vs STAGING)
+      - dump version (timestamped GCS URI)
+      - PII-handling approval if any
+      - rollback procedure
+
+    Bypass marker: `db-mutation-rule`. Per-repo opt-out:
+    `touch .no-make-no-mistakes-db-mutation` at the root.
+  tests:
+    - name: blocks-gcloud-sql-import-sql
+      input:
+        tool_input:
+          command: 'gcloud sql import sql my-instance gs://backups/dump.sql --database=mydb'
+      expected_exit: 2
+    - name: blocks-gcloud-sql-export-sql
+      input:
+        tool_input:
+          command: 'gcloud sql export sql my-instance gs://backups/dump.sql --database=mydb'
+      expected_exit: 2
+    - name: blocks-gcloud-sql-import-csv
+      input:
+        tool_input:
+          command: 'gcloud sql import csv my-instance gs://backups/users.csv --database=mydb --table=users'
+      expected_exit: 2
+    - name: blocks-gcloud-sql-export-bak
+      input:
+        tool_input:
+          command: 'gcloud sql export bak my-instance gs://backups/dump.bak --database=mydb'
+      expected_exit: 2
+    # Greptile finding (P1+Security, PR #25): `gcloud` accepts global flags
+    # BEFORE the command group. The previous pattern required `gcloud sql`
+    # contiguously, missing `gcloud --project=my-prod sql ...` — exactly the
+    # shape used when targeting a specific project (i.e., production).
+    - name: blocks-gcloud-global-project-sql-export
+      input:
+        tool_input:
+          command: 'gcloud --project=my-prod sql export sql my-instance gs://backups/dump.sql --database=mydb'
+      expected_exit: 2
+    - name: blocks-gcloud-global-quiet-sql-import
+      input:
+        tool_input:
+          command: 'gcloud --quiet sql import sql my-instance gs://backups/dump.sql --database=mydb'
+      expected_exit: 2
+    - name: blocks-gcloud-global-account-sql-export-csv
+      input:
+        tool_input:
+          command: 'gcloud --account=svc@example.iam.gserviceaccount.com sql export csv my-instance gs://backups/users.csv --database=mydb --query="SELECT * FROM users"'
+      expected_exit: 2
+    - name: blocks-gcloud-multiple-global-flags-sql-export
+      input:
+        tool_input:
+          command: 'gcloud --project=my-prod --quiet sql export sql my-instance gs://backups/dump.sql --database=mydb'
+      expected_exit: 2
+    # Greptile re-review on PR #25: the `=`-bound match wasn't enough.
+    # gcloud also accepts global flags as TWO space-separated tokens
+    # (`--project my-prod`, `--configuration prod`, etc.). Each of the
+    # five cases below would have bypassed the old regex.
+    - name: blocks-gcloud-global-project-space-sql-export
+      input:
+        tool_input:
+          command: 'gcloud --project my-prod sql export sql my-instance gs://backups/dump.sql --database=mydb'
+      expected_exit: 2
+    - name: blocks-gcloud-global-configuration-space-sql-import
+      input:
+        tool_input:
+          command: 'gcloud --configuration prod sql import sql my-instance gs://backups/dump.sql --database=mydb'
+      expected_exit: 2
+    - name: blocks-gcloud-global-impersonate-space-sql-export
+      input:
+        tool_input:
+          command: 'gcloud --impersonate-service-account svc@example.iam.gserviceaccount.com sql export sql my-instance gs://backups/dump.sql --database=mydb'
+      expected_exit: 2
+    - name: blocks-gcloud-global-account-space-sql-export-csv
+      input:
+        tool_input:
+          command: 'gcloud --account user@example.com sql export csv my-instance gs://backups/users.csv --database=mydb --query="SELECT * FROM users"'
+      expected_exit: 2
+    - name: blocks-gcloud-global-region-space-sql-import
+      input:
+        tool_input:
+          command: 'gcloud --region us-central1 sql import sql my-instance gs://backups/dump.sql --database=mydb'
+      expected_exit: 2
+    - name: blocks-gcloud-mixed-space-and-equals-flags-sql-export
+      input:
+        tool_input:
+          command: 'gcloud --project my-prod --configuration=prod --quiet sql export bak my-instance gs://backups/dump.bak --database=mydb'
+      expected_exit: 2
+    - name: allows-gcloud-sql-instances-list
+      input:
+        tool_input:
+          command: 'gcloud sql instances list --project=myproject'
+      expected_exit: 0
+    - name: allows-gcloud-global-flag-space-sql-databases-describe
+      input:
+        tool_input:
+          command: 'gcloud --project my-prod sql databases describe mydb --instance=my-instance'
+      expected_exit: 0
+    - name: allows-gcloud-global-flag-space-sql-instances-list
+      input:
+        tool_input:
+          command: 'gcloud --configuration prod sql instances list'
+      expected_exit: 0
+    - name: allows-gcloud-sql-via-versioned-script
+      input:
+        tool_input:
+          command: './scripts/sql-import.sh my-instance gs://backups/dump.sql'
+      expected_exit: 0
+    - name: allows-bypass-marker
+      input:
+        tool_input:
+          command: 'gcloud sql import sql my-instance gs://backups/dump.sql --database=mydb # hook-bypass: db-mutation-rule'
+      expected_exit: 0
