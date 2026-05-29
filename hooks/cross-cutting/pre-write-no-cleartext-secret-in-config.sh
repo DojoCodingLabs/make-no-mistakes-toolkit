@@ -92,7 +92,14 @@ if [[ -n "$EXTRA_PATTERNS_PIPE" ]]; then
   TAILS="${TAILS}|${EXTRA_PATTERNS_PIPE}"
 fi
 
-HIGH_IMPACT_RE="\\\$\\{[A-Z_]*(${TAILS})[A-Z0-9_]*\\}"
+# Quoting note (DOJ-4571 review P2 + P3, dojo-code-reviewer): use single
+# quotes around the static literal part of the regex so backslashes pass
+# straight through to grep without bash re-interpretation. The dynamic
+# ${TAILS} group is interpolated via a separate double-quoted segment.
+# This is significantly more readable than the previous quad-backslash
+# escaping (\\\$\\{...) and matches the convention in the rest of the
+# toolkit's bash codebase.
+HIGH_IMPACT_RE='\$\{[A-Z_]*('"${TAILS}"')[A-Z0-9_]*\}'
 
 # ─── Cure-shape suffixes (placeholders ending in these are OK) ──────────────
 BUILTIN_SUFFIXES="_FILE|_PATH"
@@ -106,7 +113,8 @@ if [[ -n "$EXTRA_SUFFIXES_PIPE" ]]; then
   CURE_SUFFIXES="${CURE_SUFFIXES}|${EXTRA_SUFFIXES_PIPE}"
 fi
 
-CURE_RE="(${CURE_SUFFIXES})\\}$"
+# Same single-quote-plus-interpolation convention as HIGH_IMPACT_RE.
+CURE_RE='('"${CURE_SUFFIXES}"')\}$'
 
 # ─── Scan proposed content ──────────────────────────────────────────────────
 MATCHES=""

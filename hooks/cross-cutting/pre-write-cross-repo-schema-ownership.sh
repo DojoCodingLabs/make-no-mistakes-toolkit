@@ -143,9 +143,17 @@ fi
 # Capture identifiers after CREATE TABLE, ALTER TABLE, DROP TABLE, RENAME TABLE.
 # Strip optional IF NOT EXISTS / IF EXISTS, optional schema prefix (`public.`),
 # and trailing punctuation. ERE-only to stay portable.
+#
+# Portability note (DOJ-4571 review P2, dojo-code-reviewer): the previous
+# implementation used `sed -E '...//I'` to match the TABLE keyword case-
+# insensitively. The `/I` flag is a GNU extension; BSD sed on macOS errors
+# out with "unknown option to `s'". Replaced with explicit bracket-class
+# spelling (`[Tt][Aa][Bb][Ll][Ee]`) which is ERE-portable across both
+# implementations. `grep -i` is portable for the upstream extraction so it
+# stays as-is.
 REFERENCED_TABLES=$(echo "$PROPOSED" \
   | grep -oiE '(CREATE|ALTER|DROP|RENAME)[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+(NOT[[:space:]]+)?EXISTS[[:space:]]+)?[A-Za-z_][A-Za-z0-9_."]*' \
-  | sed -E 's/.*TABLE[[:space:]]+(IF[[:space:]]+(NOT[[:space:]]+)?EXISTS[[:space:]]+)?//I' \
+  | sed -E 's/.*[Tt][Aa][Bb][Ll][Ee][[:space:]]+([Ii][Ff][[:space:]]+([Nn][Oo][Tt][[:space:]]+)?[Ee][Xx][Ii][Ss][Tt][Ss][[:space:]]+)?//' \
   | sed -E 's/"//g' \
   | sed -E 's/^[A-Za-z_][A-Za-z0-9_]*\.//' \
   | sed -E 's/[^A-Za-z0-9_].*$//' \
