@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # =============================================================================
-# pre-edit.sh — PreToolUse dispatcher for Edit, Write, and MultiEdit tools.
+# pre-edit.sh — PreToolUse dispatcher for Edit, Write, MultiEdit, and
+# NotebookEdit tools.
 #
 # Identical pattern to pre-bash.sh; selects rules whose `applies_to` matches
-# any of Edit / Write / MultiEdit. The matcher in hooks.json (Edit|Write|
-# MultiEdit) routes all three tool kinds to this single dispatcher.
+# any of Edit / Write / MultiEdit / NotebookEdit. The matcher in hooks.json
+# (Edit|Write|MultiEdit|NotebookEdit) routes all four tool kinds to this
+# single dispatcher.
 # =============================================================================
 set -uo pipefail
 
@@ -34,6 +36,7 @@ done < <(jq -r '
       (.applies_to | index("Edit"))
       or (.applies_to | index("Write"))
       or (.applies_to | index("MultiEdit"))
+      or (.applies_to | index("NotebookEdit"))
     )
   | .id
 ' "$RULES_JSON")

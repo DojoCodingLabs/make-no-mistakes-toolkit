@@ -1,5 +1,5 @@
 {
-  "description": "make-no-mistakes — manifest-driven PreToolUse + PostToolUse hooks. Rules live in hooks/rules/rules.yaml (compiled to rules.json). See hooks/rules/README.md.",
+  "description": "make-no-mistakes — manifest-driven PreToolUse + PostToolUse hooks. Generic regex rules live in hooks/rules/rules.yaml (compiled to rules.json). Per-repo atomic-design enforcement lives in hooks/atomic/ and reads .atomic-design-rules.json at the consumer repo root (no-op if absent). Cross-cutting Cure 4b hooks (DOJ-4571) live in hooks/cross-cutting/ and read per-repo config from .claude/config/cross-cutting-hooks.json at the consumer-repo root (no-op if absent). See hooks/rules/README.md, hooks/atomic/README.md, and hooks/cross-cutting/README.md.",
   "hooks": {
     "PreToolUse": [
       {
@@ -13,12 +13,32 @@
         ]
       },
       {
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/pre-edit.sh",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/atomic/pre-atomic.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/cross-cutting/pre-write-no-cleartext-secret-in-config.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/cross-cutting/pre-write-cross-repo-schema-ownership.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/cross-cutting/pre-write-version-bump-discipline.sh",
+            "timeout": 10
           }
         ]
       }
@@ -30,6 +50,16 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/post-slack.sh",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/atomic/post-atomic-drift.sh",
             "timeout": 3
           }
         ]
