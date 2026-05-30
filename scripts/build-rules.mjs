@@ -147,6 +147,24 @@ for (const rule of rules) {
     }
   }
 
+  // disable_if_repo_file is optional. When present it must be a flat
+  // filename (no slashes, no leading dot-only sentinels) so the runtime
+  // check `[ -f "./<name>" ]` cannot reach outside the cwd. Mirrors the
+  // safety contract in eval-rule.sh.
+  if (rule.disable_if_repo_file !== undefined && rule.disable_if_repo_file !== null) {
+    if (
+      typeof rule.disable_if_repo_file !== 'string' ||
+      !/^[a-zA-Z0-9._-]+$/.test(rule.disable_if_repo_file) ||
+      rule.disable_if_repo_file === '.' ||
+      rule.disable_if_repo_file === '..'
+    ) {
+      console.error(
+        `rule ${rule.id} has invalid disable_if_repo_file: must be a flat filename matching ^[a-zA-Z0-9._-]+$ and not "." or "..", got: ${JSON.stringify(rule.disable_if_repo_file)}`,
+      );
+      process.exit(1);
+    }
+  }
+
   // IP-leak guard: scan the entire rule (serialized) for forbidden patterns.
   // This catches leaks in references, messages, test fixtures, anywhere.
   const serialized = JSON.stringify(rule);

@@ -18,6 +18,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-05-29
+
+### Added
+- **Six new `inline-db-mutation-*` rules extending the scripts-not-DB
+  discipline (`feedback_scripts_not_db.md`) beyond Moodle/SSH to every DB
+  CLI.** The pre-existing `ssh-db-mutation` rule only caught
+  `gcloud compute ssh ... --command=` with Moodle-flavoured payloads
+  (`mdl_`, `scorm_`, `php -r`). This release blocks inline mutations
+  across the full surface a developer is likely to reach for:
+  - `inline-db-mutation-mysql` — `mysql -e "UPDATE/DELETE/..."`,
+    `mysql ... < file.sql`, `mysqldump ... | mysql ...`.
+  - `inline-db-mutation-psql` — `psql -c "UPDATE/INSERT/ALTER/CREATE/
+    GRANT/REVOKE/REPLACE/RENAME"` and `pg_restore`. Complements the
+    existing `destructive-db-ops` rule (which already covers DROP /
+    TRUNCATE / DELETE FROM via psql).
+  - `inline-db-mutation-sqlite` — `sqlite3 path "<mutation>"`.
+  - `inline-db-mutation-mongo` — `mongo|mongosh --eval "db.x.<mutating
+    method>(...)"` and `mongorestore`.
+  - `inline-db-mutation-redis` — `redis-cli SET / DEL / FLUSHDB /
+    FLUSHALL / HSET / HDEL / SADD / SREM / LPUSH / RPUSH / ZADD / ZREM /
+    EXPIRE / RENAME / MSET / SETEX / SETNX / INCR / DECR / COPY / MOVE /
+    UNLINK / RESTORE / EVAL`.
+  - `inline-db-mutation-gcloud-sql` — `gcloud sql import sql|csv|bak` and
+    `gcloud sql export sql|csv|bak` (export blocked because PII-bearing
+    prod exports also belong in versioned scripts).
+- **Shared bypass marker `db-mutation-rule`** across all six rules. A single
+  consistent escape token keeps the muscle memory cheap.
+- **Per-repo escape hatch via `disable_if_repo_file`.** New optional rule
+  schema field: when present, the rule no-ops if a sentinel file with
+  that exact name exists in the cwd. The inline-DB-mutation family ships
+  with `disable_if_repo_file: .no-make-no-mistakes-db-mutation`, so a
+  repo whose entire job is inline DB work can opt out with a one-liner
+  (`touch .no-make-no-mistakes-db-mutation`). Hardened path validation
+  (filename must match `^[a-zA-Z0-9._-]+$`, cannot be `.` / `..`) prevents
+  the runtime lookup from escaping the cwd.
+
+### Fixed
+- **Inline-DB-mutation regex bypasses** (Greptile PR #25, P1 + Security):
+  - `mysql -e"..."` / `mysql --execute="..."` short/long-option-no-space
+    shapes now block (spacing between `-e`/`--execute` and the SQL keyword
+    is `[[:space:]]*` instead of `[[:space:]]+`).
+  - `psql -c"..."` / `psql --command="..."` short/long-option-no-space
+    shapes now block.
+  - `mongo --eval "db.x.update(...)"` with whitespace inside the quoted JS
+    expression now blocks (regex no longer requires the mutation method to
+    live inside a single non-space token after `--eval`). `--eval=` shape
+    also covered.
+  - `gcloud --project=PROD sql export ...` and other variants with global
+    flags between `gcloud` and `sql` now block (regex tolerates
+    zero-or-more `--flag[=value]` tokens before the `sql` command group).
+    Extended in this release to also cover SPACE-separated global flags
+    (`--project my-prod`, `--configuration prod`,
+    `--impersonate-service-account svc@example.com`, `--account user@...`,
+    `--region us-central1`, etc.) — Greptile re-review on PR #25.
+- **`disable_if_repo_file` sentinel walks up to repo root** (Greptile PR
+  #25, P1). Previously the lookup only checked `./<sentinel>` in the
+  process cwd, so a sentinel placed at the documented location (repo
+  root) was ignored whenever the hook fired from any subdirectory. The
+  lookup now walks upward looking for a `.git` marker (file or
+  directory — worktrees use a file) and resolves the sentinel relative
+  to that root, with a cwd fallback for non-git deployments. Added
+  `hooks/test-sentinel-walkup.sh` to lock the behavior in CI.
+
+### Changed
+- `hooks/lib/eval-rule.sh` honours `disable_if_repo_file` between the
+  bypass-marker check and the match-condition loop.
+- `scripts/build-rules.mjs` validates the new field's shape at build time
+  (same kebab-validation defense-in-depth as `bypass_marker`).
+- `hooks/rules/README.md` documents the new field and the per-repo escape
+  hatch pattern. README.md "Hooks" section now lists the six rules and
+  the bypass marker.
+
+### Notes
+- 38 rules total (was 32). Tests pass (210 baseline + new inline-DB cases
+  + space-separated Cloud SQL flag cases).
+- SELECT-only reads (`SELECT`, `SHOW`, `DESCRIBE`, `EXPLAIN`, `KEYS`,
+  `GET`, `.find`, `.aggregate`, ...) remain allowed inline. The rules
+  only fire on the mutation keyword set per CLI tool.
+- Commands that START with `./scripts/`, `bash scripts/`, `./bin/`, or
+  `bash bin/` are exempted via `not_pattern` — the principle is
+  "versioned scripts: yes; inline one-shots: no". When a wrapper script
+  is the invocation surface, the sensitive payload lives in git history.
+- Memory ref: `feedback_scripts_not_db.md` (already existed for the
+  Moodle-flavoured `ssh-db-mutation` rule; this release simply expands
+  the enforcement surface).
+- **Parallel-version coordination:** originally claimed `1.17.0`; bumped
+  to `1.20.0` after rebasing onto main (which had absorbed 1.17.0–1.19.0),
+  then to `1.23.0` after PR #28 (1.21.0), #32 (1.22.0), and #29 merged
+  during the rebase window. Used `git merge origin/main --no-edit` per
+  policy memory `reference_use_merge_not_rebase_after_team_releases.md`
+  (preserves original commit history and avoids re-pushing a rewritten
+  branch onto the reviewer's diff).
+
 ## [1.22.0] - 2026-05-29
 
 ### Added

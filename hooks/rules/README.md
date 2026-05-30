@@ -24,6 +24,7 @@ Every rule is one YAML row with these fields:
       flags: i                      # optional; only "i" (case-insensitive) supported
   action: block | warn              # required
   bypass_marker: <kebab-case> | null  # optional acknowledgement token
+  disable_if_repo_file: <flat-filename>  # optional per-repo escape hatch (see below)
   memory_ref: <filename>            # optional metadata only — NOT printed at runtime
   message: |                        # required, multi-line stderr output
     Block / warning text shown when this rule fires.
@@ -58,6 +59,25 @@ the raw tool_input JSON. Bypasses are explicit acknowledgements — they sit
 inside the command/content itself, not as silent flags.
 
 `bypass_marker: null` (or omitted) means the rule cannot be bypassed.
+
+### Per-repo escape hatch (`disable_if_repo_file`)
+
+For rules that are too aggressive in specific repos (e.g., a data-migration
+repo whose entire job is to run inline DB mutations), a rule can declare a
+sentinel filename. If that file exists in the current working directory when
+the hook fires, the rule is a no-op.
+
+```yaml
+- id: inline-db-mutation-mysql
+  # ...
+  disable_if_repo_file: .no-make-no-mistakes-db-mutation
+```
+
+Then in the consuming repo, opting out is `touch .no-make-no-mistakes-db-mutation`
+at the repo root. Validation: the filename must match `^[a-zA-Z0-9._-]+$` and
+cannot be `.` or `..`, so the runtime lookup `[ -f "./<name>" ]` cannot
+escape the cwd. Use this sparingly — the bypass marker is preferred when the
+escape is per-command rather than per-repo.
 
 ## Adding a rule
 

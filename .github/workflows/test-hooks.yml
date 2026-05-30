@@ -37,3 +37,9 @@ jobs:
 
       - name: Run hook smoke tests
         run: bash hooks/test-hooks.sh
+
+      - name: Run sentinel walk-up tests
+        # Exercises the `disable_if_repo_file` lookup from subdirectories
+        # (Greptile #25 P1 regression — sentinel at repo root must be honored
+        # even when the hook fires from any nested cwd within the repo).
+        run: bash hooks/test-sentinel-walkup.sh
