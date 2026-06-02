@@ -43,43 +43,53 @@ npx @lapc506/make-no-mistakes install
 
 ## What's Inside
 
-### Commands (18)
+### Commands (24)
 
 Deliberate actions you invoke explicitly.
 
 | Command | Description |
 |---------|-------------|
-| `/make-no-mistakes:implement <ISSUE-ID>` | Disciplined execution of Linear issues — worktree isolation, all-reviewer loops, CI verification, clean merges |
-| `/make-no-mistakes:prioritize <pillar-slug>` | MoSCoW + RICE-adapted applied to a pillar's Linear issues, traceable to its PIBER+IDCF sub-spike and the latest vision audit. Outputs priority report + description-footer per issue + snapshot comment on the sub-spike. Chain: `product-vision-audit → prioritize → spike-recommend → implement` |
-| `/make-no-mistakes:rebase <repo>` | Team release sync — rebase all branches, auto-merge ready PRs, health report |
-| `/make-no-mistakes:linear-projects-setup` | Bootstrap Linear workspace with full label taxonomy, projects, and integrations |
-| `/make-no-mistakes:e2e-test-builder <source>` | Generate a TestSprite-compatible `test-suite.json` from docs or PRDs |
-| `/make-no-mistakes:e2e-test-runner [filter]` | Execute E2E tests from `test-suite.json` with runner selection and reporting |
-| `/make-no-mistakes:pentest-runner <phase>` | Automated pentesting following Cyber Kill Chain + OWASP methodology |
-| `/make-no-mistakes:goodmorning` | Bootstrap your session from previous day's handoff files |
-| `/make-no-mistakes:goodnight [label]` | Save full session context as a handoff file for tomorrow |
-| `/make-no-mistakes:pending-left` | Track what's left unfinished across git, Linear, and session context |
-| `/make-no-mistakes:summarize` | Structured recap of everything done in the current session |
-| `/make-no-mistakes:daily-standup-add-completed [text]` | Append completed work items to today's standup file (auto-detects from PRs/issues) |
-| `/make-no-mistakes:daily-standup-post-slack [draft]` | Compose and post today's standup to the configured Slack channel |
-| `/make-no-mistakes:remind <topic>` | Recall past decisions, instructions, or feedback from memory and project context |
-| `/make-no-mistakes:takeover-pr <repo> [pr#]` | Pick a random open PR from a teammate, check it out, review it, and take over the work |
-| `/make-no-mistakes:secret-input` | Stage a secret/password via OS-native GUI dialog (Linux zenity/kdialog/pinentry, macOS osascript, Windows Get-Credential). The value never appears in the conversation log or terminal history. Cross-platform via `.sh` (Linux/macOS/WSL/Git Bash) + `.ps1` (native Windows) |
-| `/make-no-mistakes:secret-use ENVVAR -- <cmd>` | Run one command with the staged secret loaded as an environment variable. Env var lives only inside the consuming process and is unset on completion |
-| `/make-no-mistakes:secret-clear` | Wipe the staged secret (shred/rm-P/random-overwrite per OS). Idempotent — safe to call when no secret is staged. Always run when done with credentials |
+| [`/make-no-mistakes:implement <ISSUE-ID>`](commands/implement.md) | Disciplined execution of Linear issues — worktree isolation, all-reviewer loops, CI verification, clean merges |
+| [`/make-no-mistakes:prioritize <pillar-slug>`](commands/prioritize.md) | MoSCoW + RICE-adapted applied to a pillar's Linear issues, traceable to its PIBER+IDCF sub-spike and the latest vision audit. Outputs priority report + description-footer per issue + snapshot comment on the sub-spike. Chain: `product-vision-audit → prioritize → spike-recommend → implement` |
+| [`/make-no-mistakes:rebase <repo>`](commands/rebase.md) | Team release sync — rebase all branches, auto-merge ready PRs, health report |
+| [`/make-no-mistakes:linear-projects-setup`](commands/linear-projects-setup.md) | Bootstrap Linear workspace with full label taxonomy, projects, and integrations |
+| [`/make-no-mistakes:e2e-test-builder <source>`](commands/e2e-test-builder.md) | Generate a TestSprite-compatible `test-suite.json` from docs or PRDs |
+| [`/make-no-mistakes:e2e-test-runner [filter]`](commands/e2e-test-runner.md) | Execute E2E tests from `test-suite.json` with runner selection and reporting |
+| [`/make-no-mistakes:pentest-runner <phase>`](commands/pentest-runner.md) | Automated pentesting following Cyber Kill Chain + OWASP methodology |
+| [`/make-no-mistakes:goodmorning`](commands/goodmorning.md) | Bootstrap your session from previous day's handoff files |
+| [`/make-no-mistakes:goodnight [label]`](commands/goodnight.md) | Save full session context as a handoff file for tomorrow |
+| [`/make-no-mistakes:pending-left`](commands/pending-left.md) | Track what's left unfinished across git, Linear, and session context |
+| [`/make-no-mistakes:summarize`](commands/summarize.md) | Structured recap of everything done in the current session |
+| [`/make-no-mistakes:daily-standup-add-completed [text]`](commands/daily-standup-add-completed.md) | Append completed work items to today's standup file (auto-detects from PRs/issues) |
+| [`/make-no-mistakes:daily-standup-post-slack [draft]`](commands/daily-standup-post-slack.md) | Compose and post today's standup to the configured Slack channel |
+| [`/make-no-mistakes:remind <topic>`](commands/remind.md) | Recall past decisions, instructions, or feedback from memory and project context |
+| [`/make-no-mistakes:takeover-pr <repo> [pr#]`](commands/takeover-pr.md) | Pick a random open PR from a teammate, check it out, review it, and take over the work |
+| [`/make-no-mistakes:secret-input`](commands/secret-input.md) | Stage a secret/password via OS-native GUI dialog (Linux zenity/kdialog/pinentry, macOS osascript, Windows Get-Credential). The value never appears in the conversation log or terminal history. Cross-platform via `.sh` (Linux/macOS/WSL/Git Bash) + `.ps1` (native Windows) |
+| [`/make-no-mistakes:secret-use ENVVAR -- <cmd>`](commands/secret-use.md) | Run one command with the staged secret loaded as an environment variable. Env var lives only inside the consuming process and is unset on completion |
+| [`/make-no-mistakes:secret-clear`](commands/secret-clear.md) | Wipe the staged secret (shred/rm-P/random-overwrite per OS). Idempotent — safe to call when no secret is staged. Always run when done with credentials |
+| [`/make-no-mistakes:domain-driven-advisor`](commands/domain-driven-advisor.md) | **Guided entry point** — inspects the repo, recommends which audit(s) to run (or the full sequence), runs them, and finishes with a premortem. Start here for repo health. |
+| [`/make-no-mistakes:audit-schema-drift`](commands/audit-schema-drift.md) | Audit for schema drift — 1NF violations + the same logical column duplicated across tables without a single source of truth |
+| [`/make-no-mistakes:premortem <plan>`](commands/premortem.md) | Stress-test a plan/launch/decision by imagining it already failed 6 months out, then work backward to expose blind spots; outputs an HTML report + Markdown transcript |
+| [`/make-no-mistakes:atomic-rules-init`](commands/atomic-rules-init.md) | Scaffold a `.atomic-design-rules.json` at the repo root so the atomic-design hooks (PreToolUse ownership enforcement + PostToolUse drift telemetry) start enforcing. No-op if the file already exists |
+| [`/make-no-mistakes:e2e-test-preview [path]`](commands/e2e-test-preview.md) | Launch a Qt-based visual previewer for `test-suite.json` — interactive table with filtering, detail pane, and CSV export (auto-installs PySide6) |
+| [`/make-no-mistakes:gemini-code-review [target]`](commands/gemini-code-review.md) | Cheap first-pass code review (one-shot via liteLLM) on a parametrizable model — Gemini 3.5 Flash by default; supports `--model` and `--adversarial`, curated against the repo's CLAUDE.md |
 
-### Skills (6)
+### Skills (10)
 
 Auto-activate by context — you don't need to remember the command name.
 
 | Skill | Triggers when you... |
 |-------|---------------------|
-| `implement-advisor` | Want to work on a Linear issue, implement a feature, or fix a bug (suggests `/make-no-mistakes:implement`) |
-| `spec-recommend` | Discuss specs, SRDs, implementation briefs, or say "what should I build" |
-| `spike-recommend` | Paste a Linear issue URL or ask to analyze an issue |
-| `review-open-prs` | Ask about open PRs, merge readiness, or Greptile scores |
-| `review-active-issues` | Ask about your Linear issues, backlog, or issue status |
-| `rebase-advisor` | Mention needing to sync branches after a release (suggests `/make-no-mistakes:rebase`) |
+| [`implement-advisor`](skills/implement-advisor/SKILL.md) | Want to work on a Linear issue, implement a feature, or fix a bug (suggests `/make-no-mistakes:implement`) |
+| [`spec-recommend`](skills/spec-recommend/SKILL.md) | Discuss specs, SRDs, implementation briefs, or say "what should I build" |
+| [`spike-recommend`](skills/spike-recommend/SKILL.md) | Paste a Linear issue URL or ask to analyze an issue |
+| [`review-open-prs`](skills/review-open-prs/SKILL.md) | Ask about open PRs, merge readiness, or Greptile scores |
+| [`review-active-issues`](skills/review-active-issues/SKILL.md) | Ask about your Linear issues, backlog, or issue status |
+| [`rebase-advisor`](skills/rebase-advisor/SKILL.md) | Mention needing to sync branches after a release (suggests `/make-no-mistakes:rebase`) |
+| [`audit-engine`](skills/audit-engine/SKILL.md) | Run any repo-health audit (schema-drift today; CDC/DDD/ARC/STR/ENF as they ship). Hybrid LLM-first detection + deterministic verification + cure-mapping |
+| [`domain-driven-advisor`](skills/domain-driven-advisor/SKILL.md) | Ask "which audit do I need?" / "where do I start with repo health?" — routes you to the right audit(s) and runs a premortem |
+| [`premortem`](skills/premortem/SKILL.md) | Say "premortem this", "what could kill this", "stress test this plan", "what am I missing", or "find the blind spots" on a plan/launch/decision |
+| [`prioritize`](skills/prioritize/SKILL.md) | Ask to "prioritize issues", "rank the backlog", "apply MoSCoW", or "RICE scoring" for a product pillar (suggests `/make-no-mistakes:prioritize`) |
 
 Skills can also be invoked explicitly: `/make-no-mistakes:spec-recommend T0-4`
 
@@ -91,6 +101,81 @@ Specialized subagents dispatched by commands/skills for heavy work.
 |-------|-------|---------------|
 | `execution-lead` | Opus | `/make-no-mistakes:implement` — runs the full protocol in its own context |
 | `pr-reviewer` | Sonnet | `review-open-prs` skill — cross-references PRs with Linear and Greptile |
+
+## Guided repo health: `/domain-driven-advisor`
+
+New to the audit family, or not sure where to start? Run **one** command and let
+it guide you. The advisor is the front door to the whole audit-engine family.
+
+### When to use it
+
+- You inherited a repo and want to know what's structurally wrong.
+- You suspect drift (duplicated columns, FE/BE validation mismatches, tangled
+  modules, a stalled monolith migration) but don't know which audit applies.
+- You want a remediation plan that's already been stress-tested.
+
+### What it does (4 steps)
+
+1. **Inspects the repo** — detects signals (a shared database, FE+backend
+   validation, a monolith mid-migration, layered architecture, cross-module
+   imports).
+2. **Asks a few plain-language questions** — no jargon required. Each answer
+   maps to one of the audits.
+3. **Recommends and runs the audit(s)** — just the ones you need, or the full
+   ordered sweep `schema → contract → DDD → architecture → strangler →
+   enforcement` if you're unsure.
+4. **Runs a premortem** — on the aggregated remediation plan, so you ship a plan
+   that already survived "it's 6 months later and this failed — why?".
+
+### Quick start
+
+```
+/make-no-mistakes:domain-driven-advisor
+```
+
+Point it at a subdirectory if you only want part of the repo:
+
+```
+/make-no-mistakes:domain-driven-advisor src/payments
+```
+
+### Example session
+
+```
+You:  /make-no-mistakes:domain-driven-advisor
+Tool: Scanning… found supabase/migrations and FE+edge validation.
+      Q1: ¿Varios equipos escriben en la misma base de datos? > yes
+      Q2: ¿El frontend y el backend validan los mismos datos por separado? > yes
+      → Recommended: /audit-schema-drift now; /audit-contract-drift (coming soon), then enforcement.
+      Tip: enable agent teams for parallel audits — add
+           "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" to ~/.claude/settings.json
+      Run them now? > yes
+      … findings written to docs/repo-health/… + premortem report on ~/Escritorio.
+```
+
+### What it produces
+
+For each audit it runs: a findings doc in `docs/repo-health/`, an OpenSpec
+remediation change, Bilingual-Layer Linear issues, and 4-cure scaffold
+proposals — plus a single premortem report (HTML + transcript) over the combined
+plan.
+
+### Faster with agent teams
+
+The audits fan out one verifier per finding, so they're much faster with a
+parallel agent team. The advisor will recommend enabling
+`"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` in `~/.claude/settings.json`
+(it shows the exact one-line change; it never edits your settings without
+consent). If you decline, it falls back to subagent-driven-development on the
+latest Opus rather than a slow sequential crawl.
+
+### Run a single audit directly
+
+If you already know what you need, skip the advisor:
+
+```
+/make-no-mistakes:audit-schema-drift
+```
 
 ## Configuration
 
@@ -215,9 +300,9 @@ make-no-mistakes-toolkit/
 │   ├── cli.ts
 │   ├── index.ts
 │   └── lib/
-├── commands/           # 14 explicit commands
+├── commands/           # 24 explicit commands
 ├── agents/             # 2 specialized subagents
-├── skills/             # 6 auto-activating skills
+├── skills/             # 10 auto-activating skills
 │   └── */SKILL.md
 ├── hooks/              # Manifest-driven PreToolUse + PostToolUse hooks (v1.5.0+)
 │   ├── hooks.json      # Claude Code wiring (thin)

@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/DojoCodingLabs/make-no-mistakes-toolkit/main/schemas/audit-report-schema.schema.json",
+  "title": "Audit Report",
+  "type": "object",
+  "required": ["family", "repo", "stack", "date", "engine_version", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "family": { "enum": ["SCH", "CDC", "DDD", "ARC", "STR", "ENF"] },
+    "repo": { "type": "string" },
+    "stack": { "type": "string" },
+    "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "engine_version": { "type": "string" },
+    "findings": { "type": "array", "items": { "$ref": "#/definitions/finding" } }
+  },
+  "definitions": {
+    "finding": {
+      "type": "object",
+      "required": ["id", "title", "severity", "anti_pattern", "evidence", "cure_map", "confidence"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^(SCH|CDC|DDD|ARC|STR|ENF)-[0-9]{3}$" },
+        "title": { "type": "string" },
+        "severity": { "enum": ["blocker", "high", "medium", "low", "advisory"] },
+        "anti_pattern": { "type": "string" },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["file"],
+            "additionalProperties": false,
+            "properties": {
+              "file": { "type": "string" },
+              "line": { "type": "integer" },
+              "snippet": { "type": "string" }
+            }
+          }
+        },
+        "owner": { "type": "string" },
+        "cure_map": { "type": "array", "items": { "enum": ["ownership", "ci_guard", "agent_rule", "hook"] } },
+        "exemption": { "type": "string" },
+        "confidence": { "enum": ["confirmed", "probable", "unverified"] }
+      }
+    }
+  }
+}
