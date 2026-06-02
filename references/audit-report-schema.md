@@ -47,12 +47,11 @@ only so the namespace stays globally unique across the toolkit family.
 | `low`      | Minor; opportunistic fix.                                            |
 | `advisory` | Informational; no action required yet.                               |
 
-This ladder is aligned with the **advisory → blocking promotion** policy in
-[`docs/repo-health/governance.md`](../docs/repo-health/governance.md): findings begin
-their life as `advisory` and are promoted up the ladder (ultimately to `blocker`,
-where they become CI-blocking) per the governance cadence. Severity is therefore a
-*governed* field — the engine emits an initial severity, but governance owns
-promotion.
+This ladder is aligned with the **advisory → blocking promotion** policy in the
+repo-health governance policy (forthcoming): findings begin their life as `advisory`
+and are promoted up the ladder (ultimately to `blocker`, where they become
+CI-blocking) per the governance cadence. Severity is therefore a *governed* field —
+the engine emits an initial severity, but governance owns promotion.
 
 ---
 

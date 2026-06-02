@@ -3,6 +3,8 @@ import Ajv from "ajv";
 import schema from "../../schemas/audit-report-schema.schema.json";
 import type { AuditReport } from "./types";
 
+const validate = new Ajv().compile(schema);
+
 const sample: AuditReport = {
   family: "SCH",
   repo: "dojo-os",
@@ -24,15 +26,17 @@ const sample: AuditReport = {
 
 describe("audit-report contract", () => {
   it("validates a well-formed report", () => {
-    const ajv = new Ajv();
-    const validate = ajv.compile(schema);
     expect(validate(sample)).toBe(true);
   });
 
   it("rejects a report with an unknown severity", () => {
-    const ajv = new Ajv();
-    const validate = ajv.compile(schema);
     const bad = { ...sample, findings: [{ ...sample.findings[0], severity: "nope" }] };
+    expect(validate(bad)).toBe(false);
+  });
+
+  it("rejects a finding missing a required field", () => {
+    const { evidence: _evidence, ...findingWithoutEvidence } = sample.findings[0];
+    const bad = { ...sample, findings: [findingWithoutEvidence] };
     expect(validate(bad)).toBe(false);
   });
 });
