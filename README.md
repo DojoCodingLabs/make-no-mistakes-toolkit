@@ -43,7 +43,7 @@ npx @lapc506/make-no-mistakes install
 
 ## What's Inside
 
-### Commands (20)
+### Commands (24)
 
 Deliberate actions you invoke explicitly.
 
@@ -69,8 +69,12 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:secret-clear`](commands/secret-clear.md) | Wipe the staged secret (shred/rm-P/random-overwrite per OS). Idempotent — safe to call when no secret is staged. Always run when done with credentials |
 | [`/make-no-mistakes:domain-driven-advisor`](commands/domain-driven-advisor.md) | **Guided entry point** — inspects the repo, recommends which audit(s) to run (or the full sequence), runs them, and finishes with a premortem. Start here for repo health. |
 | [`/make-no-mistakes:audit-schema-drift`](commands/audit-schema-drift.md) | Audit for schema drift — 1NF violations + the same logical column duplicated across tables without a single source of truth |
+| [`/make-no-mistakes:premortem <plan>`](commands/premortem.md) | Stress-test a plan/launch/decision by imagining it already failed 6 months out, then work backward to expose blind spots; outputs an HTML report + Markdown transcript |
+| [`/make-no-mistakes:atomic-rules-init`](commands/atomic-rules-init.md) | Scaffold a `.atomic-design-rules.json` at the repo root so the atomic-design hooks (PreToolUse ownership enforcement + PostToolUse drift telemetry) start enforcing. No-op if the file already exists |
+| [`/make-no-mistakes:e2e-test-preview [path]`](commands/e2e-test-preview.md) | Launch a Qt-based visual previewer for `test-suite.json` — interactive table with filtering, detail pane, and CSV export (auto-installs PySide6) |
+| [`/make-no-mistakes:gemini-code-review [target]`](commands/gemini-code-review.md) | Cheap first-pass code review (one-shot via liteLLM) on a parametrizable model — Gemini 3.5 Flash by default; supports `--model` and `--adversarial`, curated against the repo's CLAUDE.md |
 
-### Skills (8)
+### Skills (10)
 
 Auto-activate by context — you don't need to remember the command name.
 
@@ -84,6 +88,8 @@ Auto-activate by context — you don't need to remember the command name.
 | [`rebase-advisor`](skills/rebase-advisor/SKILL.md) | Mention needing to sync branches after a release (suggests `/make-no-mistakes:rebase`) |
 | [`audit-engine`](skills/audit-engine/SKILL.md) | Run any repo-health audit (schema-drift today; CDC/DDD/ARC/STR/ENF as they ship). Hybrid LLM-first detection + deterministic verification + cure-mapping |
 | [`domain-driven-advisor`](skills/domain-driven-advisor/SKILL.md) | Ask "which audit do I need?" / "where do I start with repo health?" — routes you to the right audit(s) and runs a premortem |
+| [`premortem`](skills/premortem/SKILL.md) | Say "premortem this", "what could kill this", "stress test this plan", "what am I missing", or "find the blind spots" on a plan/launch/decision |
+| [`prioritize`](skills/prioritize/SKILL.md) | Ask to "prioritize issues", "rank the backlog", "apply MoSCoW", or "RICE scoring" for a product pillar (suggests `/make-no-mistakes:prioritize`) |
 
 Skills can also be invoked explicitly: `/make-no-mistakes:spec-recommend T0-4`
 
@@ -140,7 +146,7 @@ You:  /make-no-mistakes:domain-driven-advisor
 Tool: Scanning… found supabase/migrations and FE+edge validation.
       Q1: ¿Varios equipos escriben en la misma base de datos? > yes
       Q2: ¿El frontend y el backend validan los mismos datos por separado? > yes
-      → Recommended: /audit-schema-drift, /audit-contract-drift, then enforcement.
+      → Recommended: /audit-schema-drift now; /audit-contract-drift (coming soon), then enforcement.
       Tip: enable agent teams for parallel audits — add
            "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" to ~/.claude/settings.json
       Run them now? > yes
@@ -294,9 +300,9 @@ make-no-mistakes-toolkit/
 │   ├── cli.ts
 │   ├── index.ts
 │   └── lib/
-├── commands/           # 20 explicit commands
+├── commands/           # 24 explicit commands
 ├── agents/             # 2 specialized subagents
-├── skills/             # 8 auto-activating skills
+├── skills/             # 10 auto-activating skills
 │   └── */SKILL.md
 ├── hooks/              # Manifest-driven PreToolUse + PostToolUse hooks (v1.5.0+)
 │   ├── hooks.json      # Claude Code wiring (thin)
