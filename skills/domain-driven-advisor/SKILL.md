@@ -62,10 +62,12 @@ Apply `recommendAudits()` semantics to the resolved signals to produce the
 signals → full sweep).
 
 **Only offer audits whose command currently exists.** Today those are
-`/audit-schema-drift` (`SCH`), `/audit-contract-drift` (`CDC`), and `/audit-ddd`
-(`DDD`). The remaining families (`ARC`, `STR`, `ENF`) are **"coming soon"** until
-their follow-up plan ships — list them in the recommended order so the user sees
-the full picture, but mark them unavailable and do not attempt to run them.
+`/audit-schema-drift` (`SCH`), `/audit-contract-drift` (`CDC`), `/audit-ddd`
+(`DDD`), and `/audit-explicit-architecture` (`ARC`) — all **LIVE**. The remaining
+families (`STR`, `ENF`) are **"coming soon"** until their follow-up plan ships —
+list them in the recommended order so the user sees the full picture, but mark
+them unavailable and do not attempt to run them. (live: SCH/CDC/DDD/ARC; coming
+soon: STR/ENF)
 
 ---
 
