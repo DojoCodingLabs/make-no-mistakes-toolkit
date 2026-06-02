@@ -61,11 +61,11 @@ Apply `recommendAudits()` semantics to the resolved signals to produce the
 **ordered set** (canonical order `SCH → CDC → DDD → ARC → STR → ENF`; empty
 signals → full sweep).
 
-**Only offer audits whose command currently exists.** Today that is just
-`/audit-schema-drift` (`SCH`). The other families (`CDC`, `DDD`, `ARC`, `STR`,
-`ENF`) are **"coming soon"** until their follow-up plan ships — list them in the
-recommended order so the user sees the full picture, but mark them unavailable
-and do not attempt to run them.
+**Only offer audits whose command currently exists.** Today those are
+`/audit-schema-drift` (`SCH`) and `/audit-contract-drift` (`CDC`). The other
+families (`DDD`, `ARC`, `STR`, `ENF`) are **"coming soon"** until their follow-up
+plan ships — list them in the recommended order so the user sees the full
+picture, but mark them unavailable and do not attempt to run them.
 
 ---
 
