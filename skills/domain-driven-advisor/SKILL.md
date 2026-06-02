@@ -63,11 +63,11 @@ signals → full sweep).
 
 **Only offer audits whose command currently exists.** Today those are
 `/audit-schema-drift` (`SCH`), `/audit-contract-drift` (`CDC`), `/audit-ddd`
-(`DDD`), and `/audit-explicit-architecture` (`ARC`) — all **LIVE**. The remaining
-families (`STR`, `ENF`) are **"coming soon"** until their follow-up plan ships —
-list them in the recommended order so the user sees the full picture, but mark
-them unavailable and do not attempt to run them. (live: SCH/CDC/DDD/ARC; coming
-soon: STR/ENF)
+(`DDD`), `/audit-explicit-architecture` (`ARC`), and `/audit-strangler` (`STR`) —
+all **LIVE**. The remaining family (`ENF`) is **"coming soon"** until its
+follow-up plan ships — list it in the recommended order so the user sees the full
+picture, but mark it unavailable and do not attempt to run it. (live:
+SCH/CDC/DDD/ARC/STR; coming soon: ENF)
 
 ---
 
