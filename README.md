@@ -294,9 +294,9 @@ make-no-mistakes-toolkit/
 │   ├── cli.ts
 │   ├── index.ts
 │   └── lib/
-├── commands/           # 14 explicit commands
+├── commands/           # 20 explicit commands
 ├── agents/             # 2 specialized subagents
-├── skills/             # 6 auto-activating skills
+├── skills/             # 8 auto-activating skills
 │   └── */SKILL.md
 ├── hooks/              # Manifest-driven PreToolUse + PostToolUse hooks (v1.5.0+)
 │   ├── hooks.json      # Claude Code wiring (thin)
