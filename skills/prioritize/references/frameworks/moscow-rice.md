@@ -157,17 +157,36 @@ Probable causa: spike sin IDCF parseable, o keyword detection demasiado estricta
 
 Poco probable pero posible si todos son same-size + same-thesis-count + same-confidence. En ese caso el tiebreak por issue.identifier da orden estable. Log en Appendix del report.
 
-### Edge 4: pillar sin project Linear asociado
+### Edge 4: positional scope arg cannot be resolved
 
-Probable config error. Exit 1 con mensaje: "Pillar '<slug>' has no `project` field in linear-setup.json. Either add it or switch to interactive mode."
+Posicional arg no matchea `pillars.<slug>`, `projects.<slug>`, ni un Linear
+project name via MCP. Exit 1 with: "Scope '<arg>' could not be resolved. Pass
+--label, --filter, or pick from the available Linear projects: <list>."
 
-### Edge 5: codebase existe pero `audits/<pillar>/` no
+### Edge 5: legacy pillar mode + codebase existe pero `audits/<pillar>/` no
 
-Comportamiento: proceder sin audit (Confidence=0.8 default). Warn + sugerir `/business-model-toolkit:product-vision-audit`.
+Comportamiento: proceder sin audit (Confidence=0.8 default). Warn + sugerir
+`/business-model-toolkit:product-vision-audit`.
 
-### Edge 6: codebase path no existe
+### Edge 6: legacy pillar mode + codebase path no existe
 
-Exit 1: "Codebase path '<path>' does not exist. Check linear-setup.json `pillars.<slug>.codebase` o pasa --codebase override."
+Exit 1: "Codebase path '<path>' does not exist. Check linear-setup.json
+`pillars.<slug>.codebase` o pasa --codebase override."
+
+### Edge 7: agnostic mode con --evidence y --audit ausentes
+
+Permitido. RICE Confidence default 0.8, MoSCoW corre con label-driven rules
+solamente. El executive summary del report anota "Run without product-vision
+grounding — verdicts derived from labels + LLM fallback only." Esto no es un
+error, pero el reader debe interpretar los Musts con mas escepticismo.
+
+### Edge 8: agnostic mode con --evidence apuntando a archivo no-IDCF
+
+Si `subagent-2` retorna `{parsed: false, raw: "<text>"}`, el rule engine usa
+keyword matching sobre `raw` (la regex de Section "Keyword detection heuristics"
+de scoring-rules.md sigue funcionando) pero NO puede citar
+thesis_id/feature_tier explicitos. Los matches se etiquetan
+`cited_evidence: "freeform"` + flag `low-confidence-estimate`.
 
 ## Testing
 

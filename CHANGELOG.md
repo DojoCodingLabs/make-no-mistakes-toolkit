@@ -18,6 +18,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`/make-no-mistakes:prioritize` is now workspace-agnostic.** Drops four hard
+  couplings from the original dogfood design while preserving full backward
+  compatibility with `pillars.<slug>` configs:
+  - **Scope**: the first positional arg is now optional. Resolution order is
+    `pillars.<slug>` (legacy) → `projects.<slug>` (agnostic) → Linear MCP
+    `list_projects` exact-name match → interactive. Two new alternative
+    scope flags: `--label <name>` and `--filter <query>`.
+  - **Evidence anchor**: the required PIBER+IDCF sub-spike is now optional via
+    `--evidence <path-or-issue-id>`. Accepts a Linear issue ID OR a local
+    markdown path. Without it, evidence-driven MoSCoW rules are skipped and
+    RICE Confidence defaults to 0.8. Label-driven rules and LLM fallback
+    continue to work.
+  - **Vision audit**: auto-discovery at `<codebase>/audits/<pillar>/vision-audit-*.md`
+    only fires in legacy pillar mode. Agnostic mode requires the explicit
+    `--audit <path>` flag (no flag → no audit enrichment).
+  - **Output path**: default is now `./priority-<YYYY-MM-DD>.md` in cwd, with
+    `~/` expansion when `--out <path>` is provided. Legacy pillar mode keeps
+    the original `<codebase>/audits/<pillar>/priority-<DATE>.md` default.
+  - **Snapshot comment artifact**: posted on the `--evidence` Linear issue
+    when evidence is an issue ID; skipped when evidence is a local file or
+    absent. Legacy pillar mode continues to post on `pillars.<slug>.spike`.
+  - **MoSCoW rule split**: scoring rules are now annotated as
+    *evidence-driven* (skip when no anchor) vs *label-driven* (always fire).
+    New label-driven rules added for explicit `moscow/{must,should,could,wont}`
+    labels so that workspaces using MoSCoW labels directly get deterministic
+    coverage without needing an evidence anchor.
+
+  Rationale: the original command was opinionated against a pillar taxonomy
+  that does not exist in typical Linear workspaces (per Andrés analysis,
+  2026-06-02). Dogfood configs continue to work unchanged.
+
 ## [1.23.0] - 2026-05-29
 
 ### Added

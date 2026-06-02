@@ -106,22 +106,30 @@ Context + Acceptance criteria intactos. Solo el bloque de priority cambio.
 ## Priority report template
 
 Filename: `priority-<YYYY-MM-DD>.md`
-Path: `<codebase>/audits/<pillar>/priority-<YYYY-MM-DD>.md`
+Path (default agnostic mode): `./priority-<YYYY-MM-DD>.md` in cwd.
+Path (legacy pillar mode): `<codebase>/audits/<pillar>/priority-<YYYY-MM-DD>.md`.
+Override either with `--out <path>` (supports `~/`).
 
 ### Template completo
 
+Fields shown as `<…>` are required; fields shown as `<… or "n/a">` collapse to
+`"n/a"` (or `"none"` / `"absent"`) when the corresponding flag/config is
+absent. In agnostic mode without `--evidence`, the `Evidence anchor` line
+collapses to `none`. In agnostic mode without a pillar, the `Scope` line
+shows the project / label / filter that was used.
+
 ```markdown
-# Priority Snapshot -- <Pillar Title>
+# Priority Snapshot -- <Scope Title>
 
 **Framework**: MoSCoW + RICE (Reach × Impact × Confidence / Size)
-**Pillar**: <pillar-slug>
-**Sub-spike**: [<APP-XXXX>](<spike url>) -- <spike title>
-**Project Linear**: [<project-name>](<project url>)
+**Scope**: <pillar-slug | project-name | label:<name> | filter:<query>>
+**Evidence anchor**: [<APP-XXXX>](<url>) -- <title>  |  <local-path>  |  none
+**Project Linear**: [<project-name>](<project url>)  |  n/a
 **Vision audit**: <path or "none">  (alineacion: <FUERTE|PARCIAL|DEBIL|CRITICO|N/A>)
 **Issues evaluated**: <N>
 **Fecha**: YYYY-MM-DD
 **Previous snapshot**: <path to prev or "first snapshot">
-**Command**: `/make-no-mistakes:prioritize <pillar> <flags>`
+**Command**: `/make-no-mistakes:prioritize <args>`
 
 ---
 
@@ -201,13 +209,21 @@ First priority snapshot. No comparison available.
 
 ---
 
-## Sub-spike comment template
+## Evidence-anchor comment template
+
+(Originally "Sub-spike comment template" — generalized for workspace-agnostic
+mode.)
 
 ### Target
 
-El spike del pillar: `pillars.<slug>.spike` (ej: APP-101 para mobile).
+- **Agnostic mode**: the Linear issue passed as `--evidence` IF it is a Linear
+  issue ID (not a local file). Example: `--evidence APP-101`.
+- **Legacy pillar mode**: `pillars.<slug>.spike` (e.g. APP-101 for mobile).
+- **Skipped**: when evidence is a local file or absent entirely. The report is
+  still written and serves as the sole snapshot artifact for that run.
 
-**NO** postear en el spike maestro APP-001 (constitucion umbrella, si aplica).
+**Do NOT** post on a master umbrella spike (e.g. APP-001) when a more
+specific anchor exists.
 
 ### Formato
 

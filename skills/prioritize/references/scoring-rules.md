@@ -1,10 +1,31 @@
 # MoSCoW Scoring Rules -- deterministic bucket assignment
 
-Tabla deterministica que mapea un issue a su MoSCoW bucket aplicando reglas contra el sub-spike PIBER+IDCF del pillar. Las reglas se evaluan en orden. **La primera regla que matchea gana**.
+Tabla deterministica que mapea un issue a su MoSCoW bucket aplicando reglas en
+orden. **La primera regla que matchea gana**.
 
-Un issue matchea una regla cuando:
-- Su `title` o `description` contiene keywords del target del spike (thesis/feature/capability/antipattern), O
-- Un label del issue cita explicitamente el target (ej: label `thesis/D1`, `feature/P0`).
+Las reglas se dividen en dos familias:
+
+- **Evidence-driven rules** (fire only when `--evidence` was provided — a
+  Linear issue ID, e.g. a PIBER+IDCF sub-spike, OR a local markdown doc). Cite
+  thesis / feature / capability / anti-pattern from the anchor.
+- **Label-driven rules** (always fire — anchor-independent). Cite labels,
+  Size, priority, and phase locks.
+
+An issue matches an evidence-driven rule when:
+- Its `title` or `description` contains keywords from the anchor target
+  (thesis/feature/capability/antipattern), OR
+- A label on the issue explicitly cites the target (e.g. `thesis/D1`,
+  `feature/P0`).
+
+An issue matches a label-driven rule when the declared condition holds (Size
+label, literal label, lock file in the codebase, etc.). These rules do not
+require an anchor.
+
+**Workspace-agnostic mode**: when `--evidence` is NOT provided, all
+evidence-driven rules are skipped automatically. The issue falls through to
+label-driven rules; if those also don't match, it lands in UNCLASSIFIED → LLM
+fallback. The final report notes the absence of an anchor in the executive
+summary.
 
 ## Orden de evaluacion
 
@@ -31,92 +52,143 @@ Un issue matchea una regla cuando:
 
 ## MUST (killshot + P0 + audit violations)
 
-Cada regla en orden:
+Each rule in order. MUST-1 through MUST-4 are **evidence-driven** (skipped when
+no `--evidence` was provided). MUST-5 is **label-driven** (always fires).
 
-### MUST-1: killshot-thesis-match
+### MUST-1: killshot-thesis-match (evidence-driven)
 
-- Condition: issue menciona thesis #N, Y spike declara thesis #N con ⚠️ (killshot).
-- Additional: audit status de la thesis != "OK" (i.e., hay trabajo pendiente).
-- Match: cita `thesis_id`, `killshot: true`, `audit_status`.
+- Condition: issue mentions thesis #N, AND the anchor declares thesis #N with
+  ⚠️ (killshot).
+- Additional: audit status of the thesis != "OK" (i.e., pending work).
+- Match: cite `thesis_id`, `killshot: true`, `audit_status`.
 - `matched_rules: ["must/killshot-thesis-match"]`
 
-### MUST-2: anti-pattern-violation
+### MUST-2: anti-pattern-violation (evidence-driven)
 
-- Condition: issue describe resolver un anti-pattern del spike, Y audit detecto VIOLATION.
-- Match: cita `antipattern_name`, `audit_status: "VIOLATION"`.
+- Condition: issue describes resolving an anti-pattern from the anchor, AND
+  audit detected VIOLATION.
+- Match: cite `antipattern_name`, `audit_status: "VIOLATION"`.
 - `matched_rules: ["must/anti-pattern-violation"]`
 
-### MUST-3: north-star-instrumentation
+### MUST-3: north-star-instrumentation (evidence-driven)
 
-- Condition: issue implementa instrumentacion de la metric North Star del spike, Y audit status es MISSING.
-- Match: cita `north_star_metric`.
+- Condition: issue implements instrumentation of the North Star metric from the
+  anchor, AND audit status is MISSING.
+- Match: cite `north_star_metric`.
 - `matched_rules: ["must/north-star-instrumentation"]`
 
-### MUST-4: feature-p0-missing-or-partial
+### MUST-4: feature-p0-missing-or-partial (evidence-driven)
 
-- Condition: issue implementa Feature P0 del spike, Y audit status != "SHIPPED" (o no hay audit).
-- Match: cita `feature_name`, `feature_tier: "P0"`, `audit_status`.
+- Condition: issue implements a Feature P0 from the anchor, AND audit status
+  != "SHIPPED" (or there is no audit).
+- Match: cite `feature_name`, `feature_tier: "P0"`, `audit_status`.
 - `matched_rules: ["must/feature-p0-missing-or-partial"]`
+
+### MUST-5: explicit-must-label (label-driven)
+
+- Condition: issue carries an explicit MoSCoW Must label
+  (`moscow/must`, `priority/must`, `MoSCoW: Must`, or the emoji-prefixed
+  equivalent if the workspace uses one).
+- Match: cite the literal label string.
+- `matched_rules: ["must/explicit-must-label"]`
 
 ---
 
 ## SHOULD (soft theses + P1 + build-capability)
 
-### SHOULD-1: soft-thesis-match
+SHOULD-1 through SHOULD-3 are **evidence-driven**. SHOULD-4 is
+**label-driven**.
 
-- Condition: issue avanza una Design Thesis NO marcada con ⚠️, Y audit status != "OK".
-- Match: cita `thesis_id`, `killshot: false`.
+### SHOULD-1: soft-thesis-match (evidence-driven)
+
+- Condition: issue advances a Design Thesis NOT marked with ⚠️, AND audit
+  status != "OK".
+- Match: cite `thesis_id`, `killshot: false`.
 - `matched_rules: ["should/soft-thesis-match"]`
 
-### SHOULD-2: feature-p1-missing-or-partial
+### SHOULD-2: feature-p1-missing-or-partial (evidence-driven)
 
-- Condition: issue implementa Feature P1 del spike, Y audit status != "SHIPPED".
+- Condition: issue implements a Feature P1 from the anchor, AND audit status
+  != "SHIPPED".
 - `matched_rules: ["should/feature-p1-missing-or-partial"]`
 
-### SHOULD-3: build-capability-missing
+### SHOULD-3: build-capability-missing (evidence-driven)
 
-- Condition: issue cubre una Capability marcada `Build` en el spike con audit status MISSING o PARTIAL.
-- Match: cita `capability_name`.
+- Condition: issue covers a Capability marked `Build` in the anchor with audit
+  status MISSING or PARTIAL.
+- Match: cite `capability_name`.
 - `matched_rules: ["should/build-capability-missing"]`
+
+### SHOULD-4: explicit-should-label (label-driven)
+
+- Condition: issue carries an explicit MoSCoW Should label
+  (`moscow/should`, `priority/should`, etc.).
+- Match: cite the literal label string.
+- `matched_rules: ["should/explicit-should-label"]`
 
 ---
 
 ## COULD (P2 + buy-partner + UX)
 
-### COULD-1: feature-p2
+COULD-1 and COULD-2 are **evidence-driven**. COULD-3 and COULD-4 are
+**label-driven**.
 
-- Condition: issue implementa Feature P2 del spike.
+### COULD-1: feature-p2 (evidence-driven)
+
+- Condition: issue implements a Feature P2 from the anchor.
 - `matched_rules: ["could/feature-p2"]`
 
-### COULD-2: buy-partner-capability
+### COULD-2: buy-partner-capability (evidence-driven)
 
-- Condition: issue cubre una Capability marcada `Buy` o `Partner` (no `Build`).
+- Condition: issue covers a Capability marked `Buy` or `Partner` (not
+  `Build`).
 - `matched_rules: ["could/buy-partner-capability"]`
 
-### COULD-3: ux-improvement-no-thesis
+### COULD-3: ux-improvement-no-anchor-match (label-driven)
 
-- Condition: issue.labels contiene `ux`, `perf`, o `improvement`, Y NO matchea ninguna thesis ni feature tier.
-- `matched_rules: ["could/ux-improvement-no-thesis"]`
+- Condition: `issue.labels` contains `ux`, `perf`, or `improvement`, AND no
+  evidence-driven rule matched (or no evidence provided).
+- `matched_rules: ["could/ux-improvement-no-anchor-match"]`
+
+### COULD-4: explicit-could-label (label-driven)
+
+- Condition: issue carries an explicit MoSCoW Could label
+  (`moscow/could`, `priority/could`, etc.).
+- Match: cite the literal label string.
+- `matched_rules: ["could/explicit-could-label"]`
 
 ---
 
 ## WONT (P3 + out-of-scope + phase-conflict)
 
-### WONT-1: feature-p3
+WONT-1 and WONT-2 are **evidence-driven**. WONT-3 and WONT-4 are
+**label-driven**.
 
-- Condition: issue implementa Feature P3 del spike.
+### WONT-1: feature-p3 (evidence-driven)
+
+- Condition: issue implements a Feature P3 from the anchor.
 - `matched_rules: ["wont/feature-p3"]`
 
-### WONT-2: out-of-scope-explicit
+### WONT-2: out-of-scope-explicit (evidence-driven)
 
-- Condition: spike tiene seccion `Out of scope` y el issue cae ahi por title/description.
+- Condition: anchor has an `Out of scope` section and the issue lands there by
+  title/description.
 - `matched_rules: ["wont/out-of-scope-explicit"]`
 
-### WONT-3: phase-conflict
+### WONT-3: phase-conflict (label-driven)
 
-- Condition: el codebase tiene phase-lock (ej: `.claude/ship-gate.lock`, `.claude/design-freeze.lock`), Y el issue es una Feature nueva (no Bug, no Chore).
-- Match: cita el lock file y la razon del spike.
+- Condition: the codebase has a phase-lock (e.g. `.claude/ship-gate.lock`,
+  `.claude/design-freeze.lock`), AND the issue is a new Feature (not Bug, not
+  Chore).
+- Match: cite the lock file and (when available) the anchor reason.
 - `matched_rules: ["wont/phase-conflict"]`
+
+### WONT-4: explicit-wont-label (label-driven)
+
+- Condition: issue carries an explicit MoSCoW Won't label
+  (`moscow/wont`, `priority/wont`, etc.).
+- Match: cite the literal label string.
+- `matched_rules: ["wont/explicit-wont-label"]`
 
 ---
 
@@ -131,7 +203,12 @@ Si >= 0.6 -> asignar el bucket sugerido + anotar `matched_rules: ["llm-fallback"
 
 ## Keyword detection heuristics
 
-Cuando el issue NO tiene labels explicitos (ej: `thesis/D1`), buscar keywords del spike:
+These heuristics only apply when an `--evidence` anchor was provided. In
+workspace-agnostic runs without an anchor, keyword detection is skipped and the
+rule engine relies on label-driven rules + the LLM fallback.
+
+When the issue does NOT carry explicit labels (e.g. `thesis/D1`), search for
+anchor keywords:
 
 - **Thesis match**: buscar en title/description substrings del statement de la thesis. Ejemplo: thesis "Must require certification exam with human judge attestation" -> keywords `certification exam`, `human judge`, `Black Belt`, `attestor`, `attestation`.
 - **Feature match**: buscar el feature name literal. Ejemplo: feature "Core Pathway engine" -> keywords `Pathway engine`, `pathway core`, `Pathway schema`.
