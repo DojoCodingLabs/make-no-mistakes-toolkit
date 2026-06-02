@@ -13,3 +13,8 @@ slack-config.json
 # hooks/rules/README.md (the latter documents the IP-leak guard format —
 # opt-in list of client/org names that must never appear in rules.yaml).
 .private/
+
+# Agent / git worktrees (transient, never committed)
+.claude/worktrees/
+.worktrees/
+.wt-*/

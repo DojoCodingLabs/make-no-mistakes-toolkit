@@ -18,6 +18,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-06-02
+
+### Added
+- `/audit-enforcement-hooks` (`ENF`) — the Cure-4 coverage meta-audit: detects absent or misconfigured PreToolUse/PostToolUse enforcement hooks, missing rules config, and structural rules with no hook backing them (closes the detection→enforcement loop). Adds the `findHookCoverageGaps` verifier.
+
+### Changed
+- All six audit families are now live in `/domain-driven-advisor` (no more "coming soon"); the `audit-engine` skill description and example session reflect the full family.
+- Reconciled the version displays (README `**Version:**` header and `.claude-plugin/marketplace.json`) and refreshed the marketplace command/skill counts.
+
+## [1.28.0] - 2026-06-02
+
+### Added
+- `/audit-strangler` (`STR`) — Strangler-Fig migration-health audit for monolith→microservices work (façade, incremental cutover vs big-bang, coexistence, legacy retirement). Adds the `assessStranglerHealth` verifier.
+
+## [1.27.0] - 2026-06-02
+
+### Added
+- `/audit-explicit-architecture` (`ARC`) — Explicit Architecture audit (Graça: Hexagonal / Onion / Clean / CQRS); the deterministic core enforces the dependency rule (source dependencies must point inward). Adds the `findDependencyRuleViolations` verifier.
+
+## [1.26.0] - 2026-06-02
+
+### Added
+- `/audit-ddd` (`DDD`) — bounded-context boundary audit (cross-context imports, domain purity, ubiquitous-language drift). Adds the `findCrossContextImports` verifier.
+
+## [1.25.0] - 2026-06-02
+
+### Added
+- `/audit-contract-drift` (`CDC`) — consumer-driven-contract drift audit (producer↔consumer validation schemas that have silently diverged). Adds the `diffValidationSchemas` verifier.
+
+## [1.24.0] - 2026-06-02
+
+### Added
+- **Audit-engine foundation.** Shared report contract (`schemas/audit-report-schema.schema.json` + `references/audit-report-schema.md` — the SSOT), the `audit-engine` skill (hybrid LLM-first detection → deterministic + adversarial verification → cure-mapping → four-target emission), `/audit-schema-drift` (`SCH` — 1NF + DRY duplicated-column detection via `findDuplicatedColumns`), and `/domain-driven-advisor` (guided router that recommends which audit(s) to run, then runs a premortem on the aggregated remediation plan).
+
+### Changed
+- README "What's Inside" now links every command and skill to its source file; added the `## Guided repo health: /domain-driven-advisor` teaching section.
+
 ## [1.23.0] - 2026-05-29
 
 ### Added
@@ -599,7 +636,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.21.0...HEAD
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.29.0...HEAD
+[1.29.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.29.0
+[1.28.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.28.0
+[1.27.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.27.0
+[1.26.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.26.0
+[1.25.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.25.0
+[1.24.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.24.0
+[1.23.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.23.0
+[1.22.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.22.0
 [1.21.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.21.0
 [1.14.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.14.0
 [1.12.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.12.0
