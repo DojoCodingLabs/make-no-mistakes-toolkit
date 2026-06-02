@@ -43,7 +43,7 @@ npx @lapc506/make-no-mistakes install
 
 ## What's Inside
 
-### Commands (28)
+### Commands (29)
 
 Deliberate actions you invoke explicitly.
 
@@ -73,6 +73,7 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:audit-ddd`](commands/audit-ddd.md) | Audit DDD bounded-context boundaries — cross-context imports, domain purity, ubiquitous-language drift |
 | [`/make-no-mistakes:audit-explicit-architecture`](commands/audit-explicit-architecture.md) | Audit Explicit Architecture (Graça) — Hexagonal/Onion/Clean dependency rule, ports & adapters, CQRS separation |
 | [`/make-no-mistakes:audit-strangler`](commands/audit-strangler.md) | Audit Strangler-Fig migration health — façade, incremental cutover vs big-bang, coexistence, legacy retirement |
+| [`/make-no-mistakes:audit-enforcement-hooks`](commands/audit-enforcement-hooks.md) | Audit Cure-4 enforcement-hook coverage — are the PreToolUse/PostToolUse hooks that prevent the other audits' drift actually installed? |
 | [`/make-no-mistakes:premortem <plan>`](commands/premortem.md) | Stress-test a plan/launch/decision by imagining it already failed 6 months out, then work backward to expose blind spots; outputs an HTML report + Markdown transcript |
 | [`/make-no-mistakes:atomic-rules-init`](commands/atomic-rules-init.md) | Scaffold a `.atomic-design-rules.json` at the repo root so the atomic-design hooks (PreToolUse ownership enforcement + PostToolUse drift telemetry) start enforcing. No-op if the file already exists |
 | [`/make-no-mistakes:e2e-test-preview [path]`](commands/e2e-test-preview.md) | Launch a Qt-based visual previewer for `test-suite.json` — interactive table with filtering, detail pane, and CSV export (auto-installs PySide6) |
@@ -90,7 +91,7 @@ Auto-activate by context — you don't need to remember the command name.
 | [`review-open-prs`](skills/review-open-prs/SKILL.md) | Ask about open PRs, merge readiness, or Greptile scores |
 | [`review-active-issues`](skills/review-active-issues/SKILL.md) | Ask about your Linear issues, backlog, or issue status |
 | [`rebase-advisor`](skills/rebase-advisor/SKILL.md) | Mention needing to sync branches after a release (suggests `/make-no-mistakes:rebase`) |
-| [`audit-engine`](skills/audit-engine/SKILL.md) | Run any repo-health audit (schema-drift + contract-drift + ddd + explicit-architecture + strangler today; ENF as it ships). Hybrid LLM-first detection + deterministic verification + cure-mapping |
+| [`audit-engine`](skills/audit-engine/SKILL.md) | Run any of the six repo-health audits (schema-drift, contract-drift, ddd, explicit-architecture, strangler, enforcement-hooks). Hybrid LLM-first detection + deterministic verification + cure-mapping |
 | [`domain-driven-advisor`](skills/domain-driven-advisor/SKILL.md) | Ask "which audit do I need?" / "where do I start with repo health?" — routes you to the right audit(s) and runs a premortem |
 | [`premortem`](skills/premortem/SKILL.md) | Say "premortem this", "what could kill this", "stress test this plan", "what am I missing", or "find the blind spots" on a plan/launch/decision |
 | [`prioritize`](skills/prioritize/SKILL.md) | Ask to "prioritize issues", "rank the backlog", "apply MoSCoW", or "RICE scoring" for a product pillar (suggests `/make-no-mistakes:prioritize`) |
@@ -150,7 +151,7 @@ You:  /make-no-mistakes:domain-driven-advisor
 Tool: Scanning… found supabase/migrations and FE+edge validation.
       Q1: ¿Varios equipos escriben en la misma base de datos? > yes
       Q2: ¿El frontend y el backend validan los mismos datos por separado? > yes
-      → Recommended: /audit-schema-drift now; /audit-contract-drift (coming soon), then enforcement.
+      → Recommended: /audit-schema-drift + /audit-contract-drift, then enforcement.
       Tip: enable agent teams for parallel audits — add
            "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" to ~/.claude/settings.json
       Run them now? > yes
@@ -304,7 +305,7 @@ make-no-mistakes-toolkit/
 │   ├── cli.ts
 │   ├── index.ts
 │   └── lib/
-├── commands/           # 28 explicit commands
+├── commands/           # 29 explicit commands
 ├── agents/             # 2 specialized subagents
 ├── skills/             # 10 auto-activating skills
 │   └── */SKILL.md

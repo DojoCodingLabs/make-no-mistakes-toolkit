@@ -61,13 +61,12 @@ Apply `recommendAudits()` semantics to the resolved signals to produce the
 **ordered set** (canonical order `SCH → CDC → DDD → ARC → STR → ENF`; empty
 signals → full sweep).
 
-**Only offer audits whose command currently exists.** Today those are
+**All six audits are now LIVE** — every family has a runnable command:
 `/audit-schema-drift` (`SCH`), `/audit-contract-drift` (`CDC`), `/audit-ddd`
-(`DDD`), `/audit-explicit-architecture` (`ARC`), and `/audit-strangler` (`STR`) —
-all **LIVE**. The remaining family (`ENF`) is **"coming soon"** until its
-follow-up plan ships — list it in the recommended order so the user sees the full
-picture, but mark it unavailable and do not attempt to run it. (live:
-SCH/CDC/DDD/ARC/STR; coming soon: ENF)
+(`DDD`), `/audit-explicit-architecture` (`ARC`), `/audit-strangler` (`STR`), and
+`/audit-enforcement-hooks` (`ENF`). Offer any of them in the recommended order;
+none are unavailable. `ENF` always runs **last** — it checks whether the Cure-4
+enforcement hooks for the other five are installed. (live: SCH/CDC/DDD/ARC/STR/ENF)
 
 ---
 
