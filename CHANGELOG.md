@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-06-03
+
+### Added
+- `/audit` meta-dispatcher — runs the full repo-health sweep (all six audit families `SCH → CDC → DDD → ARC → STR → ENF` via `audit-engine`) and delegates the component layer to `atomic-design-toolkit` when installed (composition, not fusion), aggregating one cross-family report.
+- `schemas/repo-health-rules.schema.json` — the unified `.repo-health-rules.json` enforcement contract (draft-07): `version`, `enforcementLevel` (`advisory|strict`), and a `families` object keyed by the six namespaces, each an array of `{ id, pattern, message, severity, exemptionMarker }` rules. Superset of `atomic-design-rules.schema.json`. Validated by `repo-health-rules.contract.test.ts`.
+- `proposeHookRule` cure-scaffold emitter (`src/audit/cure-scaffold.ts`) — deterministically maps a confirmed `Finding` whose `cure_map` includes `hook` into a `HookRuleProposal` shaped against the rules schema; returns `null` otherwise. This is the foundation of the Phase-2 "hooks first" enforcement step (v1 *proposes* rules; the live PreToolUse/PostToolUse hooks + apply step are Phase-2-later).
+
 ## [1.30.0] - 2026-06-02
 
 ### Changed
@@ -645,7 +652,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.30.0...HEAD
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.32.0...HEAD
+[1.32.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.32.0
 [1.30.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.30.0
 [1.29.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.29.0
 [1.28.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.28.0

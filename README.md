@@ -1,6 +1,6 @@
 # make-no-mistakes
 
-**Version: 1.30.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
+**Version: 1.32.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
 
 The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.
 
@@ -73,7 +73,7 @@ After the audit(s), it runs a **premortem** on the aggregated remediation plan, 
 
 ## What's Inside
 
-### Commands (29)
+### Commands (30)
 
 Deliberate actions you invoke explicitly.
 
@@ -97,6 +97,7 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:secret-input`](commands/secret-input.md) | Stage a secret/password via OS-native GUI dialog (Linux zenity/kdialog/pinentry, macOS osascript, Windows Get-Credential). The value never appears in the conversation log or terminal history. Cross-platform via `.sh` (Linux/macOS/WSL/Git Bash) + `.ps1` (native Windows) |
 | [`/make-no-mistakes:secret-use ENVVAR -- <cmd>`](commands/secret-use.md) | Run one command with the staged secret loaded as an environment variable. Env var lives only inside the consuming process and is unset on completion |
 | [`/make-no-mistakes:secret-clear`](commands/secret-clear.md) | Wipe the staged secret (shred/rm-P/random-overwrite per OS). Idempotent — safe to call when no secret is staged. Always run when done with credentials |
+| [`/make-no-mistakes:audit [path]`](commands/audit.md) | **Meta-dispatcher** — runs the full repo-health sweep (all six families `SCH→CDC→DDD→ARC→STR→ENF` via `audit-engine`) and delegates the component layer to `atomic-design-toolkit` when installed; aggregates one report + emits cure-scaffold proposals per `schemas/repo-health-rules.schema.json` |
 | [`/make-no-mistakes:domain-driven-advisor`](commands/domain-driven-advisor.md) | **Guided entry point** — inspects the repo, recommends which audit(s) to run (or the full sequence), runs them, and finishes with a premortem. Start here for repo health. |
 | [`/make-no-mistakes:audit-schema-drift`](commands/audit-schema-drift.md) | Audit for schema drift — 1NF violations + the same logical column duplicated across tables without a single source of truth |
 | [`/make-no-mistakes:audit-contract-drift`](commands/audit-contract-drift.md) | Audit consumer-driven contract drift — producer↔consumer validation schemas that have silently diverged |
@@ -335,7 +336,7 @@ make-no-mistakes-toolkit/
 │   ├── cli.ts
 │   ├── index.ts
 │   └── lib/
-├── commands/           # 29 explicit commands
+├── commands/           # 30 explicit commands
 ├── agents/             # 2 specialized subagents
 ├── skills/             # 10 auto-activating skills
 │   └── */SKILL.md
