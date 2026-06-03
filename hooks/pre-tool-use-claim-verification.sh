@@ -106,7 +106,7 @@ is_bare_fs_op() {
   # after a command separator (; | && ||). Use ERE so we can express the
   # leading-position constraint without shellcheck flagging redundant case
   # globs (SC2221/SC2222).
-  if printf '%s' "$cmd" | grep -qE '(^|[;&|][[:space:]]*)(ls|find|cat|head)[[:space:]]'; then
+  if printf '%s' "$cmd" | grep -qE '(^|[;&|][[:space:]]*)(ls|find|cat|head)([[:space:]]|$)'; then
     return 0
   fi
   if printf '%s' "$cmd" | grep -qE 'grep[[:space:]]+-[rRnliN]+'; then
@@ -153,7 +153,7 @@ fi
 
 # Best-effort suggested replacement, branched by detected op.
 SUGGESTED=""
-if printf '%s' "$COMMAND" | grep -qE '(^|[;&|][[:space:]]*)ls[[:space:]]'; then
+if printf '%s' "$COMMAND" | grep -qE '(^|[;&|][[:space:]]*)ls([[:space:]]|$)'; then
   # Extract the path argument (best-effort, first non-flag token after ls).
   path_arg="$(printf '%s' "$COMMAND" \
     | sed -E 's/^.*ls[[:space:]]+(-[A-Za-z]+[[:space:]]+)*//' \
@@ -178,7 +178,7 @@ elif printf '%s' "$COMMAND" | grep -qE 'grep[[:space:]]+-[rRnliN]+'; then
   else
     SUGGESTED="git fetch origin <branch> --quiet && git grep \"<pattern>\" origin/<branch> -- src/"
   fi
-elif printf '%s' "$COMMAND" | grep -qE '(^|[;&|][[:space:]]*)find[[:space:]]'; then
+elif printf '%s' "$COMMAND" | grep -qE '(^|[;&|][[:space:]]*)find([[:space:]]|$)'; then
   SUGGESTED="git fetch origin <branch> --quiet && git ls-tree -r origin/<branch> -- <path> | grep <pattern>"
 else
   SUGGESTED="git fetch origin <branch> --quiet && git show origin/<branch>:<path>"
