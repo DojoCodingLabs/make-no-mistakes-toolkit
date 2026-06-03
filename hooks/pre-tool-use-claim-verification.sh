@@ -154,10 +154,11 @@ fi
 # Best-effort suggested replacement, branched by detected op.
 SUGGESTED=""
 if printf '%s' "$COMMAND" | grep -qE '(^|[;&|][[:space:]]*)ls([[:space:]]|$)'; then
-  # Extract the path argument (best-effort, first non-flag token after ls).
+  # Extract the path argument: first non-flag token AFTER `ls`. Awk-only
+  # avoids the trailing-flag-without-space edge case (`ls -la` would have
+  # leaked `-la` through the sed prefix-strip).
   path_arg="$(printf '%s' "$COMMAND" \
-    | sed -E 's/^.*ls[[:space:]]+(-[A-Za-z]+[[:space:]]+)*//' \
-    | awk '{print $1}')"
+    | awk '{for(i=1;i<=NF;i++) if ($i == "ls") {for(j=i+1;j<=NF;j++) if ($j !~ /^-/) {print $j; exit}}}')"
   if [ -n "$path_arg" ]; then
     SUGGESTED="git fetch origin <branch> --quiet && git ls-tree origin/<branch> -- $path_arg"
   else
@@ -169,8 +170,10 @@ elif printf '%s' "$COMMAND" | grep -qE 'grep[[:space:]]+-[rRnliN]+'; then
     | head -1 \
     | sed -E 's/^grep[[:space:]]+-[rRnliN]+[[:space:]]+"(.+)"$/\1/')"
   if [ -z "$pattern_arg" ]; then
+    # Nested awk loop: skip subsequent flag tokens so multi-flag forms
+    # like `grep -i -r "Symbol" src/` don't mis-extract `-r` as the pattern.
     pattern_arg="$(printf '%s' "$COMMAND" \
-      | awk '{for(i=1;i<=NF;i++) if ($i ~ /^-[rRnliN]+$/) {print $(i+1); exit}}' \
+      | awk '{for(i=1;i<=NF;i++) if ($i ~ /^-[rRnliN]+$/) {for(j=i+1;j<=NF;j++) if ($j !~ /^-/) {print $j; exit}}}' \
       | tr -d '"')"
   fi
   if [ -n "$pattern_arg" ]; then
