@@ -76,9 +76,13 @@ esac
 
 # Fallback command extraction if jq is missing or input is shaped oddly.
 if [ -z "$COMMAND" ] && [ -n "$INPUT_RAW" ]; then
-  # Tolerant single-line extract — does not need jq.
+  # Tolerant single-line extract — does not need jq. Escape-aware: the
+  # `([^"\\]|\\.)*` body of the JSON string accepts any non-quote-non-
+  # backslash char, OR a backslash followed by any char (so embedded
+  # `\"` sequences inside a bash command like `grep -rn \"Symbol\" src/`
+  # don't truncate the extraction at the first inner quote).
   COMMAND="$(printf '%s' "$INPUT_RAW" \
-    | grep -oE '"command"[[:space:]]*:[[:space:]]*"[^"]*"' \
+    | grep -oE '"command"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' \
     | head -1 \
     | sed -E 's/^"command"[[:space:]]*:[[:space:]]*"(.*)"$/\1/')"
 fi
@@ -165,27 +169,17 @@ if printf '%s' "$COMMAND" | grep -qE '(^|[;&|][[:space:]]*)ls([[:space:]]|$)'; t
     SUGGESTED="git fetch origin <branch> --quiet && git ls-tree origin/<branch> -- <path>"
   fi
 elif printf '%s' "$COMMAND" | grep -qE 'grep[[:space:]]+-[rRnliN]+'; then
-  # First try the double-quoted form: `grep -rn "Symbol" src/`.
+  # Single extractor handles both quote styles + multi-flag forms.
+  # Nested awk loop: locate the `-FLAGS` token, then walk forward
+  # skipping additional flag tokens before emitting the first non-flag
+  # one. Strip both " and ' so the unquoted token comes out clean
+  # regardless of which quote style the original command used.
+  # Cross-platform note: no escaped quotes inside the shell quoting
+  # (the bot flagged literal-backslash drift between GNU and BSD grep
+  # implementations in round 4).
   pattern_arg="$(printf '%s' "$COMMAND" \
-    | grep -oE 'grep[[:space:]]+-[rRnliN]+[[:space:]]+"[^"]+"' \
-    | head -1 \
-    | sed -E 's/^grep[[:space:]]+-[rRnliN]+[[:space:]]+"(.+)"$/\1/')"
-  # Then the single-quoted form: `grep -rn 'Symbol' src/`.
-  if [ -z "$pattern_arg" ]; then
-    pattern_arg="$(printf '%s' "$COMMAND" \
-      | grep -oE "grep[[:space:]]+-[rRnliN]+[[:space:]]+'[^']+'" \
-      | head -1 \
-      | sed -E "s/^grep[[:space:]]+-[rRnliN]+[[:space:]]+'(.+)'$/\\1/")"
-  fi
-  if [ -z "$pattern_arg" ]; then
-    # Nested awk loop: skip subsequent flag tokens so multi-flag forms
-    # like `grep -i -r "Symbol" src/` don't mis-extract `-r` as the pattern.
-    # Strip both " and ' so unquoted-token output is clean regardless of
-    # whether the original command used double or single quotes.
-    pattern_arg="$(printf '%s' "$COMMAND" \
-      | awk '{for(i=1;i<=NF;i++) if ($i ~ /^-[rRnliN]+$/) {for(j=i+1;j<=NF;j++) if ($j !~ /^-/) {print $j; exit}}}' \
-      | tr -d "\"'")"
-  fi
+    | awk '{for(i=1;i<=NF;i++) if ($i ~ /^-[rRnliN]+$/) {for(j=i+1;j<=NF;j++) if ($j !~ /^-/) {print $j; exit}}}' \
+    | tr -d "\"'")"
   if [ -n "$pattern_arg" ]; then
     SUGGESTED="git fetch origin <branch> --quiet && git grep \"$pattern_arg\" origin/<branch> -- src/"
   else

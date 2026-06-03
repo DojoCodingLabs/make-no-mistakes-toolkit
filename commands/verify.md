@@ -42,7 +42,10 @@ pipeline handles bare branch names, `origin/<branch>`, tags, and SHAs
 uniformly.
 
 1. **Normalize the ref.** Decide which fully-qualified ref to query, and
-   whether a remote fetch makes sense for that ref:
+   whether a remote fetch makes sense for that ref. Tag resolution probes
+   the remote via `git ls-remote` first so remote-only tags (not yet
+   fetched locally) don't fall through to the bare-branch branch and
+   resolve to a nonexistent `origin/<tag>`:
 
    ```bash
    RAW_REF="$1"
@@ -50,9 +53,14 @@ uniformly.
    RESOLVED_REF=""   # what to pass to git show / ls-tree / grep
 
    if   git rev-parse --verify --quiet "refs/tags/$RAW_REF" >/dev/null; then
-     # Annotated/lightweight tag, e.g. v1.31.0
+     # Local annotated/lightweight tag, e.g. v1.31.0 (already fetched).
      RESOLVED_REF="refs/tags/$RAW_REF"
      FETCH_TARGET="tag $RAW_REF"
+   elif git ls-remote --tags --exit-code origin "refs/tags/$RAW_REF" >/dev/null 2>&1; then
+     # Remote-only tag — refresh it locally before resolving.
+     git fetch origin "tag $RAW_REF" --quiet
+     RESOLVED_REF="refs/tags/$RAW_REF"
+     FETCH_TARGET=""  # already fetched in the probe step
    elif [[ "$RAW_REF" =~ ^[0-9a-f]{7,40}$ ]] \
         && git cat-file -e "$RAW_REF" 2>/dev/null; then
      # Commit SHA (short or long) that already exists locally — no fetch.
@@ -100,12 +108,20 @@ uniformly.
      git show "$RESOLVED_REF:$ARG" | head -50
      ```
 
-   - Otherwise, treat it as a regex/pattern to grep across `src/`:
+   - Otherwise, treat it as a regex/pattern to grep across the repo. Use
+     `src/` as the path filter when it exists at the repo root; otherwise
+     grep the whole tree so the command stays repo-agnostic (toolkit
+     consumers may have `lib/`, `app/`, `packages/`, or a flat layout):
 
      ```bash
-     git grep -nF -- "$ARG" "$RESOLVED_REF" -- src/
+     if git ls-tree --name-only "$RESOLVED_REF" -- src 2>/dev/null | grep -q .; then
+       PATH_FILTER=(-- src/)
+     else
+       PATH_FILTER=()
+     fi
+     git grep -nF -- "$ARG" "$RESOLVED_REF" "${PATH_FILTER[@]}"
      # If the user passes a regex (contains regex metachars), drop -F:
-     git grep -nE -- "$ARG" "$RESOLVED_REF" -- src/
+     git grep -nE -- "$ARG" "$RESOLVED_REF" "${PATH_FILTER[@]}"
      ```
 
 6. **Emit a single verdict line** in this exact shape so it can be pasted
