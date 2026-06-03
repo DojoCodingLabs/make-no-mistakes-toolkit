@@ -165,16 +165,26 @@ if printf '%s' "$COMMAND" | grep -qE '(^|[;&|][[:space:]]*)ls([[:space:]]|$)'; t
     SUGGESTED="git fetch origin <branch> --quiet && git ls-tree origin/<branch> -- <path>"
   fi
 elif printf '%s' "$COMMAND" | grep -qE 'grep[[:space:]]+-[rRnliN]+'; then
+  # First try the double-quoted form: `grep -rn "Symbol" src/`.
   pattern_arg="$(printf '%s' "$COMMAND" \
     | grep -oE 'grep[[:space:]]+-[rRnliN]+[[:space:]]+"[^"]+"' \
     | head -1 \
     | sed -E 's/^grep[[:space:]]+-[rRnliN]+[[:space:]]+"(.+)"$/\1/')"
+  # Then the single-quoted form: `grep -rn 'Symbol' src/`.
+  if [ -z "$pattern_arg" ]; then
+    pattern_arg="$(printf '%s' "$COMMAND" \
+      | grep -oE "grep[[:space:]]+-[rRnliN]+[[:space:]]+'[^']+'" \
+      | head -1 \
+      | sed -E "s/^grep[[:space:]]+-[rRnliN]+[[:space:]]+'(.+)'$/\\1/")"
+  fi
   if [ -z "$pattern_arg" ]; then
     # Nested awk loop: skip subsequent flag tokens so multi-flag forms
     # like `grep -i -r "Symbol" src/` don't mis-extract `-r` as the pattern.
+    # Strip both " and ' so unquoted-token output is clean regardless of
+    # whether the original command used double or single quotes.
     pattern_arg="$(printf '%s' "$COMMAND" \
       | awk '{for(i=1;i<=NF;i++) if ($i ~ /^-[rRnliN]+$/) {for(j=i+1;j<=NF;j++) if ($j !~ /^-/) {print $j; exit}}}' \
-      | tr -d '"')"
+      | tr -d "\"'")"
   fi
   if [ -n "$pattern_arg" ]; then
     SUGGESTED="git fetch origin <branch> --quiet && git grep \"$pattern_arg\" origin/<branch> -- src/"
