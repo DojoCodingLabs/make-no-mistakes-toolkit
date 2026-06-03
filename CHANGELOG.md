@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-06-02
+
+### Changed
+- **README repositioned around `/make-no-mistakes:domain-driven-advisor` as the canonical entry point.** A new "Start here" section sits right after Install (before "What's Inside"), quoting the skill's own description verbatim ("Best first command for a new repo") and listing all six audit families (`SCH`, `CDC`, `DDD`, `ARC`, `STR`, `ENF`) in a single routing table. The deeper teaching section ("Guided repo health") remains as the long-form reference. This makes the front door obvious to a new user without scrolling through the 29-command index first.
+- **Marketplace description leads with the advisor.** `marketplace.json` plugin description now opens with "Start with /make-no-mistakes:domain-driven-advisor — the canonical entry point…" instead of burying the audit engine mid-paragraph. Same 29/10/2 component counts (verified: `commands/*.md = 29`, `skills/*/SKILL.md = 10`).
+
+### Notes
+- No new commands, skills, or hooks ship in this release — it's a documentation-emphasis pass on top of 1.29.0 (which closed the six-family audit-engine loop). Cut to publish the re-announcement to `#doj-repo-health` and to surface the advisor at the top of the README/marketplace card.
+
 ## [1.29.0] - 2026-06-02
 
 ### Added
@@ -636,7 +645,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.29.0...HEAD
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.30.0...HEAD
+[1.30.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.30.0
 [1.29.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.29.0
 [1.28.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.28.0
 [1.27.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.27.0

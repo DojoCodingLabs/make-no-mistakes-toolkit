@@ -1,6 +1,6 @@
 # make-no-mistakes
 
-**Version: 1.29.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
+**Version: 1.30.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
 
 The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.
 
@@ -40,6 +40,36 @@ npx @lapc506/make-no-mistakes install
 | `make-no-mistakes doctor` | Health check |
 | `make-no-mistakes install --dry-run` | Preview changes |
 | `make-no-mistakes install --force` | Overwrite unmanaged conflicts |
+
+## Start here: `/make-no-mistakes:domain-driven-advisor`
+
+**If you only run one command from this plugin, run this one.**
+
+```
+/make-no-mistakes:domain-driven-advisor
+```
+
+The advisor is the **canonical entry point** for repo-health work. From its [SKILL.md](skills/domain-driven-advisor/SKILL.md):
+
+> Guided entry point for repo health when you don't know which audit you need.
+> Use when the user asks "which audit", "where do I start", wants to check
+> "repo health", or mentions "domain driven" design. Inspects the repo, asks a
+> few plain-language questions, recommends which audit(s) to run (or the full
+> ordered sweep), runs them via the audit-engine, and finishes with a premortem
+> on the remediation plan. **Best first command for a new repo.**
+
+It routes you across the **six audit families** (all live as of 1.29.0):
+
+| Family | Command | Detects |
+|--------|---------|---------|
+| `SCH` | [`/audit-schema-drift`](commands/audit-schema-drift.md) | 1NF violations + same column duplicated across tables |
+| `CDC` | [`/audit-contract-drift`](commands/audit-contract-drift.md) | Producer↔consumer validation schemas that silently diverged |
+| `DDD` | [`/audit-ddd`](commands/audit-ddd.md) | Cross-context imports, domain purity, ubiquitous-language drift |
+| `ARC` | [`/audit-explicit-architecture`](commands/audit-explicit-architecture.md) | Hexagonal/Onion/Clean dependency-rule violations, CQRS separation |
+| `STR` | [`/audit-strangler`](commands/audit-strangler.md) | Strangler-Fig migration health (façade, cutover, legacy retirement) |
+| `ENF` | [`/audit-enforcement-hooks`](commands/audit-enforcement-hooks.md) | Cure-4 PreToolUse/PostToolUse coverage gaps that allow the other audits' drift |
+
+After the audit(s), it runs a **premortem** on the aggregated remediation plan, so the plan you ship has already survived "it's 6 months later and this failed — why?". Full teaching section [below](#guided-repo-health-domain-driven-advisor).
 
 ## What's Inside
 
