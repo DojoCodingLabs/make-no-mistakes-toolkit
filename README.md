@@ -1,6 +1,6 @@
 # make-no-mistakes
 
-**Version: 1.30.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
+**Version: 1.31.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
 
 The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.
 
@@ -71,9 +71,27 @@ It routes you across the **six audit families** (all live as of 1.29.0):
 
 After the audit(s), it runs a **premortem** on the aggregated remediation plan, so the plan you ship has already survived "it's 6 months later and this failed — why?". Full teaching section [below](#guided-repo-health-domain-driven-advisor).
 
+## Also start here: `verify-branch-state` + `/verify`
+
+**Peer entry point** — load this alongside `/make-no-mistakes:domain-driven-advisor` before posting any authoritative claim about a branch's contents.
+
+> Working tree is ONE projection. The ref is the truth. Verify against the ref.
+
+The `verify-branch-state` skill auto-loads on "verify against develop", "does X exist on `<branch>`", "what's on origin/…", "did this land on main", "re-validate the subagent". Pair it with the `/verify` slash command:
+
+```
+/make-no-mistakes:verify <ref> <path-or-pattern>
+```
+
+The command runs `git fetch origin <ref> --quiet` then `git ls-tree origin/<ref> -- <path>` (for paths) or `git grep <pattern> origin/<ref> -- src/` (for patterns), and prints a single verdict line citing the ref's SHA — so the claim can be re-checked later.
+
+Why this matters: in multi-session, multi-worktree, hook-mediated repos (dojo-os has 12+ active worktrees), the local checkout's HEAD can silently drift between commands. A bare `ls` / `grep -rn src/` / `find` reads **that** projection, not the ref. This skill and slash command — plus a warn-mode PreToolUse hook (`hooks/pre-tool-use-claim-verification.sh`) that nudges you to ref-explicit commands — operationalize the rule across every repo the toolkit is installed in. Origin: 2026-06-03 DOJ-4851/4863/4864 authoritative-but-wrong corrections, retracted publicly; memory `feedback_working_tree_is_not_truth`. Repo-level enforcement sibling: DOJ-4868 in `dojo-os`.
+
+See `skills/verify-branch-state/SKILL.md` for the full anti-pattern catalogue and pre-flight checklist.
+
 ## What's Inside
 
-### Commands (29)
+### Commands (30)
 
 Deliberate actions you invoke explicitly.
 
@@ -108,8 +126,9 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:atomic-rules-init`](commands/atomic-rules-init.md) | Scaffold a `.atomic-design-rules.json` at the repo root so the atomic-design hooks (PreToolUse ownership enforcement + PostToolUse drift telemetry) start enforcing. No-op if the file already exists |
 | [`/make-no-mistakes:e2e-test-preview [path]`](commands/e2e-test-preview.md) | Launch a Qt-based visual previewer for `test-suite.json` — interactive table with filtering, detail pane, and CSV export (auto-installs PySide6) |
 | [`/make-no-mistakes:gemini-code-review [target]`](commands/gemini-code-review.md) | Cheap first-pass code review (one-shot via liteLLM) on a parametrizable model — Gemini 3.5 Flash by default; supports `--model` and `--adversarial`, curated against the repo's CLAUDE.md |
+| [`/make-no-mistakes:verify <ref> <path-or-pattern>`](commands/verify.md) | Verify whether a file, directory, or pattern exists on a named git ref. Runs `git fetch origin <ref> --quiet` then `git ls-tree` / `git grep` against `origin/<ref>` and emits a verdict line citing the ref's SHA. Use before posting any authoritative claim about a branch's contents (working tree is one projection; the ref is the truth) |
 
-### Skills (10)
+### Skills (11)
 
 Auto-activate by context — you don't need to remember the command name.
 
@@ -125,6 +144,7 @@ Auto-activate by context — you don't need to remember the command name.
 | [`domain-driven-advisor`](skills/domain-driven-advisor/SKILL.md) | Ask "which audit do I need?" / "where do I start with repo health?" — routes you to the right audit(s) and runs a premortem |
 | [`premortem`](skills/premortem/SKILL.md) | Say "premortem this", "what could kill this", "stress test this plan", "what am I missing", or "find the blind spots" on a plan/launch/decision |
 | [`prioritize`](skills/prioritize/SKILL.md) | Ask to "prioritize issues", "rank the backlog", "apply MoSCoW", or "RICE scoring" for a product pillar (suggests `/make-no-mistakes:prioritize`) |
+| [`verify-branch-state`](skills/verify-branch-state/SKILL.md) | Say "verify against develop", "does X exist on `<branch>`", "what's on origin/…", "did this land on main", or are about to post an authoritative claim about a branch's contents — auto-loads ref-explicit verification rules and routes you to `/make-no-mistakes:verify` (working tree is one projection; the ref is the truth) |
 
 Skills can also be invoked explicitly: `/make-no-mistakes:spec-recommend T0-4`
 
