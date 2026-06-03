@@ -49,18 +49,24 @@ uniformly.
 
    ```bash
    RAW_REF="$1"
-   FETCH_TARGET=""   # what to pass to `git fetch origin <…> --quiet`; empty = skip
+   ARG="$2"
+   FETCH_KIND=""     # "tag" | "branch" | "" (skip fetch entirely)
+   FETCH_TARGET=""   # the ref name to fetch
    RESOLVED_REF=""   # what to pass to git show / ls-tree / grep
 
    if   git rev-parse --verify --quiet "refs/tags/$RAW_REF" >/dev/null; then
      # Local annotated/lightweight tag, e.g. v1.31.0 (already fetched).
      RESOLVED_REF="refs/tags/$RAW_REF"
-     FETCH_TARGET="tag $RAW_REF"
+     FETCH_KIND="tag"
+     FETCH_TARGET="$RAW_REF"
    elif git ls-remote --tags --exit-code origin "refs/tags/$RAW_REF" >/dev/null 2>&1; then
-     # Remote-only tag — refresh it locally before resolving.
-     git fetch origin "tag $RAW_REF" --quiet
+     # Remote-only tag — refresh it locally before resolving. The probe
+     # already validated the tag exists on the remote, so the fetch is
+     # safe to run here. Use separate `tag` + `<name>` args so the keyword
+     # is parsed as the fetch-spec verb, not glued to the tag name.
+     git fetch origin tag "$RAW_REF" --quiet
      RESOLVED_REF="refs/tags/$RAW_REF"
-     FETCH_TARGET=""  # already fetched in the probe step
+     FETCH_KIND=""  # already fetched in the probe step
    elif [[ "$RAW_REF" =~ ^[0-9a-f]{7,40}$ ]] \
         && git cat-file -e "$RAW_REF" 2>/dev/null; then
      # Commit SHA (short or long) that already exists locally — no fetch.
@@ -69,10 +75,12 @@ uniformly.
      # User explicitly wrote origin/<branch> — fetch the branch part,
      # query the full origin/<branch> name.
      RESOLVED_REF="$RAW_REF"
+     FETCH_KIND="branch"
      FETCH_TARGET="${RAW_REF#origin/}"
    else
      # Bare branch name (the common case) — fetch + query origin/<branch>.
      RESOLVED_REF="origin/$RAW_REF"
+     FETCH_KIND="branch"
      FETCH_TARGET="$RAW_REF"
    fi
    ```
@@ -85,10 +93,17 @@ uniformly.
    git rev-parse HEAD
    ```
 
-3. **Refresh the ref** (skipped for already-local commit SHAs):
+3. **Refresh the ref** (skipped for already-local commit SHAs and for
+   already-fetched-during-probe remote tags). The `tag` keyword for tag
+   fetches is passed as a separate argument so `git fetch` parses the
+   refspec correctly:
 
    ```bash
-   [ -n "$FETCH_TARGET" ] && git fetch origin $FETCH_TARGET --quiet
+   case "$FETCH_KIND" in
+     tag)    git fetch origin tag "$FETCH_TARGET" --quiet ;;
+     branch) git fetch origin "$FETCH_TARGET" --quiet ;;
+     *)      ;;
+   esac
    ```
 
 4. **Resolve the ref's SHA** so the verdict can be re-checked later:

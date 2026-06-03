@@ -113,7 +113,9 @@ is_bare_fs_op() {
   if printf '%s' "$cmd" | grep -qE '(^|[;&|][[:space:]]*)(ls|find|cat|head)([[:space:]]|$)'; then
     return 0
   fi
-  if printf '%s' "$cmd" | grep -qE 'grep[[:space:]]+-[rRnliN]+'; then
+  # Anchor `grep -FLAGS` so legitimate `git grep -n ...` (the exact
+  # ref-explicit replacement this hook recommends!) does not false-positive.
+  if printf '%s' "$cmd" | grep -qE '(^|[;&|][[:space:]]*)grep[[:space:]]+-[rRnliN]+'; then
     return 0
   fi
   return 1
@@ -168,7 +170,7 @@ if printf '%s' "$COMMAND" | grep -qE '(^|[;&|][[:space:]]*)ls([[:space:]]|$)'; t
   else
     SUGGESTED="git fetch origin <branch> --quiet && git ls-tree origin/<branch> -- <path>"
   fi
-elif printf '%s' "$COMMAND" | grep -qE 'grep[[:space:]]+-[rRnliN]+'; then
+elif printf '%s' "$COMMAND" | grep -qE '(^|[;&|][[:space:]]*)grep[[:space:]]+-[rRnliN]+'; then
   # Single extractor handles both quote styles + multi-flag forms.
   # Nested awk loop: locate the `-FLAGS` token, then walk forward
   # skipping additional flag tokens before emitting the first non-flag
