@@ -53,31 +53,42 @@ If the receiver or the "what they must do" is unclear from `$ARGUMENTS` + contex
 Use this structure (modeled on real team handovers). All bullets use `-`. Adapt sections to the work — omit a section if it genuinely doesn't apply, but keep the message scannable.
 
 ```
-<@UXXXX|Name> *Handover — <one-line what + why>* · <https://linear.app/<slug>/issue/<KEY>|<KEY>>
-
-*TL;DR:* <2-3 sentences: what happened, what's ready, what's theirs. Lead with the answer.>
+*<@UXXXX|Name> Handover <https://linear.app/<slug>/issue/<KEY>|<KEY>> — <one-line what + why>*
+Resumen:
+- <one-line: what happened / what the incident was>
+- <one-line: what's ready vs what's theirs>
+- <one-line: e.g. "Nada mergeado — son para tu evaluación">
 
 *Causa raíz (verificada contra <source>):*
-- *<grouping line, e.g. "dos fallos en la misma capa">:*
-    - *<sub-point A>* — <anchored to file:line or evidence>
-    - *<sub-point B>* — <anchored to file:line or evidence>
+<plain lead line, NO bullet — e.g. "Dos fallos opuestos en la misma Capa 4:">
+- _*<sub-point A>:*_ <short context>:
+    - <detail, anchored to file:line / evidence>
+- _*<sub-point B>*_:
+    - <explanation>
+        - _<consequence or linked evidence>_
 
 *PRs listos (sin CI roja, ninguno mergeado):*
-- :github: *<repo displayName>*
-    - :github-pr: <https://github.com/<owner>/<repo>/pull/<n>|#<n>> *· READY · base `<branch>`* — <what it does>. <linear link>
-    - :github-pr: <https://github.com/<owner>/<repo>/pull/<m>|#<m>> *· DRAFT · TUYO · base `<branch>`* — <scaffold/what's left for them>. <linear link>
-- :github: *<other repo displayName>*
-    - :github-pr: <https://github.com/<owner>/<repo>/pull/<k>|#<k>> *· READY · base `<branch>`* — <what it does>. <linear link>
+- :github: _<repo displayName>_
+    - :github-pr: <https://github.com/<owner>/<repo>/pull/<n>|#<n>> _· READY · base `<branch>`_ — `<scope>`:
+        - <what it does>. <linear link>
+    - :github-pr: <https://github.com/<owner>/<repo>/pull/<m>|#<m>> _· DRAFT · TUYO · base `<branch>`_ — <scope>:
+        - <what's left for them>. <linear link>
+- :github: _<other repo displayName>_
+    - :github-pr: <https://github.com/<owner>/<repo>/pull/<k>|#<k>> _· READY · base `<branch>`_ — `<scope>`:
+        - <what it does>. <linear link>
 
-*Lo que necesita tu llamada:*
-- *Review/merge* de <#n> y <#k> (los dejé Ready, sin mergear).
-- <#m> es *tuyo*: <the decision only they can make>.
-- ⚠️ <any shared contract / risk the reviewer must hold in mind>
+*Lo que necesita tu revisión a partir de ahora:*
+- _Review/merge_ de <#n> y <#k> (los dejé Ready, sin mergear).
+    - <#m> es _tuyo_: <the decision only they can make>.
+    - <supporting note, e.g. "los tests repro ya pinnean el failure mode">
+- :warning: _<shared contract / risk>_:
+    - <the detail the reviewer must hold in mind>
 
-*Tracking:* <links to the issues, note they carry full briefs / relations>.
-
-_Generado por Claude Code on behalf of @<user>._
+_Tracking:_ <note: the issues carry full briefs + cross-relations>.
+cc. <@UYYYY|Other stakeholder>
 ```
+
+> The template above is verbatim the canonical shape the team actually ships (DOJ-4924 handover, #doj-agent, 2026-06-08). Note how Slack renders the source: `-` / `    -` / `        -` become the `•` / `◦` / `▪︎` glyph hierarchy automatically — you always WRITE `-`, never the glyphs.
 
 ### Formatting rules (identical to the standup command — these are house law)
 
@@ -90,10 +101,16 @@ _Generado por Claude Code on behalf of @<user>._
 2. **Every PR is hyperlinked**: `<https://github.com/<owner>/<repo>/pull/<n>|#<n>>`. Never a bare `#<n>`.
 3. **Every Linear issue is hyperlinked**: `<https://linear.app/<slug>/issue/<KEY>|<KEY>>`. Never a bare key.
 4. **Mentions** use real Slack ids: `<@UXXXX|Name>` (look the id up; never guess).
-5. **Bold** = `*text*` (single asterisk), **italic** = `_text_`. Inline code stays in backticks.
+5. **Emphasis conventions** (mirror the shipped handover):
+    - **Header line**: the WHOLE line is bold, and the mention + Linear link live INSIDE it, at the front: `*<@id|Name> Handover <linear|KEY> — <title>*`. The Linear link comes right after the word "Handover", not as a trailing `· <link>`.
+    - **Section headers** (`*Causa raíz …:*`, `*PRs listos …:*`, `*Lo que necesita …:*`) are bold.
+    - **Repo names, PR status chips, and inline emphasis** (`_dojo-os_`, `_· READY · base develop_`, `_Ready_`, `_tuyo_`, `_Review/merge_`) are italic `_…_`.
+    - **Sub-point names** in Causa raíz use bold+italic: `_*Under-stripping:*_`.
+    - **`Resumen:`** and any lead line under a section header are plain text (no bold, no bullet).
+    - **`_Tracking:_`** is italic. Inline code stays in backticks.
 6. **No bare markdown tables** — Slack doesn't render them; the repo's `slack-tables-no-codeblock` hook warns. Use bullets or fence the table.
 7. **Spanish keeps its tildes** (`migración`, not `migracion`) — the `slack-spanish-tildes` hook warns otherwise. Match the team's natural register.
-8. **Footer**: `_Generado por Claude Code on behalf of @<user>._` Add `*Enviado mediante* <@UXXXX|Claude>` ONLY when posting through the Claude Slack integration — omit it for a hand-sent draft, where the message goes out under the user's own account.
+8. **Footer / cc**: for a **hand-sent** message (the user posts it from their own account — the common case for a drafted handover), OMIT the `_Generado por Claude Code…_` line entirely; it reads wrong under a human's name. Instead close with a `cc. <@id|Name>` line for any secondary stakeholders the owner should loop in. Keep `_Generado por Claude Code on behalf of @<user>._` (+ optionally `*Enviado mediante* <@id|Claude>`) ONLY when the message is posted programmatically through the Claude Slack integration.
 9. **Keep it scannable** — under ~2500 characters. Lead with the answer (Minto): the receiver should know what's theirs from the first two lines.
 
 ---
