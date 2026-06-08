@@ -62,12 +62,15 @@ Use this structure (modeled on real team handovers). All bullets use `-`. Adapt 
 - <second point if needed>
 
 *PRs listos (sin CI roja, ninguno mergeado):*
-- <https://github.com/<owner>/<repo>/pull/<n>|#<n]> *· READY · base `<branch>`* — <what it does>. <linear link>
-- <https://github.com/<owner>/<repo>/pull/<n>|#<n>> *· DRAFT · TUYO · base `<branch>`* — <scaffold/what's left for them>. <linear link>
+- :github: *<repo displayName>*
+    - :github-pr: <https://github.com/<owner>/<repo>/pull/<n>|#<n>> *· READY · base `<branch>`* — <what it does>. <linear link>
+    - :github-pr: <https://github.com/<owner>/<repo>/pull/<m>|#<m>> *· DRAFT · TUYO · base `<branch>`* — <scaffold/what's left for them>. <linear link>
+- :github: *<other repo displayName>*
+    - :github-pr: <https://github.com/<owner>/<repo>/pull/<k>|#<k>> *· READY · base `<branch>`* — <what it does>. <linear link>
 
 *Lo que necesita tu llamada:*
-- *Review/merge* de <#n> y <#m> (los dejé Ready, sin mergear).
-- <#k> es *tuyo*: <the decision only they can make>.
+- *Review/merge* de <#n> y <#k> (los dejé Ready, sin mergear).
+- <#m> es *tuyo*: <the decision only they can make>.
 - ⚠️ <any shared contract / risk the reviewer must hold in mind>
 
 *Tracking:* <links to the issues, note they carry full briefs / relations>.
@@ -77,7 +80,12 @@ _Generado por Claude Code on behalf of @<user>._
 
 ### Formatting rules (identical to the standup command — these are house law)
 
-1. **Bullets are `-`. NEVER `•`, `◦`, `▪`, `▫` or any Unicode bullet** — they break Slack list rendering and the repo's `slack-unicode-bullets` hook warns on them. Sub-level with 4 spaces (`    -`).
+1. **Bullets are `-`. NEVER `•`, `◦`, `▪`, `▫` or any Unicode bullet** — they break Slack list rendering and the repo's `slack-unicode-bullets` hook warns on them.
+1b. **Sub-leveling (same pattern as `/daily-standup-post-slack`)** — when the handover spans more than one repo, group with a level-1 bullet per repo and nest the items beneath it:
+    - **Level 1** (`- `): a repo group header — `:github: *<repo displayName>*`
+    - **Level 2** (`    - `, 4 spaces): the individual PR/item under that repo — `:github-pr: <link> …` (`:github-merged:` for merged, `:github-pr:` for open/draft)
+    - **Level 3** (`        - `, 8 spaces): sub-details, rarely needed
+    - A narrative/section lead line sits directly under the section header with NO bullet (plain text). Single-repo handovers may stay flat (one level of `-`), but multi-repo handovers MUST group by repo so the receiver scans by area.
 2. **Every PR is hyperlinked**: `<https://github.com/<owner>/<repo>/pull/<n>|#<n>>`. Never a bare `#<n>`.
 3. **Every Linear issue is hyperlinked**: `<https://linear.app/<slug>/issue/<KEY>|<KEY>>`. Never a bare key.
 4. **Mentions** use real Slack ids: `<@UXXXX|Name>` (look the id up; never guess).
