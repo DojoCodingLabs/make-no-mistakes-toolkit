@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-06-08
+
+### Added
+- `/handover` command — compose and post (or draft) a structured engineering handover to Slack: hand a body of work (PRs, Linear issues, an incident + root cause, a Draft PR someone else must finish) to a specific teammate for their review/decision. Sibling of `/daily-standup-post-slack`, sharing its house Slack style: `-` bullets (never `•`), hyperlinked PRs/issues, real `<@id|Name>` mentions, Spanish tildes — composed to pass the `slack-unicode-bullets`, `slack-tables-no-codeblock`, and `slack-spanish-tildes` hooks. Adds a verify-don't-remember step (every PR status / base branch / Linear id read fresh, never recalled), one-owner/one-decision framing, and an interactive preview before posting.
+
 ## [1.32.0] - 2026-06-03
 
 ### Added
@@ -652,7 +657,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.32.0...HEAD
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.33.0...HEAD
+[1.33.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.33.0
 [1.32.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.32.0
 [1.30.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.30.0
 [1.29.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.29.0
