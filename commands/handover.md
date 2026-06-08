@@ -58,8 +58,9 @@ Use this structure (modeled on real team handovers). All bullets use `-`. Adapt 
 *TL;DR:* <2-3 sentences: what happened, what's ready, what's theirs. Lead with the answer.>
 
 *Causa raíz (verificada contra <source>):*
-- <root cause point, anchored to file:line or evidence>
-- <second point if needed>
+- *<grouping line, e.g. "dos fallos en la misma capa">:*
+    - *<sub-point A>* — <anchored to file:line or evidence>
+    - *<sub-point B>* — <anchored to file:line or evidence>
 
 *PRs listos (sin CI roja, ninguno mergeado):*
 - :github: *<repo displayName>*
@@ -120,6 +121,7 @@ Wait for confirmation. If `edit`, ask what to change. If `cancel`, stop and chan
 - **Channel**: the resolved channel id from Step 1.
 - If `$ARGUMENTS` contains `draft` (or the user chose `draft`): use `slack_send_message_draft`.
   - Only ONE attached draft per channel is allowed. If creation fails with `draft_already_exists`, tell the user to delete the existing draft (or do it themselves) and retry — do not silently post instead.
+  - **Silent no-op gotcha**: when a draft already exists, some Slack MCP servers return a *success* response that OMITS `draft_id` (only `widget_id`) and DO NOT overwrite the existing draft — your "corrected" draft never lands and the user keeps seeing the stale one. A real write returns a `draft_id`. So: confirm `draft_id` is present in the response; if it's absent, the create was a no-op — STOP retrying blindly, tell the user the old draft must be deleted first (you cannot delete drafts via the API), and offer the raw message source for manual paste.
 - Otherwise: `slack_send_message`.
 - For a **thread reply** (handing over inside an existing incident thread), pass `thread_ts`. For a fresh top-level announcement, omit it. If the handover references a thread in a DIFFERENT channel than the target, post top-level and link the thread instead (you cannot reply cross-channel).
 
