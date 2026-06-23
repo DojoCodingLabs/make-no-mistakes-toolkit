@@ -2408,7 +2408,7 @@
   },
   {
     "id": "warn-localhost-in-pr-body",
-    "description": "Warn when `gh pr create` / `gh pr edit` body contains a localhost reference (memory feedback_test_on_staging.md — QA target is dev.dojocoding.io, not localhost)",
+    "description": "Warn when `gh pr create` / `gh pr edit` body contains a localhost reference (memory feedback_test_on_staging.md — QA target is dev.example.com, not localhost)",
     "applies_to": [
       "Bash"
     ],
@@ -2425,7 +2425,7 @@
     "action": "warn",
     "bypass_marker": "localhost-in-pr-body-allowed",
     "memory_ref": "feedback_test_on_staging.md",
-    "message": "WARNING: localhost reference in PR body.\n\nPer feedback_test_on_staging.md the QA testing target is\ndev.dojocoding.io (staging), not localhost. Any reviewer who tries\nto verify against localhost will hit env mismatches:\n  - Local DB differs from staging\n  - Edge Functions missing local secrets\n  - Different feature flags\n\nReplace localhost links with dev.dojocoding.io equivalents.\n\nBypass marker (localhost-in-pr-body-allowed) ONLY for steps that\nlegitimately require an explicit local build (e.g. asking the\nreviewer to run `bun run dev` before pushing).\n",
+    "message": "WARNING: localhost reference in PR body.\n\nPer feedback_test_on_staging.md the QA testing target is\ndev.example.com (staging), not localhost. Any reviewer who tries\nto verify against localhost will hit env mismatches:\n  - Local DB differs from staging\n  - Edge Functions missing local secrets\n  - Different feature flags\n\nReplace localhost links with dev.example.com equivalents.\n\nBypass marker (localhost-in-pr-body-allowed) ONLY for steps that\nlegitimately require an explicit local build (e.g. asking the\nreviewer to run `bun run dev` before pushing).\n",
     "tests": [
       {
         "name": "warns-pr-create-with-localhost",
@@ -2451,7 +2451,7 @@
         "name": "allows-pr-create-with-staging-url",
         "input": {
           "tool_input": {
-            "command": "gh pr create --base develop --title \"feat: foo\" --body \"Test on https://dev.dojocoding.io/foo\""
+            "command": "gh pr create --base develop --title \"feat: foo\" --body \"Test on https://dev.example.com/foo\""
           }
         },
         "expected_exit": 0
@@ -3783,6 +3783,75 @@
         "input": {
           "tool_input": {
             "command": "gcloud sql import sql my-instance gs://backups/dump.sql --database=mydb # hook-bypass: db-mutation-rule"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "git-worktree-add-discipline",
+    "description": "Warn on `git worktree add` — give each parallel agent a dedicated worktree and pin git -C",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "git[[:space:]]+worktree[[:space:]]+add\\b"
+      }
+    ],
+    "action": "warn",
+    "bypass_marker": null,
+    "memory_ref": "reference_parallel_agent_worktree_collision.md",
+    "references": [
+      "Sibling re-checkout incident — collision needed a forward-fix (revert cannot separate entangled commits)"
+    ],
+    "message": "WORKTREE DISCIPLINE: `git worktree add` detected.\n\nParallel subagents share one repo: a branch can be checked out in only ONE\nworktree at a time, and an agent's shell cwd resets to the shared checkout\nbetween commands — so a bare `git checkout` / `git worktree add` can switch\nANOTHER worktree's branch and commingle uncommitted work. Once commits\nentangle, only a forward-fix recovers them (a revert cannot separate them).\n\nWhen orchestrating agents that touch git:\n  - Give EACH agent its OWN dedicated worktree off the target branch:\n      git worktree add .claude/worktrees/wt-<slug> origin/develop\n  - Brief each agent to capture its toplevel once:\n      MYWT=\"$(git rev-parse --show-toplevel)\"\n    and run ALL git as `git -C \"$MYWT\" ...` — never bare git, never\n    `git checkout` of another branch, never `git worktree` from an agent.\n  - Never spawn >=2 isolation:worktree subagents in one message (the\n    pre-task-worktree-isolation-guard hook blocks the 2nd; this is the\n    upstream nudge).\n",
+    "tests": [
+      {
+        "name": "warns-on-worktree-add",
+        "input": {
+          "tool_input": {
+            "command": "git worktree add .claude/worktrees/wt-x origin/develop"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "git-worktree-add-discipline"
+      },
+      {
+        "name": "warns-on-worktree-add-with-b-flag",
+        "input": {
+          "tool_input": {
+            "command": "git worktree add -b feat/x .claude/worktrees/wt-x origin/develop"
+          }
+        },
+        "expected_exit": 0,
+        "expected_stderr_contains": "git-worktree-add-discipline"
+      },
+      {
+        "name": "allows-worktree-list",
+        "input": {
+          "tool_input": {
+            "command": "git worktree list"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-worktree-remove",
+        "input": {
+          "tool_input": {
+            "command": "git worktree remove .claude/worktrees/wt-x"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-non-worktree-git",
+        "input": {
+          "tool_input": {
+            "command": "git status"
           }
         },
         "expected_exit": 0

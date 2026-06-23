@@ -1940,7 +1940,7 @@
       expected_exit: 0
 
 - id: warn-localhost-in-pr-body
-  description: Warn when `gh pr create` / `gh pr edit` body contains a localhost reference (memory feedback_test_on_staging.md — QA target is dev.dojocoding.io, not localhost)
+  description: Warn when `gh pr create` / `gh pr edit` body contains a localhost reference (memory feedback_test_on_staging.md — QA target is dev.example.com, not localhost)
   applies_to: [Bash]
   match:
     # Two AND-chained conditions on `command`: the gh subcommand uses
@@ -1959,13 +1959,13 @@
     WARNING: localhost reference in PR body.
 
     Per feedback_test_on_staging.md the QA testing target is
-    dev.dojocoding.io (staging), not localhost. Any reviewer who tries
+    dev.example.com (staging), not localhost. Any reviewer who tries
     to verify against localhost will hit env mismatches:
       - Local DB differs from staging
       - Edge Functions missing local secrets
       - Different feature flags
 
-    Replace localhost links with dev.dojocoding.io equivalents.
+    Replace localhost links with dev.example.com equivalents.
 
     Bypass marker (localhost-in-pr-body-allowed) ONLY for steps that
     legitimately require an explicit local build (e.g. asking the
@@ -1986,7 +1986,7 @@
     - name: allows-pr-create-with-staging-url
       input:
         tool_input:
-          command: 'gh pr create --base develop --title "feat: foo" --body "Test on https://dev.dojocoding.io/foo"'
+          command: 'gh pr create --base develop --title "feat: foo" --body "Test on https://dev.example.com/foo"'
       expected_exit: 0
     - name: allows-non-pr-localhost
       input:
@@ -3126,4 +3126,77 @@
       input:
         tool_input:
           command: 'gcloud sql import sql my-instance gs://backups/dump.sql --database=mydb # hook-bypass: db-mutation-rule'
+      expected_exit: 0
+
+# -----------------------------------------------------------------------------
+# Agent orchestration (warn) — parallel-subagent worktree discipline.
+#
+# Complements the blocking hook hooks/pre-task-worktree-isolation-guard.sh
+# (which stops >=2 isolation:worktree spawns racing in one message). This rule
+# is the upstream nudge at the `git worktree add` call site: it reminds the
+# orchestrator (or any agent) to give each parallel agent its OWN dedicated
+# worktree and pin `git -C <abs-path>` for all git, so the cwd-reset between
+# commands cannot switch another worktree's branch and commingle work.
+# Memory: reference_parallel_agent_worktree_collision /
+# reference_worktree_rechecked_out_by_sibling (the incident that needed a
+# forward-fix because a revert cannot separate entangled commits).
+# -----------------------------------------------------------------------------
+
+- id: git-worktree-add-discipline
+  description: Warn on `git worktree add` — give each parallel agent a dedicated worktree and pin git -C
+  applies_to: [Bash]
+  match:
+    - field: command
+      pattern: 'git[[:space:]]+worktree[[:space:]]+add\b'
+  action: warn
+  bypass_marker: null
+  memory_ref: reference_parallel_agent_worktree_collision.md
+  references:
+    - "Sibling re-checkout incident — collision needed a forward-fix (revert cannot separate entangled commits)"
+  message: |
+    WORKTREE DISCIPLINE: `git worktree add` detected.
+
+    Parallel subagents share one repo: a branch can be checked out in only ONE
+    worktree at a time, and an agent's shell cwd resets to the shared checkout
+    between commands — so a bare `git checkout` / `git worktree add` can switch
+    ANOTHER worktree's branch and commingle uncommitted work. Once commits
+    entangle, only a forward-fix recovers them (a revert cannot separate them).
+
+    When orchestrating agents that touch git:
+      - Give EACH agent its OWN dedicated worktree off the target branch:
+          git worktree add .claude/worktrees/wt-<slug> origin/develop
+      - Brief each agent to capture its toplevel once:
+          MYWT="$(git rev-parse --show-toplevel)"
+        and run ALL git as `git -C "$MYWT" ...` — never bare git, never
+        `git checkout` of another branch, never `git worktree` from an agent.
+      - Never spawn >=2 isolation:worktree subagents in one message (the
+        pre-task-worktree-isolation-guard hook blocks the 2nd; this is the
+        upstream nudge).
+  tests:
+    - name: warns-on-worktree-add
+      input:
+        tool_input:
+          command: 'git worktree add .claude/worktrees/wt-x origin/develop'
+      expected_exit: 0
+      expected_stderr_contains: 'git-worktree-add-discipline'
+    - name: warns-on-worktree-add-with-b-flag
+      input:
+        tool_input:
+          command: 'git worktree add -b feat/x .claude/worktrees/wt-x origin/develop'
+      expected_exit: 0
+      expected_stderr_contains: 'git-worktree-add-discipline'
+    - name: allows-worktree-list
+      input:
+        tool_input:
+          command: 'git worktree list'
+      expected_exit: 0
+    - name: allows-worktree-remove
+      input:
+        tool_input:
+          command: 'git worktree remove .claude/worktrees/wt-x'
+      expected_exit: 0
+    - name: allows-non-worktree-git
+      input:
+        tool_input:
+          command: 'git status'
       expected_exit: 0
