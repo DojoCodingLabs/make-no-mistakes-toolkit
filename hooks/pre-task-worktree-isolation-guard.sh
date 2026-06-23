@@ -43,6 +43,9 @@ HOOK_NAME="pre-task-worktree-isolation-guard.sh"
 # (pre-create + git -C, Rule 2) does NOT use isolation:worktree, so it never
 # trips this guard.
 WINDOW_SECONDS="${MNM_WORKTREE_GUARD_WINDOW:-90}"
+# A malformed MNM_WORKTREE_GUARD_WINDOW would break the `(( … ))` arithmetic
+# below under `set -u`; fall back to the default when it is not a positive int.
+[[ "$WINDOW_SECONDS" =~ ^[1-9][0-9]*$ ]] || WINDOW_SECONDS=90
 
 [[ "${CLAUDE_DISABLE_PLUGIN_HOOKS:-}" == "1" ]] && exit 0
 command -v jq >/dev/null 2>&1 || exit 0          # fail-open: no jq
@@ -64,27 +67,32 @@ LOCK_DIR="$LOCK_ROOT/${SESSION_ID}.lockd"
 now="$(date +%s 2>/dev/null || echo 0)"
 [[ "$now" =~ ^[0-9]+$ ]] || exit 0                # fail-open: no clock
 
-# Reclaim a stale lock from a prior (already-provisioned) batch.
-if [[ -d "$LOCK_DIR" ]]; then
-  last="$(cat "$LOCK_DIR/ts" 2>/dev/null || echo 0)"
-  [[ "$last" =~ ^[0-9]+$ ]] || last=0
-  if (( now - last >= WINDOW_SECONDS )); then
-    rm -rf "$LOCK_DIR" 2>/dev/null || true
-  fi
-fi
-
 # Atomic acquire. `mkdir` is atomic across simultaneous processes, so when two
 # hooks fire at once (parallel tool calls in one assistant message) exactly one
-# wins — a plain `[[ -f lock ]]` test would let BOTH through.
+# wins — a plain `[[ -f lock ]]` test would let BOTH through. The lock dir is
+# NEVER deleted here: staleness is decided by the timestamp below, not by
+# existence, so there is no check-then-rm (TOCTOU) window in which a racing
+# process's freshly-created lock could be removed.
 if mkdir "$LOCK_DIR" 2>/dev/null; then
   printf '%s' "$now" > "$LOCK_DIR/ts" 2>/dev/null || true
-  exit 0                                          # the single in-flight spawn
+  exit 0                                          # first / uncontended spawn
 fi
 
-# Lock held within the window → this is a batched 2nd+ isolation:worktree spawn.
+# Lock already exists — decide by AGE, never by deleting it:
+#   - STALE (>= window): the prior spawn already finished provisioning, so this
+#     is not a racing batch → allow, rolling the window forward by refreshing
+#     the timestamp. (Accepted edge: if a brand-new batch fires simultaneously
+#     while the lock is already stale, both may refresh-and-allow — an
+#     over-allow, never corruption; the load-bearing safety is the pre-create +
+#     git -C pattern this guard nudges toward.)
+#   - FRESH (< window): a batched 2nd+ spawn inside the window → block.
 held="$(cat "$LOCK_DIR/ts" 2>/dev/null || echo "$now")"
 [[ "$held" =~ ^[0-9]+$ ]] || held="$now"
 age=$(( now - held ))
+if (( age >= WINDOW_SECONDS )); then
+  printf '%s' "$now" > "$LOCK_DIR/ts" 2>/dev/null || true   # roll the window
+  exit 0                                          # stale lock → prior spawn done
+fi
 
 cat >&2 <<EOF
 BLOCKED [${HOOK_NAME}]: a second isolation:worktree subagent ("${LABEL}") is
