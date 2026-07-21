@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `/observability-audit` command — a **runtime** audit of whether observability actually works, as opposed to whether it is configured. Where the six `audit-*` families statically inspect a repo, this one queries live systems and measures the **receiver** side: events actually received per emitting surface (a high instrumented-emitter count with a zero received count is the failure signature), whether the configured credential resolves to a live destination in the provider (matchable via secret-digest comparison without ever reading the secret's value), init branches that disable monitoring and continue with only a `console.*` line, alert-channel liveness and ownership (channels with zero events since creation read as coverage and are worse than none; an owner with no named backup decays silently), whether any alert fires on the **absence** of an expected outcome rather than only on thrown errors, and — generalizing all of the above — whether each alert has ever been demonstrated capable of going red. Encodes the rule *no control is considered deployed until it has been demonstrated capable of going red*, and the remediation-ordering constraint that the receiver-side counter ships **before** any credential is corrected, so a subsequent green coverage metric is provably a lie. Distinguishes itself from chaos engineering, which presupposes the measurable steady state that a dead telemetry pipeline lacks.
+
+## [1.33.0] - 2026-06-15
+
+### Added
+- `/handover-pr` — the mirror of `/takeover-pr`. Packages your own open PR(s) or current-branch work into a structured Slack handover and posts it to a thread for a teammate to pick up. Gathers the same per-PR context as `/takeover-pr` (details, diff, CI, Linear, reviewer/bot verdict, mergeability, what's-left) but the output is a handover post — buckets for Shipped / In review / Subsystems / Diagnosis-gotchas / Next-steps-with-owners / Blocked. Follows the Slack formatting conventions of `/daily-standup-post-slack` (`-` bullets, repo sub-leveling, hyperlinked PRs + Linear issues) and supports `draft`, `broadcast` (threaded reply also surfaced in-channel via `reply_broadcast`), and a thread-URL destination as `$ARGUMENTS`.
+
 ## [1.32.0] - 2026-06-03
 
 ### Added
