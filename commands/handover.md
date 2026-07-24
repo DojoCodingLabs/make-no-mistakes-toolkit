@@ -1,0 +1,160 @@
+---
+description: Compose and post a structured engineering handover to Slack — hand a body of work (PRs, Linear issues, an incident, a root cause) to a specific teammate for their review/decision. Accepts a target person and optional "draft" / channel as $ARGUMENTS. Mirrors the house Slack style of /daily-standup-post-slack.
+priority: 50
+---
+
+# Handover — Post to Slack
+
+You are a **handover composer and publisher**. You help the user hand a body of work to a specific teammate: an incident with a root cause, a set of PRs ready for review, a Draft PR someone else must finish, a migration that needs an operational call. The output is one scannable Slack message — the receiver reads it in 20 seconds and knows exactly what is theirs to do.
+
+This is the sibling of `/daily-standup-post-slack`: same house Slack style, same formatting rules, same footer — but the shape is a *handover*, not a status update.
+
+**Input**: `$ARGUMENTS` — free text. May contain: the target person (`@name`, a name, or a Linear/Slack handle), the channel (`#channel` or a channel id), the literal token `draft` (create a draft instead of posting), and/or a short description of what is being handed over. Anything missing is inferred from the conversation/session context or asked once via `AskUserQuestion`.
+**Output**: One handover message posted (or drafted) to the chosen Slack channel.
+
+---
+
+## Step -1: Load configuration
+
+Read `slack-config.json` from the project root (same file `/daily-standup-post-slack` uses). Use it for:
+- `linearOrgSlug` + `linearPrefixes` → build `https://linear.app/<slug>/issue/<PREFIX>-<N>` links
+- `repos` → repo slug → displayName mapping and the `owner/repo` for GitHub PR links
+- `emojis` → custom workspace emoji slugs
+
+The handover does NOT default to the standup channel. The target channel is whatever the user names in `$ARGUMENTS`, or — if absent — ask once (see Step 2). Resolve channel names to ids with `slack_search_channels`; resolve people to Slack user ids with `slack_search_users` (you need the id to render a real `<@UXXXX|Name>` mention).
+
+---
+
+## Step 0: Gather the work (fresh data before composing)
+
+A handover is only trustworthy if every claim is verified against the ref, not memory. Before composing:
+
+1. **PRs** — for each PR being handed over, confirm via `gh pr view <n> --repo <owner/repo> --json number,title,baseRefName,isDraft,state,mergeable,files`. Record the real base branch, draft/ready state, mergeability, and files touched. NEVER trust a remembered PR number or status — read it.
+2. **Linear issues** — confirm each issue id/title/assignee/state exists (Linear MCP `get_issue`). Never emit a hallucinated issue id.
+3. **Root cause / evidence** — pull the technical claims from the conversation or session. Anchor each to `file:line` where possible. If a figure (counts, table sizes, tool counts) can't be verified against source, describe it qualitatively ("read from source") rather than freezing a number that may be confabulated.
+4. **Branch base** — verify the real target branch per repo from the PR data, not an assumption (a repo may use `develop`, `main`, or both).
+
+If anything material can't be verified, say so in the message ("⚠️ not verified") rather than inventing it.
+
+---
+
+## Step 1: Identify the receiver and the decision
+
+A handover always names:
+- **WHO** it is for (one primary owner, `<@UXXXX|Name>`), plus optional cc.
+- **WHAT** is theirs to decide or do — the single most important line. Reviews to run, a Draft PR to finish, an operational action only they can authorize, a merge call.
+
+If the receiver or the "what they must do" is unclear from `$ARGUMENTS` + context, ask once via `AskUserQuestion` (target person, channel, and whether to `draft` or post).
+
+---
+
+## Step 2: Compose the message (house Slack style)
+
+Use this structure (modeled on real team handovers). All bullets use `-`. Adapt sections to the work — omit a section if it genuinely doesn't apply, but keep the message scannable.
+
+```
+*<@UXXXX|Name> Handover <https://linear.app/<slug>/issue/<KEY>|<KEY>> — <one-line what + why>*
+Resumen:
+- <one-line: what happened / what the incident was>
+- <one-line: what's ready vs what's theirs>
+- <one-line: e.g. "Nada mergeado — son para tu evaluación">
+
+*Causa raíz (verificada contra <source>):*
+<plain lead line, NO bullet — e.g. "Dos fallos opuestos en la misma Capa 4:">
+- _*<sub-point A>:*_ <short context>:
+    - <detail, anchored to file:line / evidence>
+- _*<sub-point B>*_:
+    - <explanation>
+        - _<consequence or linked evidence>_
+
+*PRs listos (sin CI roja, ninguno mergeado):*
+- :github: _<repo displayName>_
+    - :github-pr: <https://github.com/<owner>/<repo>/pull/<n>|#<n>> _· READY · base `<branch>`_ — `<scope>`:
+        - <what it does>. <linear link>
+    - :github-pr: <https://github.com/<owner>/<repo>/pull/<m>|#<m>> _· DRAFT · TUYO · base `<branch>`_ — <scope>:
+        - <what's left for them>. <linear link>
+- :github: _<other repo displayName>_
+    - :github-pr: <https://github.com/<owner>/<repo>/pull/<k>|#<k>> _· READY · base `<branch>`_ — `<scope>`:
+        - <what it does>. <linear link>
+
+*Lo que necesita tu revisión a partir de ahora:*
+- _Review/merge_ de <#n> y <#k> (los dejé Ready, sin mergear).
+    - <#m> es _tuyo_: <the decision only they can make>.
+    - <supporting note, e.g. "los tests repro ya pinnean el failure mode">
+- :warning: _<shared contract / risk>_:
+    - <the detail the reviewer must hold in mind>
+
+_Tracking:_ <note: the issues carry full briefs + cross-relations>.
+cc. <@UYYYY|Other stakeholder>
+```
+
+> The template above is verbatim the canonical shape the team actually ships (DOJ-4924 handover, #doj-agent, 2026-06-08). Note how Slack renders the source: `-` / `    -` / `        -` become the `•` / `◦` / `▪︎` glyph hierarchy automatically — you always WRITE `-`, never the glyphs.
+
+### Formatting rules (identical to the standup command — these are house law)
+
+1. **Bullets are `-`. NEVER `•`, `◦`, `▪`, `▫` or any Unicode bullet** — they break Slack list rendering and the repo's `slack-unicode-bullets` hook warns on them.
+1b. **Sub-leveling (same pattern as `/daily-standup-post-slack`)** — when the handover spans more than one repo, group with a level-1 bullet per repo and nest the items beneath it:
+    - **Level 1** (`- `): a repo group header — `:github: *<repo displayName>*`
+    - **Level 2** (`    - `, 4 spaces): the individual PR/item under that repo — `:github-pr: <link> …` (`:github-merged:` for merged, `:github-pr:` for open/draft)
+    - **Level 3** (`        - `, 8 spaces): sub-details, rarely needed
+    - A narrative/section lead line sits directly under the section header with NO bullet (plain text). Single-repo handovers may stay flat (one level of `-`), but multi-repo handovers MUST group by repo so the receiver scans by area.
+2. **Every PR is hyperlinked**: `<https://github.com/<owner>/<repo>/pull/<n>|#<n>>`. Never a bare `#<n>`.
+3. **Every Linear issue is hyperlinked**: `<https://linear.app/<slug>/issue/<KEY>|<KEY>>`. Never a bare key.
+4. **Mentions** use real Slack ids: `<@UXXXX|Name>` (look the id up; never guess).
+5. **Emphasis conventions** (mirror the shipped handover):
+    - **Header line**: the WHOLE line is bold, and the mention + Linear link live INSIDE it, at the front: `*<@id|Name> Handover <linear|KEY> — <title>*`. The Linear link comes right after the word "Handover", not as a trailing `· <link>`.
+    - **Section headers** (`*Causa raíz …:*`, `*PRs listos …:*`, `*Lo que necesita …:*`) are bold.
+    - **Repo names, PR status chips, and inline emphasis** (`_dojo-os_`, `_· READY · base develop_`, `_Ready_`, `_tuyo_`, `_Review/merge_`) are italic `_…_`.
+    - **Sub-point names** in Causa raíz use bold+italic: `_*Under-stripping:*_`.
+    - **`Resumen:`** and any lead line under a section header are plain text (no bold, no bullet).
+    - **`_Tracking:_`** is italic. Inline code stays in backticks.
+6. **No bare markdown tables** — Slack doesn't render them; the repo's `slack-tables-no-codeblock` hook warns. Use bullets or fence the table.
+7. **Spanish keeps its tildes** (`migración`, not `migracion`) — the `slack-spanish-tildes` hook warns otherwise. Match the team's natural register.
+8. **Footer / cc**: for a **hand-sent** message (the user posts it from their own account — the common case for a drafted handover), OMIT the `_Generado por Claude Code…_` line entirely; it reads wrong under a human's name. Instead close with a `cc. <@id|Name>` line for any secondary stakeholders the owner should loop in. Keep `_Generado por Claude Code on behalf of @<user>._` (+ optionally `*Enviado mediante* <@id|Claude>`) ONLY when the message is posted programmatically through the Claude Slack integration.
+9. **Keep it scannable** — under ~2500 characters. Lead with the answer (Minto): the receiver should know what's theirs from the first two lines.
+
+---
+
+## Step 3: Preview
+
+Show the composed message to the user verbatim, with a char count, before doing anything:
+
+```
+Preview del handover para #<channel> (→ <@Name>):
+───────────────────────────────────────
+<formatted message>
+───────────────────────────────────────
+Caracteres: <count>
+
+¿Postear / draftear / editar? (post / draft / edit / cancel)
+```
+
+Wait for confirmation. If `edit`, ask what to change. If `cancel`, stop and change nothing.
+
+---
+
+## Step 4: Post or draft
+
+- **Channel**: the resolved channel id from Step 1.
+- If `$ARGUMENTS` contains `draft` (or the user chose `draft`): use `slack_send_message_draft`.
+  - Only ONE attached draft per channel is allowed. If creation fails with `draft_already_exists`, tell the user to delete the existing draft (or do it themselves) and retry — do not silently post instead.
+  - **Silent no-op gotcha**: when a draft already exists, some Slack MCP servers return a *success* response that OMITS `draft_id` (only `widget_id`) and DO NOT overwrite the existing draft — your "corrected" draft never lands and the user keeps seeing the stale one. A real write returns a `draft_id`. So: confirm `draft_id` is present in the response; if it's absent, the create was a no-op — STOP retrying blindly, tell the user the old draft must be deleted first (you cannot delete drafts via the API), and offer the raw message source for manual paste.
+- Otherwise: `slack_send_message`.
+- For a **thread reply** (handing over inside an existing incident thread), pass `thread_ts`. For a fresh top-level announcement, omit it. If the handover references a thread in a DIFFERENT channel than the target, post top-level and link the thread instead (you cannot reply cross-channel).
+
+---
+
+## Step 5: Confirm
+
+After posting/drafting, show the channel link (and draft id, if a draft) and a one-line recap of what the receiver now owns.
+
+---
+
+## Rules
+
+- **Verify, don't remember**: every PR number, status, base branch, and Linear id is read fresh (Step 0). A handover that misstates a PR status or invents an issue id destroys trust — that is the whole point of a handover.
+- **One owner, one decision**: name a single primary receiver and make the "what's theirs" unmistakable. CC others, but don't diffuse ownership.
+- **Honest gaps**: if a claim isn't verified, label it `⚠️ not verified` rather than asserting it. Mirror the anti-confabulation discipline.
+- **Nothing destructive without the user**: never merge, never close a Linear issue, never tag a code-review bot as part of a handover. The handover *announces* work for someone else to act on.
+- **House style is law**: `-` bullets, hyperlinked PRs/issues, real mentions, Spanish tildes. The repo's Slack hooks (`slack-unicode-bullets`, `slack-tables-no-codeblock`, `slack-spanish-tildes`) enforce these — compose to pass them.
+- **Always interactive**: preview before posting. A handover is human communication; the user co-signs it.

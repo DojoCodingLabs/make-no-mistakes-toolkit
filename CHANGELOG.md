@@ -18,14 +18,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- `/handover-pr` command — the mirror of `/takeover-pr`: packages your own open PR(s) or current branch work into a structured handover and posts it to a Slack thread for a teammate to pick up. Takeover pulls a teammate's work toward you; handover pushes yours to them. Output is the Slack post, not a local checkout.
-- `/observability-audit` command — a **runtime** audit of whether observability actually works, as opposed to whether it is configured. Where the six `audit-*` families statically inspect a repo, this one queries live systems and measures the **receiver** side: events actually received per emitting surface (a high instrumented-emitter count with a zero received count is the failure signature), whether the configured credential resolves to a live destination in the provider (matchable via secret-digest comparison without ever reading the secret's value), init branches that disable monitoring and continue with only a `console.*` line, alert-channel liveness and ownership (channels with zero events since creation read as coverage and are worse than none; an owner with no named backup decays silently), whether any alert fires on the **absence** of an expected outcome rather than only on thrown errors, and — generalizing all of the above — whether each alert has ever been demonstrated capable of going red. Encodes the rule *no control is considered deployed until it has been demonstrated capable of going red*, and the remediation-ordering constraint that the receiver-side counter ships **before** any credential is corrected, so a subsequent green coverage metric is provably a lie. Distinguishes itself from chaos engineering, which presupposes the measurable steady state that a dead telemetry pipeline lacks.
+## [1.34.0] - 2026-07-24
 
-## [1.33.0] - 2026-06-15
+Consolidates work that accumulated on `feat/audit-engine-phase2-enforcement` after
+`1.30.0` was squash-merged. Four commands and one skill existed locally (and in
+installed caches) but had no representation on `main`; this release lands them.
+
+> **Version note.** `1.33.0` was published twice, independently: `main` shipped
+> `/handover` on 2026-06-08, while this branch shipped `/handover-pr` on
+> 2026-06-15. `main`'s entry is preserved below as the canonical `1.33.0`; the
+> branch's content is republished here as `1.34.0`.
 
 ### Added
-- `/handover-pr` — the mirror of `/takeover-pr`. Packages your own open PR(s) or current-branch work into a structured Slack handover and posts it to a thread for a teammate to pick up. Gathers the same per-PR context as `/takeover-pr` (details, diff, CI, Linear, reviewer/bot verdict, mergeability, what's-left) but the output is a handover post — buckets for Shipped / In review / Subsystems / Diagnosis-gotchas / Next-steps-with-owners / Blocked. Follows the Slack formatting conventions of `/daily-standup-post-slack` (`-` bullets, repo sub-leveling, hyperlinked PRs + Linear issues) and supports `draft`, `broadcast` (threaded reply also surfaced in-channel via `reply_broadcast`), and a thread-URL destination as `$ARGUMENTS`.
+- `/resolve-open-questions` command + skill — sweep a session for open decisions and buried questions, then resolve them in batches via `AskUserQuestion` (recommended option first, trade-off per option), emitting a `decision → action` log and executing without re-asking.
+- `/observability-audit` command — a **runtime** audit of whether observability actually works, as opposed to whether it is configured. Where the six `audit-*` families statically inspect a repo, this one queries live systems and measures the **receiver** side: events actually received per emitting surface (a high instrumented-emitter count with a zero received count is the failure signature), whether the configured credential resolves to a live destination in the provider (matchable via secret-digest comparison without ever reading the secret's value), init branches that disable monitoring and continue with only a `console.*` line, alert-channel liveness and ownership, whether any alert fires on the **absence** of an expected outcome rather than only on thrown errors, and whether each alert has ever been demonstrated capable of going red. Encodes the rule *no control is considered deployed until it has been demonstrated capable of going red*.
+- `/postmortem` command — post-incident report in the house style.
+- `/handover-pr` command — the PR-scoped mirror of `/takeover-pr`. Takeover pulls a teammate's PR toward you; handover packages your own open PR(s) or current-branch work into a structured Slack thread post for someone else to pick up. Complements the broader `/handover` shipped in `1.33.0`: `/handover` hands off any body of work, `/handover-pr` specializes in the PR-context gathering `/takeover-pr` already models.
+
+### Fixed
+- `/e2e-test-runner` hardcoded a BDD toolchain in two places (the extract step and the Full Regression strategy), so it could not run in a repo with Playwright/Vitest but no cucumber-js / playwright-bdd. Both now derive `extract_cmd` / `run_cmd` from `meta.runners`, matching Step 2 which already dispatched that way. A project with no BDD extraction step declares no `extract_cmd` and the loop is a no-op.
+- `/e2e-test-runner` result output honors `meta.output_dir` (default `results/`), so a caller can redirect results without editing the command.
+- `/e2e-test-runner` sample output used a project-specific suite name; now generic.
+
+### Changed
+- Advertised component counts corrected across `marketplace.json`: previously `29 commands, 10 skills` against an actual `35 / 11`. Commands are auto-discovered from `commands/*.md`, so the manifest never gated availability — the description was simply misreporting the surface.
+
+## [1.33.0] - 2026-06-08
+
+### Added
+- `/handover` command — compose and post (or draft) a structured engineering handover to Slack: hand a body of work (PRs, Linear issues, an incident + root cause, a Draft PR someone else must finish) to a specific teammate for their review/decision. Sibling of `/daily-standup-post-slack`, sharing its house Slack style: `-` bullets (never `•`), hyperlinked PRs/issues, real `<@id|Name>` mentions, Spanish tildes — composed to pass the `slack-unicode-bullets`, `slack-tables-no-codeblock`, and `slack-spanish-tildes` hooks. Adds a verify-don't-remember step (every PR status / base branch / Linear id read fresh, never recalled), one-owner/one-decision framing, and an interactive preview before posting.
 
 ## [1.32.0] - 2026-06-03
 
@@ -661,7 +682,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.32.0...HEAD
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.34.0...HEAD
+[1.34.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.34.0
+[1.33.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.33.0
 [1.32.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.32.0
 [1.30.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.30.0
 [1.29.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.29.0
