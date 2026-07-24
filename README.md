@@ -1,6 +1,6 @@
 # make-no-mistakes
 
-**Version: 1.33.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
+**Version: 1.34.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
 
 The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.
 
@@ -110,6 +110,7 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:atomic-rules-init`](commands/atomic-rules-init.md) | Scaffold a `.atomic-design-rules.json` at the repo root so the atomic-design hooks (PreToolUse ownership enforcement + PostToolUse drift telemetry) start enforcing. No-op if the file already exists |
 | [`/make-no-mistakes:e2e-test-preview [path]`](commands/e2e-test-preview.md) | Launch a Qt-based visual previewer for `test-suite.json` — interactive table with filtering, detail pane, and CSV export (auto-installs PySide6) |
 | [`/make-no-mistakes:gemini-code-review [target]`](commands/gemini-code-review.md) | Cheap first-pass code review (one-shot via liteLLM) on a parametrizable model — Gemini 3.5 Flash by default; supports `--model` and `--adversarial`, curated against the repo's CLAUDE.md |
+| [`/make-no-mistakes:observability-audit [target]`](commands/observability-audit.md) | Runtime audit of whether observability actually **works** rather than exists — measures events *received* per emitting surface, matches the configured credential to a live destination, finds init paths that silently disable monitoring, checks alert-channel liveness/ownership, and flags every alert never demonstrated capable of firing |
 
 ### Skills (10)
 
