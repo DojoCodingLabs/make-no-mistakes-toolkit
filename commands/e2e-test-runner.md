@@ -160,7 +160,7 @@ Test Execution Report — run-2026-03-23T14-30-00-a7k2m
 ═══════════════════════════════════════════════════════
 
 Strategy: smoke
-Suite: dojo-agent-openclaw-plugin v1.0.0
+Suite: example-plugin v1.0.0
 
 Runner              Cases    Passed    Failed    Skipped
 ─────────────────────────────────────────────────────────
