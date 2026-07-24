@@ -76,11 +76,20 @@ jq "[.test_cases[] | $FILTER]" "$SUITE" > /tmp/filtered-cases.json
 
 ### Step 1: Extract .feature Files (for automated runners)
 
-Check `meta.runners` for runners with `type: "automated"` and `extract_cmd` set:
+Run **each automated runner's own `extract_cmd`** from `meta.runners` — never
+assume a single fixed extraction script:
 
 ```bash
-./scripts/extract-features.sh
+# derive per-runner from the suite; do not hardcode a script name
+jq -r '.meta.runners | to_entries[]
+       | select(.value.type == "automated" and .value.extract_cmd)
+       | .value.extract_cmd' test-suite.json \
+  | while read -r cmd; do eval "$cmd"; done
 ```
+
+A project that declares `extract_cmd: "./scripts/extract-features.sh"` runs that;
+a Playwright-only / Vitest project with no BDD extraction step declares no
+`extract_cmd` and this loop is a no-op.
 
 ### Step 2: Execute by Runner Type
 
@@ -102,8 +111,12 @@ For each test case, check `project.runners[]` and dispatch to the appropriate ru
 Generate an immutable result file:
 
 ```
-results/run-{YYYY-MM-DDTHH-mm-ss}-{5char-salt}.json
+{output_dir}/run-{YYYY-MM-DDTHH-mm-ss}-{5char-salt}.json
 ```
+
+`{output_dir}` is `meta.output_dir` if set, else `results/` — cwd-relative
+either way, so a caller can redirect results (e.g. a QA round writing under its
+own evidence directory) without editing this command.
 
 Schema:
 
@@ -217,10 +230,14 @@ jq '[.test_cases[] | select(.project.coverage_type == "happy_path")] | group_by(
 Run everything:
 
 ```bash
-./scripts/extract-features.sh
-npx cucumber-js --format html:reports/cucumber.html
-npx bddgen && npx playwright test --reporter=html
-# Interactive runners: execute via MCP tools
+# Automated runners: run each declared runner's own extract_cmd + run_cmd from
+# meta.runners — never hardcode cucumber-js / bddgen (a repo may be Playwright-only,
+# Vitest, behave, etc.). This keeps Full Regression consistent with Step 2.
+jq -r '.meta.runners | to_entries[]
+       | select(.value.type == "automated")
+       | [.value.extract_cmd, .value.run_cmd] | map(select(.)) | .[]' test-suite.json \
+  | while read -r cmd; do eval "$cmd"; done
+# Interactive runners (chrome-devtools-mcp, slack-mcp, …): execute via MCP tools
 ```
 
 ### C: Targeted Investigation
