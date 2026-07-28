@@ -39,14 +39,21 @@ Why this is the default:
 - Completion is delivered as a `<task-notification>` inside the orchestrator's context — no polling needed.
 - Each sub-agent's worktree is locked and isolated, so parallel edits never conflict.
 
-### Mode B — Agent Teams CLI (experimental, legacy)
+### Mode B — Separate top-level sessions (experimental)
 
 ```bash
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-claude --team "Implement ALT-13, ALT-14, ALT-15 in parallel with worktree isolation"
+claude --agent-teams        # then describe the parallel work in-session
 ```
 
-Use this only when you explicitly want a separate top-level session per teammate (e.g., different model selection per agent, or longer-running work that outlives the current session). For most issues Mode A is cheaper and simpler.
+Use this only when you explicitly want a separate top-level session per agent (e.g., different model selection per agent, or longer-running work that outlives the current session). For most issues Mode A is cheaper and simpler.
+
+Two corrections if you have seen older instructions for this mode:
+
+- **The flag is `--agent-teams`, not `--team`.** There is no `--team` flag.
+- **The env var does not create the parallelism.** Mode A's `Agent` + `isolation: "worktree"` fan-out runs with or without it. What the flag gates is the *coordination* layer on top — the teammate mailbox, shared team context, assigning a task to a teammate — and it is ANDed with a server-side gate, so setting it locally does not guarantee the layer is live. There is no `TeamCreate` tool in current harnesses; team lifecycle was folded into `Agent` (`name` makes an agent addressable via `SendMessage`, during and after its run). Its absence is expected and is not a failure to report.
+
+See `/make-no-mistakes:parallelize` for the full capability gate and the decomposition protocol.
 
 ### When to parallelize vs. run sequentially
 

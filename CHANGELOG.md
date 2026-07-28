@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `/parallelize` command — decompose a body of work and fan it out across named, worktree-isolated agents, then converge the results. Opens with a **mandatory capability gate** that reads two things instead of one: the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` flag *and* the live tool surface. Neither alone gives a correct answer — the flag can be set while a server-side gate disables the coordination layer, and `TeamCreate` is absent by design in current harnesses because team lifecycle was folded into the `Agent` tool (`name` + `isolation: "worktree"`, coordinated by `SendMessage`). The gate therefore treats *flag set + `TeamCreate` absent* as the *normal, working* configuration and aborts only when `Agent` itself lacks `isolation`; a command that reported "teams unavailable" on a missing `TeamCreate` would be reporting a harness upgrade as an outage. Also encodes: decomposition by **who can execute a step** (a stream whose central step needs a human — reading a credential's value, changing a provider setting — becomes its own agent producing *artifacts rather than actions*), per-agent worktree isolation with disjoint file ownership, `shutdown_request` via `SendMessage` rather than `TaskStop`, Opus-or-inherit for subagents, and the 3-4x cost check that makes "don't parallelize this" a valid outcome.
+
+### Fixed
+- `/implement` Mode B documented `claude --team`, a flag that does not exist — the real one is `--agent-teams` — and framed `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` as what enables parallel execution. Corrected on both counts, with the `TeamCreate`-is-expected-absent note so the next reader does not diagnose a harness upgrade as a broken setup.
+- `audit-engine` Stage 0 and `domain-driven-advisor` Step 4 gated fan-out on the agent-teams flag, so a user who declined it was routed to a slower fallback despite the fan-out primitive being fully available. Both now confirm the primitive first (`Agent` with `name` + `isolation`), fan out regardless of the flag, and recommend the flag separately for the coordination layer it actually gates. Declining now costs mid-run coordination, not parallelism. Same reframing applied to the README's "Faster with agent teams" section and the advisor's sample session.
+
 ## [1.34.0] - 2026-07-24
 
 Consolidates work that accumulated on `feat/audit-engine-phase2-enforcement` after
