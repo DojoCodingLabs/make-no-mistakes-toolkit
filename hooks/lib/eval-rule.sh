@@ -151,6 +151,7 @@ while [ "$i" -lt "$N_CONDITIONS" ]; do
   PATTERN="$(printf '%s' "$COND" | jq -r '.pattern // empty')"
   NOT_PATTERN="$(printf '%s' "$COND" | jq -r '.not_pattern // empty')"
   FLAGS="$(printf '%s' "$COND" | jq -r '.flags // empty')"
+  NORMALIZE="$(printf '%s' "$COND" | jq -r '.normalize // empty')"
 
   # Resolve which input variable to inspect.
   case "$FIELD" in
@@ -161,6 +162,43 @@ while [ "$i" -lt "$N_CONDITIONS" ]; do
     old_string) VALUE="$INPUT_OLD_STRING" ;;
     *)
       # Unknown field — treat as condition failure (rule won't fire).
+      exit 0
+      ;;
+  esac
+
+  # Optional per-condition normalization, applied BEFORE matching.
+  #
+  # Why per-condition and not per-rule: a verb-scoped rule needs to read two
+  # different surfaces of the same command. "Does this name a production
+  # target?" is a question about the FLAGS (`--project=acme-prod`), while
+  # "is this a mutation or a read?" is a question about the VERB, which the
+  # flags only obscure. One condition therefore matches raw, the next matches
+  # normalized.
+  #
+  # strip-flags: drop every `--flag` / `--flag=value` and collapse runs of
+  # whitespace, so the surface form of the command stops mattering. Substring
+  # matching on `"<tool> <verb>"` is otherwise evaded by any global flag placed
+  # earlier — `gcloud --project=x compute instances delete` — and a guard whose
+  # bypass is "move a flag" is not a guard.
+  #
+  # Quoted arguments are deliberately NOT stripped. Doing so would let a real
+  # mutation hide inside `bash -c "... delete ..."`, and a false negative in a
+  # guard is silent, while a false positive is visible and has a documented
+  # bypass. The residual cost is that a read whose quoted argument happens to
+  # contain a mutating word (e.g. a log filter naming a `delete-*` resource)
+  # can still trip a verb-scoped rule.
+  #
+  # An unknown normalize value fails OPEN (exit 0) rather than matching on
+  # un-normalized input, which would silently restore the over-broad behavior
+  # the normalization was added to fix.
+  case "$NORMALIZE" in
+    "")
+      ;;
+    strip-flags)
+      VALUE="$(printf '%s' "$VALUE" | sed -E 's/--[A-Za-z0-9_-]+=[^[:space:]]*//g; s/--[A-Za-z0-9_-]+//g; s/[[:space:]]+/ /g')"
+      ;;
+    *)
+      echo "make-no-mistakes: rule ${RULE_ID} condition ${i} has unknown normalize '${NORMALIZE}'; skipping rule." >&2
       exit 0
       ;;
   esac

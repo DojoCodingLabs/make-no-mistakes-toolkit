@@ -147,6 +147,22 @@ for (const rule of rules) {
     }
   }
 
+  // Per-condition `normalize` is optional, but when present must name a
+  // transform eval-rule.sh implements. A typo would otherwise fail open at
+  // runtime (eval-rule.sh skips the rule on an unknown value) — correct as a
+  // runtime posture, but silent, so a whole protection could disappear on a
+  // misspelling that never reaches a human. Catch it at build time instead.
+  const KNOWN_NORMALIZERS = ['strip-flags'];
+  for (const [idx, cond] of rule.match.entries()) {
+    if (cond.normalize === undefined || cond.normalize === null) continue;
+    if (!KNOWN_NORMALIZERS.includes(cond.normalize)) {
+      console.error(
+        `rule ${rule.id} match[${idx}] has unknown normalize: ${JSON.stringify(cond.normalize)}. Known: ${KNOWN_NORMALIZERS.join(', ')}`,
+      );
+      process.exit(1);
+    }
+  }
+
   // disable_if_repo_file is optional. When present it must be a flat
   // filename (no slashes, no leading dot-only sentinels) so the runtime
   // check `[ -f "./<name>" ]` cannot reach outside the cwd. Mirrors the
