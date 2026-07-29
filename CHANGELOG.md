@@ -18,11 +18,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-07-29
+
 ### Added
+- **`/explain <topic>`** — explains something in two layers, then converts the
+  explanation into a decision. The layers are not the same content at two levels
+  of detail: prose answers *what is going on and why it matters*, technical
+  answers *where exactly and how*. A prose layer that is only the technical layer
+  in smaller words is redundant, gets skipped, and kills the format within a few
+  uses — so the command carries that as its own pass/fail test rather than as
+  advice.
+
+  Two steps carry the weight. **Step 0 requires reading the artifact before
+  writing a line**, because fluent prose about a mechanism *reads as*
+  understanding, which makes this format unusually good at hiding that the file
+  was never opened. And **step 5 permits skipping `AskUserQuestion`** when the
+  explanation leaves no decision open — a menu invented to satisfy the format
+  trains the reader to ignore the menus that matter.
+
+  The insight block earns its place only by saying something not derivable from
+  the two layers above it; if it summarizes, the command says to delete it.
+
+- **`make-no-mistakes.config.json`** (see
+  `commands/make-no-mistakes.config.example.json`) — optional per-project file
+  for toolkit-wide behaviour, starting with `language` (default `es`) and
+  `diacritics`. A third config on purpose: `slack-config.json` and
+  `linear-setup.json` answer *where things go*, and a preference parked in a
+  domain config is invisible to every command that does not touch that domain.
+  The boundary is written into the file itself.
+
+  `language` governs **prose addressed to the user only**. Code, identifiers,
+  commit messages, PR titles and bodies, and Linear issues follow the target
+  repo's own convention. Wired into `/explain`; retrofitting the other commands
+  is deliberately left as separate work.
 - `normalize: strip-flags` on a rule's match condition — rewrites the field (drops `--flag` / `--flag=value`, collapses whitespace) before the pattern applies. Per-condition rather than per-rule, because a verb-scoped rule reads two surfaces of one command: the flags answer "does this target production?", the verb answers "is this a mutation?". Unknown values fail open at runtime and are rejected at build time by `build-rules.mjs`. Documented in `hooks/rules/README.md`, including why quoted arguments are deliberately left unstripped.
 - `/parallelize` command — decompose a body of work and fan it out across named, worktree-isolated agents, then converge the results. Opens with a **mandatory capability gate** that reads two things instead of one: the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` flag *and* the live tool surface. Neither alone gives a correct answer — the flag can be set while a server-side gate disables the coordination layer, and `TeamCreate` is absent by design in current harnesses because team lifecycle was folded into the `Agent` tool (`name` + `isolation: "worktree"`, coordinated by `SendMessage`). The gate therefore treats *flag set + `TeamCreate` absent* as the *normal, working* configuration and aborts only when `Agent` itself lacks `isolation`; a command that reported "teams unavailable" on a missing `TeamCreate` would be reporting a harness upgrade as an outage. Also encodes: decomposition by **who can execute a step** (a stream whose central step needs a human — reading a credential's value, changing a provider setting — becomes its own agent producing *artifacts rather than actions*), per-agent worktree isolation with disjoint file ownership, `shutdown_request` via `SendMessage` rather than `TaskStop`, Opus-or-inherit for subagents, and the 3-4x cost check that makes "don't parallelize this" a valid outcome.
 
 ### Fixed
+- Two advertised counts had drifted apart from the directory and from each other.
+  `README.md` said **`### Commands (30)`** while its table listed 33 and
+  `commands/` held 36; `marketplace.json` said 35. Three commands had no row at
+  all — `resolve-open-questions` (the sibling `/explain` cites), `postmortem`,
+  and `handover-pr`. Heading, table, marketplace and directory now agree at
+  **37**, and the agreement is checkable in one command instead of trusted.
 - `prod-ops-no-approval` blocked **read-only** commands against any resource whose name contained `prod`. A pure `<tool> services list --project=<name>-prod` was refused, so an inventory sweep came back with that project as its only unverified cell while the non-prod ones filled in normally. The rule matched the resource NAME; it now matches the **verb**. Reads (`list`, `describe`, `get`, `read`, anything not on the mutating block-list) and any command carrying `--dry-run` pass; `create` / `update` / `delete` / `deploy` / `start` / `stop` / `set-*` / `add-*` / `remove-*` and siblings stay blocked with exit 2. The verb condition matches a flag-stripped form of the command, so moving a global flag ahead of the verb no longer changes the verdict. Beyond the nuisance, a guard that blocks reads trains people to route around it, and that habit does not distinguish the read it over-blocked from the write it existed to stop.
 - `/implement` Mode B documented `claude --team`, a flag that does not exist — the real one is `--agent-teams` — and framed `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` as what enables parallel execution. Corrected on both counts, with the `TeamCreate`-is-expected-absent note so the next reader does not diagnose a harness upgrade as a broken setup.
 - `audit-engine` Stage 0 and `domain-driven-advisor` Step 4 gated fan-out on the agent-teams flag, so a user who declined it was routed to a slower fallback despite the fan-out primitive being fully available. Both now confirm the primitive first (`Agent` with `name` + `isolation`), fan out regardless of the flag, and recommend the flag separately for the coordination layer it actually gates. Declining now costs mid-run coordination, not parallelism. Same reframing applied to the README's "Faster with agent teams" section and the advisor's sample session.
@@ -691,7 +729,8 @@ installed caches) but had no representation on `main`; this release lands them.
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.34.0...HEAD
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.35.0...HEAD
+[1.35.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.35.0
 [1.34.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.34.0
 [1.33.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.33.0
 [1.32.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.32.0
