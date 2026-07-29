@@ -111,6 +111,7 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:e2e-test-preview [path]`](commands/e2e-test-preview.md) | Launch a Qt-based visual previewer for `test-suite.json` — interactive table with filtering, detail pane, and CSV export (auto-installs PySide6) |
 | [`/make-no-mistakes:gemini-code-review [target]`](commands/gemini-code-review.md) | Cheap first-pass code review (one-shot via liteLLM) on a parametrizable model — Gemini 3.5 Flash by default; supports `--model` and `--adversarial`, curated against the repo's CLAUDE.md |
 | [`/make-no-mistakes:observability-audit [target]`](commands/observability-audit.md) | Runtime audit of whether observability actually **works** rather than exists — measures events *received* per emitting surface, matches the configured credential to a live destination, finds init paths that silently disable monitoring, checks alert-channel liveness/ownership, and flags every alert never demonstrated capable of firing |
+| [`/make-no-mistakes:parallelize <work>`](commands/parallelize.md) | Decompose a body of work and fan it out across named, worktree-isolated agents. Opens with a mandatory capability gate that reads the agent-teams flag **and** the live tool surface (a retired `TeamCreate` is the healthy case, never an abort), splits streams by *who can execute them* as well as by topic, and converges the results into one report |
 
 ### Skills (10)
 
@@ -185,8 +186,9 @@ Tool: Scanning… found supabase/migrations and FE+edge validation.
       Q1: ¿Varios equipos escriben en la misma base de datos? > yes
       Q2: ¿El frontend y el backend validan los mismos datos por separado? > yes
       → Recommended: /audit-schema-drift + /audit-contract-drift, then enforcement.
-      Tip: enable agent teams for parallel audits — add
-           "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" to ~/.claude/settings.json
+      Tip: fan-out is on by default; for mid-run coordination between
+           verifiers, add "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+           to ~/.claude/settings.json
       Run them now? > yes
       … findings written to docs/repo-health/… + premortem report on ~/Escritorio.
 ```
@@ -198,14 +200,25 @@ remediation change, Bilingual-Layer Linear issues, and 4-cure scaffold
 proposals — plus a single premortem report (HTML + transcript) over the combined
 plan.
 
-### Faster with agent teams
+### Faster with parallel fan-out
 
-The audits fan out one verifier per finding, so they're much faster with a
-parallel agent team. The advisor will recommend enabling
-`"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` in `~/.claude/settings.json`
+The audits fan out one verifier per finding, so they're much faster in parallel.
+The parallelism itself comes from the `Agent` tool (`name` +
+`isolation: "worktree"`, coordinated by `SendMessage`) and needs no flag —
+there is no `TeamCreate` tool in current harnesses, and its absence is expected
+rather than a problem.
+
+What `"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` adds is the **coordination**
+layer on top: the teammate mailbox, shared team context, and assigning a task to
+a teammate. The advisor recommends enabling it in `~/.claude/settings.json`
 (it shows the exact one-line change; it never edits your settings without
-consent). If you decline, it falls back to subagent-driven-development on the
-latest Opus rather than a slow sequential crawl.
+consent). Decline and you still get the fan-out — you lose mid-run coordination,
+so each verifier is briefed self-contained and reports once at the end. Note the
+flag is ANDed with a server-side gate, so setting it locally doesn't guarantee
+the layer is live; the tool surface is what to believe.
+
+See [`/make-no-mistakes:parallelize`](commands/parallelize.md) for the full
+capability gate.
 
 ### Run a single audit directly
 

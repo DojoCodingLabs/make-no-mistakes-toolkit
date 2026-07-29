@@ -70,13 +70,18 @@ enforcement hooks for the other five are installed. (live: SCH/CDC/DDD/ARC/STR/E
 
 ---
 
-## Step 4 — Agent-teams preflight
+## Step 4 — Fan-out preflight
 
-Before executing, surface the Agent Teams recommendation (the audit-engine fans
-out per finding). Check `~/.claude/settings.json` for
-`"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"`; if missing, show the one-line
-diff and apply **only with the user's explicit consent** — never silently edit
-global settings:
+Before executing, establish the execution mode (the audit-engine fans out per
+finding). The parallelism comes from the `Agent` tool (`name` +
+`isolation: "worktree"`) and needs no flag; a missing `TeamCreate` is expected,
+not a blocker.
+
+Then surface the **coordination** recommendation: check the process env and
+`~/.claude/settings.json` for `"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"`,
+which gates the teammate mailbox and shared team context — not the parallelism
+itself. If missing, fan out anyway and show the one-line diff, applying it
+**only with the user's explicit consent** — never silently edit global settings:
 
 ```diff
   "env": {
