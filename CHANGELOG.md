@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `prod-ops-no-approval` blocked **read-only** commands against any resource whose name contained `prod`. A pure `<tool> services list --project=<name>-prod` was refused, so an inventory sweep came back with that project as its only unverified cell while the non-prod ones filled in normally. The rule matched the resource NAME; it now matches the **verb**. Reads (`list`, `describe`, `get`, `read`, anything not on the mutating block-list) and any command carrying `--dry-run` pass; `create` / `update` / `delete` / `deploy` / `start` / `stop` / `set-*` / `add-*` / `remove-*` and siblings stay blocked with exit 2. The verb condition matches a flag-stripped form of the command, so moving a global flag ahead of the verb no longer changes the verdict. Beyond the nuisance, a guard that blocks reads trains people to route around it, and that habit does not distinguish the read it over-blocked from the write it existed to stop.
+
+### Added
+- `normalize: strip-flags` on a rule's match condition — rewrites the field (drops `--flag` / `--flag=value`, collapses whitespace) before the pattern applies. Per-condition rather than per-rule, because a verb-scoped rule reads two surfaces of one command: the flags answer "does this target production?", the verb answers "is this a mutation?". Unknown values fail open at runtime and are rejected at build time by `build-rules.mjs`. Documented in `hooks/rules/README.md`, including why quoted arguments are deliberately left unstripped.
+
 ## [1.34.0] - 2026-07-24
 
 Consolidates work that accumulated on `feat/audit-engine-phase2-enforcement` after
