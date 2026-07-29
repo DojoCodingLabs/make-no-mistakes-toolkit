@@ -1,6 +1,6 @@
 # make-no-mistakes
 
-**Version: 1.34.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
+**Version: 1.35.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
 
 The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.
 
@@ -73,7 +73,7 @@ After the audit(s), it runs a **premortem** on the aggregated remediation plan, 
 
 ## What's Inside
 
-### Commands (30)
+### Commands (37)
 
 Deliberate actions you invoke explicitly.
 
@@ -90,10 +90,14 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:goodnight [label]`](commands/goodnight.md) | Save full session context as a handoff file for tomorrow |
 | [`/make-no-mistakes:pending-left`](commands/pending-left.md) | Track what's left unfinished across git, Linear, and session context |
 | [`/make-no-mistakes:summarize`](commands/summarize.md) | Structured recap of everything done in the current session |
+| [`/make-no-mistakes:explain <topic>`](commands/explain.md) | Explain something in two layers — plain prose first, then technical detail — closing with a non-obvious insight, ranked actionables, and `AskUserQuestion`. The prose layer answers *what is going on and why it matters*; the technical layer answers *where exactly and how*. If the prose is only the technical layer in smaller words, it is redundant and gets skipped |
 | [`/make-no-mistakes:daily-standup-add-completed [text]`](commands/daily-standup-add-completed.md) | Append completed work items to today's standup file (auto-detects from PRs/issues) |
 | [`/make-no-mistakes:daily-standup-post-slack [draft]`](commands/daily-standup-post-slack.md) | Compose and post today's standup to the configured Slack channel |
 | [`/make-no-mistakes:handover <@person> [#channel] [draft]`](commands/handover.md) | Hand a body of work (PRs, issues, an incident + root cause, a Draft someone must finish) to a specific teammate for review/decision — house Slack style, verify-don't-remember |
 | [`/make-no-mistakes:remind <topic>`](commands/remind.md) | Recall past decisions, instructions, or feedback from memory and project context |
+| [`/make-no-mistakes:resolve-open-questions [scope]`](commands/resolve-open-questions.md) | Sweep the session for open decisions and questions buried in prose, then resolve them in batches via `AskUserQuestion` with options + a recommendation. Executes immediately on the answers — one approval, one action |
+| [`/make-no-mistakes:postmortem <incident>`](commands/postmortem.md) | Compose a blameless post-incident report in the house style — evidence verified against logs/DB *before* writing — with the mandatory Causa Raíz / La Buena Noticia / Plan de Mitigación sections, adapted to a technical or a stakeholder audience |
+| [`/make-no-mistakes:handover-pr <repo> [pr#] <@person>`](commands/handover-pr.md) | Package your open PR(s) / branch work into a structured handover and post it to a Slack thread for a teammate to pick up. The mirror of `/takeover-pr` |
 | [`/make-no-mistakes:takeover-pr <repo> [pr#]`](commands/takeover-pr.md) | Pick a random open PR from a teammate, check it out, review it, and take over the work |
 | [`/make-no-mistakes:secret-input`](commands/secret-input.md) | Stage a secret/password via OS-native GUI dialog (Linux zenity/kdialog/pinentry, macOS osascript, Windows Get-Credential). The value never appears in the conversation log or terminal history. Cross-platform via `.sh` (Linux/macOS/WSL/Git Bash) + `.ps1` (native Windows) |
 | [`/make-no-mistakes:secret-use ENVVAR -- <cmd>`](commands/secret-use.md) | Run one command with the staged secret loaded as an environment variable. Env var lives only inside the consuming process and is unset on completion |

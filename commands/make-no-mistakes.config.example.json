@@ -1,0 +1,18 @@
+{
+  "_note": "Copy to `make-no-mistakes.config.json` at the ROOT of a project to set toolkit-wide behaviour for that project. Optional — every key has a default.",
+
+  "_boundary": "This file answers HOW THE TOOLKIT BEHAVES. The two domain configs answer WHERE THINGS GO: `slack-config.json` (channel IDs, repo display names, emoji) and `linear-setup.json` (team key, project mapping, SRD/OpenSpec paths). Do not add a channel or a Linear project here, and do not add a preference there — a preference that lives in a domain config is invisible to every command that does not touch that domain.",
+
+  "language": "es",
+  "_language": "Output language for commands that address the user in prose. BCP-47 or a bare two-letter code ('es', 'en', 'pt-BR'). Default: 'es'. This governs PROSE ONLY — code, identifiers, commit messages, PR titles/bodies, and Linear issues follow the target repo's own convention, which is usually English. A command that writes to GitHub or Linear must not translate that output just because this key is set.",
+
+  "diacritics": true,
+  "_diacritics": "Keep full orthographic correctness for the chosen language — accents, tildes, cedillas. Never substitute ASCII lookalikes ('nao' for 'não', 'anos' for 'años'). Default: true.",
+
+  "explain": {
+    "insight": true,
+    "actionables": true,
+    "askUserQuestion": "when-open-decisions"
+  },
+  "_explain": "Per-command overrides for /explain. `askUserQuestion` accepts 'when-open-decisions' (default — only call it if the explanation actually leaves a decision open), 'always', or 'never'. Setting 'always' is discouraged: a menu invented to satisfy the format trains the reader to ignore the menus that matter."
+}
