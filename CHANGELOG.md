@@ -18,6 +18,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.37.0] - 2026-07-31
+
+### Changed
+- **`rebase-advisor` → `sync-advisor`, and it now measures instead of asking.**
+  The old skill was 43 lines and measured nothing: step 1 was *"Confirm the user
+  wants a full team sync"* — a question back to the user about something three
+  git commands answer. Its `description` then over-routed, triggering on
+  `"align with develop"` and `"branches are behind"` — both `git pull` cases —
+  and sending them all to `/make-no-mistakes:rebase`, which stashes every
+  worktree, rebases every local branch and auto-merges PRs. Between `git pull`
+  and that, the toolkit offered nothing, and nothing read-only at all.
+
+  **Six read-only predicates** now run before anything is named: distance
+  (`git rev-list --left-right --count`), whether a fast-forward is possible
+  (`git merge-base --is-ancestor`), a dirty tree split into staged vs unstaged,
+  untracked files that the base ref already tracks, worktrees behind, and
+  branches carrying unpushed commits. The fifth is the threshold that decides
+  between a plain pull and the team command: one branch behind is a pull;
+  several worktrees behind is what `/rebase` was built for.
+
+  **The fourth predicate is the one nothing else reports.** An untracked local
+  file at a path the ref tracks aborts the pull outright, and it is invisible
+  everywhere else — verified on a throwaway pair of repos: `git status` shows
+  only `?? newfile.txt`, distance reports a clean `0 ahead, 1 behind`, and
+  `git merge-base --is-ancestor` says a fast-forward is possible. The pull then
+  exits 1 with *"The following untracked working tree files would be
+  overwritten by merge … Please move or remove them before you merge"* — the
+  message names the user's own file and offers deletion as the remedy, which is
+  the one irreversible move available. The skill reports these by name and
+  recommends copying them out of the repo; it never recommends deleting them.
+
+  **It never acts.** Every fix is printed for the user to run — `git pull`,
+  `git stash`, `git rebase`, `/make-no-mistakes:rebase`. The single write is
+  `git fetch origin --quiet`, which touches remote-tracking refs and nothing
+  else, and the skill says so out loud when it runs: without it every
+  measurement is taken against a stale `origin/<base>` and reports a drift that
+  stopped being true days ago, which is the failure the skill exists to catch.
+
+  `commands/rebase.md` is untouched and stays a real destination. What changed
+  is who decides when it applies — measured, not asked.
+
+### Added
+- **`syncAdvisor.governedPaths` in `make-no-mistakes.config.json`** (see
+  `commands/make-no-mistakes.config.example.json`) — the paths whose changes
+  `sync-advisor` reports **by name**, turning "you are 12 commits behind" into
+  "three hooks changed, two of them fix defects you may be looking at right
+  now". Repo-relative prefixes, fed to
+  `git diff --name-only HEAD...origin/<base> -- <path>` (three dots, so it
+  diffs from the merge base and shows what landed on the ref rather than what
+  the user changed locally).
+
+  **No default, and the degraded path omits the line rather than guessing.**
+  With the key unset the skill still reports distance and routing and simply
+  drops the consequence section. A built-in fallback list would be wrong in
+  every repo but the one it was copied from — and it would read as measured,
+  which is worse than a missing section. The key lives in the behaviour config
+  rather than in a domain config for the reason that file's own `_boundary`
+  note gives: a preference parked in a domain config is invisible to every
+  command that does not touch that domain.
+
+  Origin (2026-07-31, as reported): a developer filed two bug reports against a
+  hook, both with clean reproductions. One was a real defect; the other
+  described behaviour fixed days earlier against a stale checkout, and nothing
+  in the report separated them. A commit count alone would not have separated
+  them either — naming the changed hooks would have.
+
 ## [1.36.0] - 2026-07-31
 
 ### Added
@@ -766,7 +832,9 @@ installed caches) but had no representation on `main`; this release lands them.
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.35.0...HEAD
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.37.0...HEAD
+[1.37.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.37.0
+[1.36.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.36.0
 [1.35.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.35.0
 [1.34.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.34.0
 [1.33.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.33.0
