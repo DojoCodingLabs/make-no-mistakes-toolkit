@@ -120,9 +120,26 @@ The one nobody has, and the one worth the most:
 
 ```bash
 comm -12 \
-  <(git ls-files --others --exclude-standard | sort) \
-  <(git ls-tree -r --name-only "origin/$BASE" | sort)
+  <(git ls-files --others --exclude-standard --full-name -- :/ | sort) \
+  <(git ls-tree -r --full-tree --name-only "origin/$BASE" | sort)
 ```
+
+**All three of `--full-name`, `:/` and `--full-tree` are load-bearing, and two
+of them fix different problems.** Run from a subdirectory with none of them,
+both commands report paths relative to the current prefix *and* restrict
+themselves to that subtree — so they still agree with each other, and the
+predicate quietly answers for one directory instead of the repo.
+
+`--full-name` and `--full-tree` fix the **format** halves, and they are a pair:
+adding `--full-name` alone is worse than adding nothing, because `ls-files`
+starts emitting `sub/newfile.txt` while `ls-tree` still emits `newfile.txt`,
+the two stop matching, and `comm -12` returns empty — a clean bill of health
+for a tree that is about to abort the pull.
+
+`-- :/` fixes the **scope** half, which the flags do not touch: `--full-name`
+changes how a path is printed, never which paths are considered. Without the
+pathspec, a collision at the repo root is invisible to a run started from
+`sub/`.
 
 Every path this prints exists locally as untracked **and** exists on the ref as
 tracked. Git refuses to overwrite it, so the pull aborts before doing anything:

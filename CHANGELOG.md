@@ -49,6 +49,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the one irreversible move available. The skill reports these by name and
   recommends copying them out of the repo; it never recommends deleting them.
 
+  The collision check carries `--full-name -- :/` and `--full-tree` because the
+  predicate is otherwise silently wrong when run from a subdirectory, in two
+  independent ways. **Format:** without the flags both commands print
+  prefix-relative paths, and adding `--full-name` on its own is worse than
+  adding nothing — `ls-files` emits `sub/newfile.txt` while `ls-tree` emits
+  `newfile.txt`, they stop matching, and `comm -12` returns empty for a tree
+  that is about to abort the pull. **Scope:** `--full-name` changes how a path
+  prints, never which paths are considered, so without `-- :/` a collision at
+  the repo root is invisible to a run started from `sub/`. Both controls run,
+  from the repo root and from a subdirectory, with the command extracted
+  verbatim from the SKILL.md so the test cannot drift from the doc.
+
   **It never acts.** Every fix is printed for the user to run — `git pull`,
   `git stash`, `git rebase`, `/make-no-mistakes:rebase`. The single write is
   `git fetch origin --quiet`, which touches remote-tracking refs and nothing
