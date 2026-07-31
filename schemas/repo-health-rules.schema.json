@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/DojoCodingLabs/make-no-mistakes-toolkit/main/schemas/repo-health-rules.schema.json",
+  "title": "Repo Health Rules",
+  "description": "Unified per-repo enforcement config consumed by the make-no-mistakes repo-health hooks (PreToolUse: structural blocking; PostToolUse: drift telemetry). Drop this file at consumer repo root as `.repo-health-rules.json`. SUPERSET of `schemas/atomic-design-rules.schema.json`: that file's junk-drawer / exception-marker concepts generalize here to per-family `pattern`+`exemptionMarker` rules keyed by the six audit-engine namespaces (SCH|CDC|DDD|ARC|STR|ENF). The atomic-design component layer (E### findings) stays owned by `atomic-design-toolkit` and is NOT a family here (composition, not fusion). IN THIS SLICE the schema + the `proposeHookRule` emitter that targets it are delivered; the live PreToolUse/PostToolUse `.sh` hooks that READ this file and the 4-cure apply step are Phase-2-later.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "enforcementLevel", "families"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Schema version. Current schema is version 1.",
+      "const": 1
+    },
+    "enforcementLevel": {
+      "enum": ["advisory", "strict"],
+      "description": "advisory = hooks warn only (PostToolUse telemetry); strict = PreToolUse blocks on blocker/high rules. Mirrors the governance.md advisory→blocking promotion model."
+    },
+    "families": {
+      "type": "object",
+      "description": "Rules keyed by the six audit-engine finding-ID namespaces. Each value is an array of structural enforcement rules for that family. Keys are optional — an absent or empty family means no enforcement for it.",
+      "additionalProperties": false,
+      "properties": {
+        "SCH": { "$ref": "#/definitions/ruleArray" },
+        "CDC": { "$ref": "#/definitions/ruleArray" },
+        "DDD": { "$ref": "#/definitions/ruleArray" },
+        "ARC": { "$ref": "#/definitions/ruleArray" },
+        "STR": { "$ref": "#/definitions/ruleArray" },
+        "ENF": { "$ref": "#/definitions/ruleArray" }
+      }
+    }
+  },
+  "definitions": {
+    "ruleArray": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/rule" }
+    },
+    "rule": {
+      "type": "object",
+      "description": "One structural enforcement rule. Generalizes the atomic-design junk-drawer/canonical-folder/forbid-pattern concepts: `pattern` is the glob/ERE the hook matches a write against; `message` is shown on a block; `exemptionMarker` is the in-file comment (analog of atomic-design `exempt_markers`, default family of `@repo-health-exempt`) that lets a legitimate write through.",
+      "required": ["id", "pattern", "message", "severity", "exemptionMarker"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable rule id, kebab-case, scoped by family (e.g. 'sch-bio-duplicated-across-3-tables-without-ssot'). Produced by the cure-scaffold emitter.",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Glob (e.g. '**/*.sql') or ERE the PreToolUse/PostToolUse hook matches the written path/content against.",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable violation message surfaced on a block. Typically the originating finding title.",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": ["blocker", "high", "medium", "low", "advisory"],
+          "description": "Aligned with the audit-report contract + governance.md. Under enforcementLevel=strict, blocker/high block; lower severities warn."
+        },
+        "exemptionMarker": {
+          "type": "string",
+          "description": "In-file comment marker that exempts a write from this rule (e.g. '@repo-health-exempt'). The hook scans for '// <marker>: <reason>' or '# <marker>: <reason>' in the content payload.",
+          "pattern": "^[a-z@][a-z0-9_-]*$"
+        }
+      }
+    }
+  }
+}

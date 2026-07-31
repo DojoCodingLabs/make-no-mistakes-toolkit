@@ -30,29 +30,49 @@ A run moves through six stages, **0 → 5**, in order. Do not skip a stage.
 
 ---
 
-## Stage 0 — Agent-teams preflight
+## Stage 0 — Fan-out preflight
 
-Fan-out is the engine's default execution model, so check for Agent Teams first.
+Fan-out is the engine's default execution model, so establish the execution mode
+first.
 
-1. Read `~/.claude/settings.json` and look for:
+**What actually provides the parallelism** is the `Agent` tool with a `name` and
+`isolation: "worktree"`, coordinated via `SendMessage`. That works regardless of
+any flag. There is **no `TeamCreate` tool** in current harnesses — team lifecycle
+was folded into `Agent`, and a team is now implicit, one per session. Its absence
+is expected; never treat it as a reason to fall back.
+
+1. Confirm the fan-out primitive is available: `Agent` is present **and** its
+   schema carries `name` and `isolation`. If it does not, skip to step 4.
+2. Check the coordination layer — read the process env and
+   `~/.claude/settings.json` for:
    ```json
    "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" }
    ```
-2. **If present**, proceed with Agent Teams fan-out.
-3. **If missing**, recommend enabling it and show the user the exact one-line diff:
+   This flag does **not** switch on the parallelism; it gates the coordination
+   layer *on top* of it (teammate mailbox, shared team context, assigning a task
+   to a teammate). It is also ANDed with a server-side gate, so "set locally"
+   does not prove "live" — if the flag reads set but the mailbox tools are
+   absent, believe the tools.
+3. **If the flag is missing**, fan out anyway, and separately recommend enabling
+   it with the exact one-line diff:
    ```diff
      "env": {
    +   "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
      }
    ```
    **Apply this only with the user's explicit consent.** Never silently edit
-   global settings.
-4. **If the user declines** (or consent isn't available), PREFER the
+   global settings. Without it you lose mid-run coordination, not parallelism —
+   so brief each verifier to be fully self-contained and to report once at the
+   end.
+4. **If `Agent` cannot isolate** (or the user has ruled out fan-out), PREFER the
    `superpowers:subagent-driven-development` skill — dispatch **one subagent per
-   finding** on the latest Opus (4.8).
+   finding** on the latest Opus.
 5. A **sequential single-context crawl** is the *last resort*. It is valid only
    when fan-out doesn't pay off: very few findings, subagents unavailable, or an
    explicit cost / quota limit the user has stated.
+
+For the full capability gate and decomposition protocol, see
+`/make-no-mistakes:parallelize`.
 
 Record which execution mode you chose; it determines how Stages 2–3 fan out.
 

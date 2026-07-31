@@ -22,6 +22,7 @@ Every rule is one YAML row with these fields:
       pattern: '<ERE regex>'        # optional; if present, field MUST match
       not_pattern: '<ERE regex>'    # optional; if present, field must NOT match
       flags: i                      # optional; only "i" (case-insensitive) supported
+      normalize: strip-flags        # optional; transform the field before matching
   action: block | warn              # required
   bypass_marker: <kebab-case> | null  # optional acknowledgement token
   disable_if_repo_file: <flat-filename>  # optional per-repo escape hatch (see below)
@@ -50,6 +51,37 @@ conditions hold. Within a single condition:
 To express OR across conditions, write multiple rules with the same effect
 (e.g., one rule per `applies_to` tool). To express OR within a single
 condition, use ERE alternation in `pattern` (e.g., `(php -r|set_config)`).
+
+### Normalization (`normalize`)
+
+`normalize` rewrites the field value **before** the pattern is applied. It is
+per-condition, not per-rule, because one rule often has to read two different
+surfaces of the same command.
+
+| Value | Effect |
+|-------|--------|
+| `strip-flags` | Removes every `--flag` and `--flag=value`, then collapses runs of whitespace. |
+
+The motivating case is telling a mutation apart from a read. "Does this target
+production?" is a question about the flags, so it matches raw. "Is this a
+mutation?" is a question about the verb, and there the flags are noise that
+also let the position of a flag change the verdict — `<tool> --project=x
+<group> delete` versus `<tool> <group> delete --project=x`. A guard whose
+bypass is "move a flag" is not a guard, so the verb condition matches
+normalized. See `prod-ops-no-approval` for the worked example.
+
+Two deliberate limits:
+
+- **Quoted arguments are not stripped.** Stripping them would let a real
+  mutation hide inside `bash -c "... delete ..."`. A false negative in a guard
+  is silent; a false positive is visible and has a documented bypass. The
+  residual cost is that a read whose quoted argument contains a mutating word
+  can still trip a verb-scoped rule.
+- **An unknown `normalize` value fails open** (the rule is skipped) rather than
+  matching un-normalized input, which would silently restore the broader
+  behavior the normalization was added to narrow. `build-rules.mjs` rejects
+  unknown values at build time so the fail-open path is only ever reached by a
+  hand-edited `rules.json`.
 
 ### Bypass markers
 

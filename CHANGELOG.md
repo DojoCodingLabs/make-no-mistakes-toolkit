@@ -50,6 +50,136 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that does not exist in typical Linear workspaces (per Andrés analysis,
   2026-06-02). Dogfood configs continue to work unchanged.
 
+## [1.35.0] - 2026-07-29
+
+### Added
+- **`/explain <topic>`** — explains something in two layers, then converts the
+  explanation into a decision. The layers are not the same content at two levels
+  of detail: prose answers *what is going on and why it matters*, technical
+  answers *where exactly and how*. A prose layer that is only the technical layer
+  in smaller words is redundant, gets skipped, and kills the format within a few
+  uses — so the command carries that as its own pass/fail test rather than as
+  advice.
+
+  Two steps carry the weight. **Step 0 requires reading the artifact before
+  writing a line**, because fluent prose about a mechanism *reads as*
+  understanding, which makes this format unusually good at hiding that the file
+  was never opened. And **step 5 permits skipping `AskUserQuestion`** when the
+  explanation leaves no decision open — a menu invented to satisfy the format
+  trains the reader to ignore the menus that matter.
+
+  The insight block earns its place only by saying something not derivable from
+  the two layers above it; if it summarizes, the command says to delete it.
+
+- **`make-no-mistakes.config.json`** (see
+  `commands/make-no-mistakes.config.example.json`) — optional per-project file
+  for toolkit-wide behaviour, starting with `language` (default `es`) and
+  `diacritics`. A third config on purpose: `slack-config.json` and
+  `linear-setup.json` answer *where things go*, and a preference parked in a
+  domain config is invisible to every command that does not touch that domain.
+  The boundary is written into the file itself.
+
+  `language` governs **prose addressed to the user only**. Code, identifiers,
+  commit messages, PR titles and bodies, and Linear issues follow the target
+  repo's own convention. Wired into `/explain`; retrofitting the other commands
+  is deliberately left as separate work.
+- `normalize: strip-flags` on a rule's match condition — rewrites the field (drops `--flag` / `--flag=value`, collapses whitespace) before the pattern applies. Per-condition rather than per-rule, because a verb-scoped rule reads two surfaces of one command: the flags answer "does this target production?", the verb answers "is this a mutation?". Unknown values fail open at runtime and are rejected at build time by `build-rules.mjs`. Documented in `hooks/rules/README.md`, including why quoted arguments are deliberately left unstripped.
+- `/parallelize` command — decompose a body of work and fan it out across named, worktree-isolated agents, then converge the results. Opens with a **mandatory capability gate** that reads two things instead of one: the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` flag *and* the live tool surface. Neither alone gives a correct answer — the flag can be set while a server-side gate disables the coordination layer, and `TeamCreate` is absent by design in current harnesses because team lifecycle was folded into the `Agent` tool (`name` + `isolation: "worktree"`, coordinated by `SendMessage`). The gate therefore treats *flag set + `TeamCreate` absent* as the *normal, working* configuration and aborts only when `Agent` itself lacks `isolation`; a command that reported "teams unavailable" on a missing `TeamCreate` would be reporting a harness upgrade as an outage. Also encodes: decomposition by **who can execute a step** (a stream whose central step needs a human — reading a credential's value, changing a provider setting — becomes its own agent producing *artifacts rather than actions*), per-agent worktree isolation with disjoint file ownership, `shutdown_request` via `SendMessage` rather than `TaskStop`, Opus-or-inherit for subagents, and the 3-4x cost check that makes "don't parallelize this" a valid outcome.
+
+### Fixed
+- Two advertised counts had drifted apart from the directory and from each other.
+  `README.md` said **`### Commands (30)`** while its table listed 33 and
+  `commands/` held 36; `marketplace.json` said 35. Three commands had no row at
+  all — `resolve-open-questions` (the sibling `/explain` cites), `postmortem`,
+  and `handover-pr`. Heading, table, marketplace and directory now agree at
+  **37**, and the agreement is checkable in one command instead of trusted.
+- `prod-ops-no-approval` blocked **read-only** commands against any resource whose name contained `prod`. A pure `<tool> services list --project=<name>-prod` was refused, so an inventory sweep came back with that project as its only unverified cell while the non-prod ones filled in normally. The rule matched the resource NAME; it now matches the **verb**. Reads (`list`, `describe`, `get`, `read`, anything not on the mutating block-list) and any command carrying `--dry-run` pass; `create` / `update` / `delete` / `deploy` / `start` / `stop` / `set-*` / `add-*` / `remove-*` and siblings stay blocked with exit 2. The verb condition matches a flag-stripped form of the command, so moving a global flag ahead of the verb no longer changes the verdict. Beyond the nuisance, a guard that blocks reads trains people to route around it, and that habit does not distinguish the read it over-blocked from the write it existed to stop.
+- `/implement` Mode B documented `claude --team`, a flag that does not exist — the real one is `--agent-teams` — and framed `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` as what enables parallel execution. Corrected on both counts, with the `TeamCreate`-is-expected-absent note so the next reader does not diagnose a harness upgrade as a broken setup.
+- `audit-engine` Stage 0 and `domain-driven-advisor` Step 4 gated fan-out on the agent-teams flag, so a user who declined it was routed to a slower fallback despite the fan-out primitive being fully available. Both now confirm the primitive first (`Agent` with `name` + `isolation`), fan out regardless of the flag, and recommend the flag separately for the coordination layer it actually gates. Declining now costs mid-run coordination, not parallelism. Same reframing applied to the README's "Faster with agent teams" section and the advisor's sample session.
+
+## [1.34.0] - 2026-07-24
+
+Consolidates work that accumulated on `feat/audit-engine-phase2-enforcement` after
+`1.30.0` was squash-merged. Four commands and one skill existed locally (and in
+installed caches) but had no representation on `main`; this release lands them.
+
+> **Version note.** `1.33.0` was published twice, independently: `main` shipped
+> `/handover` on 2026-06-08, while this branch shipped `/handover-pr` on
+> 2026-06-15. `main`'s entry is preserved below as the canonical `1.33.0`; the
+> branch's content is republished here as `1.34.0`.
+
+### Added
+- `/resolve-open-questions` command + skill — sweep a session for open decisions and buried questions, then resolve them in batches via `AskUserQuestion` (recommended option first, trade-off per option), emitting a `decision → action` log and executing without re-asking.
+- `/observability-audit` command — a **runtime** audit of whether observability actually works, as opposed to whether it is configured. Where the six `audit-*` families statically inspect a repo, this one queries live systems and measures the **receiver** side: events actually received per emitting surface (a high instrumented-emitter count with a zero received count is the failure signature), whether the configured credential resolves to a live destination in the provider (matchable via secret-digest comparison without ever reading the secret's value), init branches that disable monitoring and continue with only a `console.*` line, alert-channel liveness and ownership, whether any alert fires on the **absence** of an expected outcome rather than only on thrown errors, and whether each alert has ever been demonstrated capable of going red. Encodes the rule *no control is considered deployed until it has been demonstrated capable of going red*.
+- `/postmortem` command — post-incident report in the house style.
+- `/handover-pr` command — the PR-scoped mirror of `/takeover-pr`. Takeover pulls a teammate's PR toward you; handover packages your own open PR(s) or current-branch work into a structured Slack thread post for someone else to pick up. Complements the broader `/handover` shipped in `1.33.0`: `/handover` hands off any body of work, `/handover-pr` specializes in the PR-context gathering `/takeover-pr` already models.
+
+### Fixed
+- `/e2e-test-runner` hardcoded a BDD toolchain in two places (the extract step and the Full Regression strategy), so it could not run in a repo with Playwright/Vitest but no cucumber-js / playwright-bdd. Both now derive `extract_cmd` / `run_cmd` from `meta.runners`, matching Step 2 which already dispatched that way. A project with no BDD extraction step declares no `extract_cmd` and the loop is a no-op.
+- `/e2e-test-runner` result output honors `meta.output_dir` (default `results/`), so a caller can redirect results without editing the command.
+- `/e2e-test-runner` sample output used a project-specific suite name; now generic.
+
+### Changed
+- Advertised component counts corrected across `marketplace.json`: previously `29 commands, 10 skills` against an actual `35 / 11`. Commands are auto-discovered from `commands/*.md`, so the manifest never gated availability — the description was simply misreporting the surface.
+
+## [1.33.0] - 2026-06-08
+
+### Added
+- `/handover` command — compose and post (or draft) a structured engineering handover to Slack: hand a body of work (PRs, Linear issues, an incident + root cause, a Draft PR someone else must finish) to a specific teammate for their review/decision. Sibling of `/daily-standup-post-slack`, sharing its house Slack style: `-` bullets (never `•`), hyperlinked PRs/issues, real `<@id|Name>` mentions, Spanish tildes — composed to pass the `slack-unicode-bullets`, `slack-tables-no-codeblock`, and `slack-spanish-tildes` hooks. Adds a verify-don't-remember step (every PR status / base branch / Linear id read fresh, never recalled), one-owner/one-decision framing, and an interactive preview before posting.
+
+## [1.32.0] - 2026-06-03
+
+### Added
+- `/audit` meta-dispatcher — runs the full repo-health sweep (all six audit families `SCH → CDC → DDD → ARC → STR → ENF` via `audit-engine`) and delegates the component layer to `atomic-design-toolkit` when installed (composition, not fusion), aggregating one cross-family report.
+- `schemas/repo-health-rules.schema.json` — the unified `.repo-health-rules.json` enforcement contract (draft-07): `version`, `enforcementLevel` (`advisory|strict`), and a `families` object keyed by the six namespaces, each an array of `{ id, pattern, message, severity, exemptionMarker }` rules. Superset of `atomic-design-rules.schema.json`. Validated by `repo-health-rules.contract.test.ts`.
+- `proposeHookRule` cure-scaffold emitter (`src/audit/cure-scaffold.ts`) — deterministically maps a confirmed `Finding` whose `cure_map` includes `hook` into a `HookRuleProposal` shaped against the rules schema; returns `null` otherwise. This is the foundation of the Phase-2 "hooks first" enforcement step (v1 *proposes* rules; the live PreToolUse/PostToolUse hooks + apply step are Phase-2-later).
+
+## [1.30.0] - 2026-06-02
+
+### Changed
+- **README repositioned around `/make-no-mistakes:domain-driven-advisor` as the canonical entry point.** A new "Start here" section sits right after Install (before "What's Inside"), quoting the skill's own description verbatim ("Best first command for a new repo") and listing all six audit families (`SCH`, `CDC`, `DDD`, `ARC`, `STR`, `ENF`) in a single routing table. The deeper teaching section ("Guided repo health") remains as the long-form reference. This makes the front door obvious to a new user without scrolling through the 29-command index first.
+- **Marketplace description leads with the advisor.** `marketplace.json` plugin description now opens with "Start with /make-no-mistakes:domain-driven-advisor — the canonical entry point…" instead of burying the audit engine mid-paragraph. Same 29/10/2 component counts (verified: `commands/*.md = 29`, `skills/*/SKILL.md = 10`).
+
+### Notes
+- No new commands, skills, or hooks ship in this release — it's a documentation-emphasis pass on top of 1.29.0 (which closed the six-family audit-engine loop). Cut to publish the re-announcement to `#doj-repo-health` and to surface the advisor at the top of the README/marketplace card.
+
+## [1.29.0] - 2026-06-02
+
+### Added
+- `/audit-enforcement-hooks` (`ENF`) — the Cure-4 coverage meta-audit: detects absent or misconfigured PreToolUse/PostToolUse enforcement hooks, missing rules config, and structural rules with no hook backing them (closes the detection→enforcement loop). Adds the `findHookCoverageGaps` verifier.
+
+### Changed
+- All six audit families are now live in `/domain-driven-advisor` (no more "coming soon"); the `audit-engine` skill description and example session reflect the full family.
+- Reconciled the version displays (README `**Version:**` header and `.claude-plugin/marketplace.json`) and refreshed the marketplace command/skill counts.
+
+## [1.28.0] - 2026-06-02
+
+### Added
+- `/audit-strangler` (`STR`) — Strangler-Fig migration-health audit for monolith→microservices work (façade, incremental cutover vs big-bang, coexistence, legacy retirement). Adds the `assessStranglerHealth` verifier.
+
+## [1.27.0] - 2026-06-02
+
+### Added
+- `/audit-explicit-architecture` (`ARC`) — Explicit Architecture audit (Graça: Hexagonal / Onion / Clean / CQRS); the deterministic core enforces the dependency rule (source dependencies must point inward). Adds the `findDependencyRuleViolations` verifier.
+
+## [1.26.0] - 2026-06-02
+
+### Added
+- `/audit-ddd` (`DDD`) — bounded-context boundary audit (cross-context imports, domain purity, ubiquitous-language drift). Adds the `findCrossContextImports` verifier.
+
+## [1.25.0] - 2026-06-02
+
+### Added
+- `/audit-contract-drift` (`CDC`) — consumer-driven-contract drift audit (producer↔consumer validation schemas that have silently diverged). Adds the `diffValidationSchemas` verifier.
+
+## [1.24.0] - 2026-06-02
+
+### Added
+- **Audit-engine foundation.** Shared report contract (`schemas/audit-report-schema.schema.json` + `references/audit-report-schema.md` — the SSOT), the `audit-engine` skill (hybrid LLM-first detection → deterministic + adversarial verification → cure-mapping → four-target emission), `/audit-schema-drift` (`SCH` — 1NF + DRY duplicated-column detection via `findDuplicatedColumns`), and `/domain-driven-advisor` (guided router that recommends which audit(s) to run, then runs a premortem on the aggregated remediation plan).
+
+### Changed
+- README "What's Inside" now links every command and skill to its source file; added the `## Guided repo health: /domain-driven-advisor` teaching section.
+
 ## [1.23.0] - 2026-05-29
 
 ### Added
@@ -631,7 +761,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.21.0...HEAD
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.35.0...HEAD
+[1.35.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.35.0
+[1.34.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.34.0
+[1.33.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.33.0
+[1.32.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.32.0
+[1.30.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.30.0
+[1.29.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.29.0
+[1.28.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.28.0
+[1.27.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.27.0
+[1.26.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.26.0
+[1.25.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.25.0
+[1.24.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.24.0
+[1.23.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.23.0
+[1.22.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.22.0
 [1.21.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.21.0
 [1.14.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.14.0
 [1.12.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.12.0
