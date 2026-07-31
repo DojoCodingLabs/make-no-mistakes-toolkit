@@ -1,6 +1,6 @@
 # make-no-mistakes
 
-**Version: 1.35.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
+**Version: 1.36.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
 
 The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.
 
@@ -391,6 +391,7 @@ ships 10 rules:
 - `destructive-db-ops` — blocks `supabase db reset|push|repair` and inline `DROP/TRUNCATE/DELETE FROM`
 - `manual-edge-fn-deploy` — blocks `supabase functions deploy` (forces CI-only deploys)
 - `gcloud-missing-project` — warns when a `gcloud` subcommand is missing `--project=`
+- `discard-stderr` (v1.36.0) — blocks a command that routes stderr to `/dev/null` (`2>/dev/null`, `&>/dev/null`, `>/dev/null 2>&1`). A failing command with its stderr discarded is indistinguishable from a succeeding one that printed nothing, so the empty result reads as *"none found"* rather than *"it errored"*. `cmd >/dev/null` alone is untouched — stderr still reaches you — and so is `cmd 2>&1 >/dev/null`, where stderr is duplicated to the original stdout *before* stdout is redirected and therefore survives. Same tokens, opposite outcomes; the rule matches on order. **No bypass marker** — see below.
 
 **PreToolUse on `Edit | Write | MultiEdit` (block):**
 - `minified-build-output` — blocks writing minified content to `amd/build/*.min.js` or `dist/*.min.{js,css}`
@@ -429,6 +430,22 @@ becomes a no-op in that repo. The current sentinel filenames are:
 
 Bypasses are explicit acknowledgements — they sit inside the command/content
 itself, not as silent flags.
+
+**Not every rule has one, on purpose.** `discard-stderr` (v1.36.0) ships with
+`bypass_marker: null`, because the legitimate cases it might otherwise need a
+bypass for are already *allowed* by the rule itself: `cmd >/dev/null` for noisy
+stdout, `cmd 2>&1 >/dev/null` when stderr must survive, `command -v x >/dev/null`
+for existence probes, and `cmd 2>>"$log"` to keep stderr somewhere readable.
+With no case left over, a marker would only buy a way past a rule nobody needs
+to get past.
+
+The general shape matters beyond this one rule: a gate whose refusal message
+*prints the way around it* is not a gate. `pre-bash-block-main-target.sh` in
+dojo-os accepted `DOJO_HOTFIX_TO_MAIN=1` **and** quoted that literal in its own
+refusal, so typing the string it handed you WAS the authorization; two agents
+filed false P0-hotfix claims that way on 2026-07-28 (DOJ-6247). A bypass is
+worth its cost when it names a real case the rule cannot express. When it does
+not, it is a password printed on the lock.
 
 ### Adding your own rules
 

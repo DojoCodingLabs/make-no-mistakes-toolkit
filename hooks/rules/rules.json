@@ -3788,5 +3788,113 @@
         "expected_exit": 0
       }
     ]
+  },
+  {
+    "id": "discard-stderr",
+    "description": "Block a command that routes stderr to /dev/null",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "(2>>?[[:space:]]*/dev/null|&>>?[[:space:]]*/dev/null|>&[[:space:]]*/dev/null|[^0-9&]1?>[[:space:]]*/dev/null[[:space:]]+2>&1)"
+      },
+      {
+        "field": "command",
+        "not_pattern": "['\\\"]2>>?[[:space:]]*/dev/null"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": null,
+    "memory_ref": "feedback_never_redirect_errors_to_devnull.md",
+    "references": [
+      "dojo-os CLAUDE.md non-negotiable 24",
+      "DOJ-6391"
+    ],
+    "message": "BLOCKED: this command discards stderr.\n\nA failing command with its stderr discarded is INDISTINGUISHABLE from a\nsucceeding one that printed nothing. The empty result then reads as\n\"none found\" rather than \"it errored\".\n\nMeasured, 2026-07-31: `gh api --jq --arg ... 2>/dev/null` -- gh rejects that\nflag combination -- produced an empty file that was reported to the team as\n\"0 red PRs\". Sixteen of 41 were red, twelve on TypeScript.\n\nKeep stderr and put it somewhere:\n    cmd 2>>\"$logfile\"           # separate file, exit code preserved\n    cmd 2>&1 | tee \"$logfile\"   # interleaved, readable now and later\n    out=$(cmd 2>&1); rc=$?      # captured, inspected, still branchable\n\nOnly stdout is noisy? Already allowed, unchanged:\n    cmd >/dev/null              # stderr still reaches you\n    cmd 2>&1 >/dev/null         # stderr to the ORIGINAL stdout\n    command -v x >/dev/null     # the existence probe still passes\n\nNo bypass marker: the alternatives above cover every legitimate case, and\na gate whose refusal hands you the way around it is not a gate (DOJ-6247).\n",
+    "tests": [
+      {
+        "name": "blocks-bare-2-dev-null",
+        "input": {
+          "tool_input": {
+            "command": "gh api foo 2>/dev/null"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-append-form",
+        "input": {
+          "tool_input": {
+            "command": "node x.mjs 2>> /dev/null"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-ordered-both-streams",
+        "input": {
+          "tool_input": {
+            "command": "ls -la >/dev/null 2>&1"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-ampersand-form",
+        "input": {
+          "tool_input": {
+            "command": "find . -name x &>/dev/null"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-stdout-only",
+        "input": {
+          "tool_input": {
+            "command": "ls -la >/dev/null"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-existence-probe",
+        "input": {
+          "tool_input": {
+            "command": "command -v jq >/dev/null"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-reversed-order-stderr-survives",
+        "input": {
+          "tool_input": {
+            "command": "cmd 2>&1 >/dev/null"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-stderr-to-a-file",
+        "input": {
+          "tool_input": {
+            "command": "node s.mjs 2>>\"$log\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-single-quoted-mention",
+        "input": {
+          "tool_input": {
+            "command": "git grep '2>/dev/null' -- scripts/"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
   }
 ]
