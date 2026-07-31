@@ -80,7 +80,7 @@ Deliberate actions you invoke explicitly.
 | Command | Description |
 |---------|-------------|
 | [`/make-no-mistakes:implement <ISSUE-ID>`](commands/implement.md) | Disciplined execution of Linear issues — worktree isolation, all-reviewer loops, CI verification, clean merges |
-| [`/make-no-mistakes:prioritize <pillar-slug>`](commands/prioritize.md) | MoSCoW + RICE-adapted applied to a pillar's Linear issues, traceable to its PIBER+IDCF sub-spike and the latest vision audit. Outputs priority report + description-footer per issue + snapshot comment on the sub-spike. Chain: `product-vision-audit → prioritize → spike-recommend → implement` |
+| [`/make-no-mistakes:prioritize [scope]`](commands/prioritize.md) | MoSCoW + RICE-adapted applied to any slice of a Linear backlog. Workspace-agnostic: scope by project slug, `--label`, or `--filter`; a pillar taxonomy, a PIBER+IDCF sub-spike, and a vision-audit doc are all optional enrichment rather than requirements. Outputs priority report + description-footer per issue, and a snapshot comment when `--evidence` names a Linear issue. Legacy `pillars.<slug>` configs keep working unchanged |
 | [`/make-no-mistakes:rebase <repo>`](commands/rebase.md) | Team release sync — rebase all branches, auto-merge ready PRs, health report |
 | [`/make-no-mistakes:linear-projects-setup`](commands/linear-projects-setup.md) | Bootstrap Linear workspace with full label taxonomy, projects, and integrations |
 | [`/make-no-mistakes:e2e-test-builder <source>`](commands/e2e-test-builder.md) | Generate a TestSprite-compatible `test-suite.json` from docs or PRDs |
@@ -132,7 +132,7 @@ Auto-activate by context — you don't need to remember the command name.
 | [`audit-engine`](skills/audit-engine/SKILL.md) | Run any of the six repo-health audits (schema-drift, contract-drift, ddd, explicit-architecture, strangler, enforcement-hooks). Hybrid LLM-first detection + deterministic verification + cure-mapping |
 | [`domain-driven-advisor`](skills/domain-driven-advisor/SKILL.md) | Ask "which audit do I need?" / "where do I start with repo health?" — routes you to the right audit(s) and runs a premortem |
 | [`premortem`](skills/premortem/SKILL.md) | Say "premortem this", "what could kill this", "stress test this plan", "what am I missing", or "find the blind spots" on a plan/launch/decision |
-| [`prioritize`](skills/prioritize/SKILL.md) | Ask to "prioritize issues", "rank the backlog", "apply MoSCoW", or "RICE scoring" for a product pillar (suggests `/make-no-mistakes:prioritize`) |
+| [`prioritize`](skills/prioritize/SKILL.md) | Ask to "prioritize issues", "rank the backlog", "apply MoSCoW", or "RICE scoring" for any Linear project, label, or filter (suggests `/make-no-mistakes:prioritize`) |
 
 Skills can also be invoked explicitly: `/make-no-mistakes:spec-recommend T0-4`
 
