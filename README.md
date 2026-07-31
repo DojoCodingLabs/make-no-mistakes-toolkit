@@ -467,6 +467,42 @@ filed false P0-hotfix claims that way on 2026-07-28 (DOJ-6247). A bypass is
 worth its cost when it names a real case the rule cannot express. When it does
 not, it is a password printed on the lock.
 
+**And as of v1.37.0, no refusal prints its own marker.** The markers still
+work, exactly as before — a human who knows one exists can type it
+deliberately, and the `allows-bypass-marker` test on every rule that has one
+pins that mechanic in place. What changed is that the hook no longer
+*announces* it. Measured on `origin/main` @ `ee0ba47`: of 40 rules, 35 carried
+a `bypass_marker` and **26 quoted that marker inside their own refusal text**
+— including `prod-ops-no-approval`, `destructive-db-ops`, `secrets-hardcoded`
+and `block-git-force-push-no-lease`.
+
+```bash
+jq '[.[] | select((.bypass_marker // "") != "")
+         | select(.bypass_marker as $m | (.message // "") | contains($m))] | length' \
+  hooks/rules/rules.json
+```
+
+That is the DOJ-6247 shape reproduced 26 times: reading the refusal *is* the
+authorization, and typing the marker becomes a reflex rather than a decision.
+A refusal now says what was blocked and why, and closes with *a block is a
+finding — report it upward rather than routing around it.* The markers are
+documented here, in a file you open on purpose, which is a different act from
+being handed one at the moment you are trying to get past something.
+
+Held in place by three generic assertions in `hooks/test-hooks.sh` (run by CI
+on every PR touching `hooks/**`), which hold over the whole manifest rather
+than rule by rule — because rule by rule is what drifted the first time:
+
+- a message may not contain its own `bypass_marker`
+- a message may not contain its own `disable_if_repo_file` (the per-repo
+  escape hatch is the same door, one level up)
+- no message may contain the literal `hook-bypass`, which catches the template
+  form even when the marker is renamed
+
+Ordinary prose is untouched: `ds-deep-ui-import` still says deep imports
+"bypass the barrel", and `discard-stderr` still says outright that it has no
+bypass marker.
+
 ### Adding your own rules
 
 Edit `hooks/rules/rules.yaml`, run `npm run build-rules`, run

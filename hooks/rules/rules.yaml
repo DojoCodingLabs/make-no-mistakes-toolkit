@@ -19,10 +19,15 @@
 #   action: block | warn
 #   bypass_marker: kebab-case id used in "// hook-bypass: <marker>" comments;
 #       null if no bypass is offered. Bypass tokens are searched in any
-#       string field of tool_input.
+#       string field of tool_input. NEVER name it in `message` -- see below.
 #   memory_ref: filename of the corresponding feedback memory
 #   references: array of external doc references (free text)
-#   message: multi-line stderr output shown on match
+#   message: multi-line stderr output shown on match. It must NOT contain the
+#       rule's own bypass_marker, its own disable_if_repo_file, or the literal
+#       "hook-bypass" (DOJ-6433). A refusal that quotes its own bypass hands
+#       you the password -- reading the block IS the authorization. Close with
+#       "A block is a finding. Report it upward rather than routing around it."
+#       Enforced by the manifest invariants in hooks/test-hooks.sh.
 #   tests: array of unit tests
 #     - name: kebab-case test id
 #       input: { tool_input: { ... } }   # JSON passed to the hook on stdin
@@ -44,7 +49,9 @@
     BLOCKED: gcloud compute ssh + inline DB/Moodle command detected.
 
     Use a versioned script in scripts/ instead. If none fits, write+commit
-    one first. Bypass: add "// hook-bypass: ssh-db-rule" to the command.
+    one first.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-ssh-php-r
       input:
@@ -158,13 +165,15 @@
   message: |
     BLOCKED: production MUTATION detected.
 
-    Production changes require explicit user approval. Once confirmed, add
-    "// hook-bypass: prod-ops" to the command to acknowledge.
+    Production changes require explicit user approval, and the approval is
+    the user's to give — not the agent's to assume.
 
     Read-only calls against production (list / describe / get / read, or any
     command carrying --dry-run) are NOT blocked. If you are seeing this for a
-    command that only reads, the verb block-list is too wide — report it rather
-    than reaching for the bypass.
+    command that only reads, the verb block-list is too wide — that is a
+    defect in this rule, and reporting it is the fix.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     # --- The regression this rule was narrowed for -------------------------
     # A pure read against a production project. No mutating verb anywhere in
@@ -250,8 +259,10 @@
   message: |
     BLOCKED: destructive DB operation.
 
-    Even with --local, ask explicit user permission first. Once confirmed,
-    add "// hook-bypass: db-destructive" to the command.
+    Even with --local, ask explicit user permission first. The permission is
+    the user's to give — not the agent's to assume.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-supabase-reset
       input:
@@ -293,7 +304,10 @@
     BLOCKED: manual Edge Function deploy.
 
     Deploy via CI workflow (push to develop for staging, main for prod).
-    Bypass: add "// hook-bypass: edge-fn-manual" if a hotfix justifies it.
+    A hotfix that genuinely cannot wait for CI is a decision the user makes,
+    with the reason recorded.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-functions-deploy
       input:
@@ -327,7 +341,9 @@
     BLOCKED: minified content being written to build/.
 
     Build artifacts must stay human-readable. Replace with a readable copy
-    of src/. Bypass: "// hook-bypass: minified-build" inside the content.
+    of src/.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-minified-amd-build
       input:
@@ -371,8 +387,10 @@
     POTENTIAL SECRET LEAK: hardcoded credential pattern detected.
 
     Use Secret Manager / .env / local memory for real values. If this is a
-    placeholder or test fixture, prefix with "EXAMPLE_" / "CHANGEME_", move
-    to .env.example, or add "// hook-bypass: secret-leak" near the line.
+    placeholder or test fixture, prefix with "EXAMPLE_" / "CHANGEME_" or
+    move it to .env.example.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-hardcoded-password-in-src
       input:
@@ -528,9 +546,10 @@
     lg: (1024px), xl: (1280px), 2xl: (1536px). Arbitrary values fragment
     the responsive design language and break consistency across the app.
 
-    If a non-preset breakpoint is genuinely required, add
-    "// hook-bypass: ds-arbitrary-breakpoint" to the line and justify
-    in the PR description.
+    If a non-preset breakpoint is genuinely required, that is a design
+    decision to raise and justify, not a hook to get past.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-min-1200px-in-tsx
       input:
@@ -702,9 +721,9 @@
     The token system is the single source of truth for color and theming.
 
     Exempt paths (NOT flagged): tailwind.config.*, theme/, design-system/,
-    design-tokens, .test.*, .stories.*. Use the bypass marker if a hex is
-    genuinely required outside those paths (e.g. embedding a brand color
-    in a logo SVG that the design system doesn't yet expose).
+    design-tokens, .test.*, .stories.*. A hex genuinely required outside
+    those paths (e.g. a brand color in a logo SVG the design system doesn't
+    yet expose) is a gap in the token set — raise it.
   tests:
     - name: warns-on-raw-hex-in-tsx
       input:
@@ -811,9 +830,11 @@
     Create a new file:
       supabase/migrations/$(date -u +%Y%m%d%H%M%S)_<slug>.sql
 
-    Legitimate exceptions (use the bypass marker):
+    Two shapes are not real violations and should be fixed at the source:
     - Schema docs / examples in READMEs — should not be executable SQL
     - Test fixtures under supabase/tests/ — already exempt via not_pattern
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-create-table-in-script
       input:
@@ -887,8 +908,8 @@
       3. Push to develop — CI applies the migration to staging automatically
       4. For production: follow the create-release SOP
 
-    Use the bypass marker only for legitimate hotfixes where the PR cycle
-    is too slow.
+    A hotfix that genuinely cannot wait for the PR cycle is a decision the
+    user makes, with the reason recorded.
   tests:
     - name: warns-on-psql-supabase-remote
       input:
@@ -960,7 +981,8 @@
 
     This rule does NOT inspect the diff — it only reads the command, and it
     intentionally skips --body-file invocations because it cannot read the
-    referenced file. Use the bypass marker if your PR has no migrations.
+    referenced file. If your PR has no migrations, this warning is noise and
+    saying so is more useful than silencing it.
   tests:
     - name: warns-on-pr-create-body-without-migration-mention
       input:
@@ -1021,9 +1043,11 @@
       2. The release owner runs the create-release SOP that ships
          migrations to production through CI, not from a developer machine.
 
-    Use the bypass marker ONLY when the user has verbally approved the
-    operation. For --linked, double-check the active link first:
+    If you reached this on --linked, the first thing to check is which
+    project is actually linked:
       supabase status --output json | jq -r '.project_ref'
+
+    A block is a finding. Report it upward rather than routing around it.
 
     Marketplace consumers: the production project ref is configured per
     install via .private/substitutions.json (PROD_SUPABASE_REF token). See
@@ -1107,8 +1131,8 @@
       - Data mutations      -> an Edge Function or a committed script
       - One-shot fixes      -> use the API client from a versioned script
 
-    Use the bypass marker (curl-supabase-rest-mutation) only for documented
-    hotfixes that the team has explicitly approved.
+    A hotfix that genuinely needs a direct REST mutation is a decision the
+    team makes, with the reason recorded.
   tests:
     - name: warns-curl-post-supabase-rest
       input:
@@ -1228,8 +1252,11 @@
       - --ui       Playwright UI mode (interactive)
       - --debug    step-through debugger
 
-    Bypass marker (playwright-headless-allowed) is reserved for
-    explicitly-documented CI runs (e.g. a Vercel preview workflow).
+    A CI run with no display (e.g. a Vercel preview workflow) is the one
+    case this rule does not apply to — and a CI workflow is a reviewed file,
+    not an ad-hoc command.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-playwright-test-bare
       input:
@@ -1310,8 +1337,11 @@
     Use:
       git push --force-with-lease origin <branch>
 
-    Bypass marker (git-force-push-bare-allowed) ONLY when you have
-    verified that no other contributor has pushed to the branch.
+    If --force-with-lease is itself refusing, the remote HAS advanced —
+    that is the collaborator push you were about to destroy, and it is
+    information, not an obstacle.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-force-short-flag
       input:
@@ -1363,8 +1393,11 @@
       - Resolve manually, `git add`, `git rebase --continue`
       - If the commit is genuinely obsolete, `git rebase --abort` and
         cherry-pick the commits you want
-      - Bypass marker (git-rebase-skip-acknowledged) ONLY with explicit
-        acknowledgement of the data loss
+
+    Dropping a commit is data loss. That is the user's call to make with the
+    loss named out loud.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-rebase-skip
       input:
@@ -1418,8 +1451,9 @@
       ~/Escritorio/daily-standup.md
     (or ~/Desktop/daily-standup.md on English-locale machines).
 
-    Bypass marker is intentionally NOT recommended — there is no
-    legitimate path outside the desktop.
+    There is no legitimate path outside the desktop.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-standup-in-repo
       input:
@@ -1498,7 +1532,7 @@
       ~/Escritorio/<filename>.md
     (or ~/Desktop/<filename>.md on English-locale machines).
 
-    Bypass marker is intentionally NOT recommended.
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-next-day-in-claude-dir
       input:
@@ -1595,7 +1629,8 @@
     Per feedback_never_remove_debug_logs_early.md even when converting
     to env-gating, NEVER delete before verifying the fix in prod.
 
-    Use the bypass marker (console-log-deletion-verified) ONLY when:
+    The three cases where removal is defensible — and each is a claim you
+    have to be able to back:
       - Converting to env-gating (the new gate replaces the log)
       - The fix has been verified in prod for >24h
       - The log was a documented debug-temp called out in the original
@@ -1703,8 +1738,8 @@
       - "After X ships -> Y starts"
       - "Once Greptile 5/5 + CI green -> merge"
 
-    Bypass marker (time-estimates-allowed) ONLY when the doc is
-    marketing / external-facing (where calendar dates are expected).
+    Calendar dates belong in marketing / external-facing docs, where a
+    reader expects them. An internal plan is not one of those.
   tests:
     - name: warns-on-3-days-in-plan
       input:
@@ -1781,8 +1816,7 @@
     Verify with:
       git diff --stat <base>..HEAD | tail -1
 
-    If the diff touches <=15 files, use bypass marker
-    `pr-file-count-verified`. If it touches >15 files, abort and split.
+    If it touches >15 files, abort and split before opening.
   tests:
     - name: warns-on-pr-create-bare
       input:
@@ -1835,7 +1869,7 @@
     PostHog / dashboards / instrumentation from alerts; Juan owns that
     surface, other POs explicitly told it is out of scope.
 
-    Use the bypass marker (posthog-mention-approved) ONLY when:
+    The mention is only welcome when both hold:
       - The alert is addressed to Juan directly (his Slack user-id)
       - You confirmed with Juan that the alert is welcome
   tests:
@@ -1896,8 +1930,11 @@
       <bucket>/originals/foo.zip
       <bucket>/processed/foo.zip
 
-    Bypass marker (sibling-suffix-storage-allowed) ONLY for legacy
-    buckets in active migration.
+    A legacy bucket still in active migration is the one case this layout
+    survives in — and that migration is tracked work, not a per-command
+    decision.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-supabase-storage-processed-suffix
       input:
@@ -1967,9 +2004,9 @@
 
     Replace localhost links with dev.dojocoding.io equivalents.
 
-    Bypass marker (localhost-in-pr-body-allowed) ONLY for steps that
-    legitimately require an explicit local build (e.g. asking the
-    reviewer to run `bun run dev` before pushing).
+    A step that legitimately requires a local build (e.g. asking the
+    reviewer to run `bun run dev` before pushing) is the exception — say
+    so in the body so the reviewer knows it is deliberate.
   tests:
     - name: warns-pr-create-with-localhost
       input:
@@ -2041,9 +2078,9 @@
     - Required revert on PR-2 + correct re-apply on PR-3. Confused commit
       history visible to reviewers.
 
-    If the command operates on absolute paths or doesn't need cwd context,
-    or you've intentionally verified cwd via `pwd` immediately before,
-    add "# hook-bypass: cd-worktree-rule" to acknowledge.
+    The cheapest fix is to prefix the command with the absolute path you
+    mean. If you have already verified cwd with `pwd` immediately before,
+    prefixing it anyway costs nothing and survives the next turn.
   tests:
     - name: warns-on-git-commit-no-cd
       input:
@@ -2219,10 +2256,9 @@
       bump version in manifest(s) → update README.md "Version: ..." line →
       append CHANGELOG.md entry → commit all four files together.
 
-    If you're intentionally splitting the bump from the README/CHANGELOG
-    update (e.g., bumping a vendored sub-manifest's version that isn't user-
-    visible), add "# hook-bypass: version-readme-changelog-sync" inline in
-    a comment near the version field or pass it on the Write call.
+    Splitting the bump from the README/CHANGELOG update is only defensible
+    for a vendored sub-manifest whose version no human ever reads. If that
+    is what this is, say which manifest and why in the PR body.
   tests:
     - name: warns-on-package-json-version-bump
       input:
@@ -2430,9 +2466,9 @@
     ordering.md: same failure mode (trust an implicit order without
     validating it).
 
-    Bypass marker (greptile-extraction-acknowledged) ONLY for legitimate
-    cases (e.g., you explicitly WANT the creation order to audit posting
-    cadence, not the latest state).
+    Creation order is the right question for exactly one thing — auditing
+    posting cadence. If that is not what you are doing, it is the wrong
+    question.
   tests:
     # B1: sort_by(.created_at) is the canonical buggy form.
     - name: warns-on-sort-by-created-at-greptile-comments
@@ -2540,11 +2576,8 @@
     Allowed patterns:
       - SELECT / SHOW / DESCRIBE / EXPLAIN — read-only is fine inline
       - `./scripts/<name>.sh` / `bash scripts/<name>.sh` — versioned wrapper
-      - `# hook-bypass: db-mutation-rule` appended to the command for an
-        explicitly-acknowledged one-shot
 
-    Per-repo escape hatch: `touch .no-make-no-mistakes-db-mutation` at the
-    repo root if the entire repo's job is inline DB work.
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-mysql-e-update
       input:
@@ -2653,8 +2686,7 @@
 
     SELECT / SHOW / EXPLAIN / DESCRIBE are still allowed inline.
 
-    Bypass with `# hook-bypass: db-mutation-rule` after explicit team
-    approval, or drop `.no-make-no-mistakes-db-mutation` at the repo root.
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-psql-c-update
       input:
@@ -2742,9 +2774,9 @@
     others' don't, debugging session reproduction degrades silently.
     Move the SQL into scripts/ and commit it.
 
-    SELECT / EXPLAIN remain allowed inline. The bypass marker is
-    `db-mutation-rule`. Per-repo opt-out:
-    `touch .no-make-no-mistakes-db-mutation` at the root.
+    SELECT / EXPLAIN remain allowed inline.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-sqlite3-update
       input:
@@ -2816,11 +2848,12 @@
 
     Per feedback_scripts_not_db.md, mongo data changes belong in a
     versioned migration runner script — never in a transient `--eval`
-    one-liner. The bypass marker is `db-mutation-rule`; the per-repo
-    escape hatch is `.no-make-no-mistakes-db-mutation` at the root.
+    one-liner.
 
     Read methods (.find, .findOne, .aggregate, .countDocuments, etc.)
     remain allowed inline.
+
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-mongo-eval-update
       input:
@@ -2919,8 +2952,7 @@
     Read verbs (GET, MGET, HGET, KEYS, SCAN, INFO, PING, EXISTS, TYPE,
     TTL, LLEN, SCARD, ZRANGE, SMEMBERS, ...) remain allowed inline.
 
-    Bypass marker: `db-mutation-rule`. Per-repo opt-out:
-    `touch .no-make-no-mistakes-db-mutation` at the root.
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-redis-cli-set
       input:
@@ -3021,8 +3053,7 @@
       - PII-handling approval if any
       - rollback procedure
 
-    Bypass marker: `db-mutation-rule`. Per-repo opt-out:
-    `touch .no-make-no-mistakes-db-mutation` at the root.
+    A block is a finding. Report it upward rather than routing around it.
   tests:
     - name: blocks-gcloud-sql-import-sql
       input:

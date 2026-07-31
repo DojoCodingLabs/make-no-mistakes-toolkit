@@ -100,6 +100,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the report separated them. A commit count alone would not have separated
   them either — naming the changed hooks would have.
 
+## [1.37.0] - 2026-07-31
+
+### Changed
+- **No refusal prints its own bypass marker** (DOJ-6433). The markers still
+  *work* — a human who knows one exists can type it deliberately, and the
+  `allows-bypass-marker` test on every rule that has one (34 of them, all
+  `expected_exit: 0`) pins that mechanic in place unchanged. What is gone is
+  the hook **announcing** it.
+
+  Measured on `origin/main` @ `ee0ba47`, before this change: **40 rules, 35
+  with a `bypass_marker`, and 26 of those quoting that marker inside their own
+  refusal text** — `prod-ops-no-approval`, `destructive-db-ops`,
+  `secrets-hardcoded` and `block-git-force-push-no-lease` among them.
+
+  ```bash
+  jq 'length' hooks/rules/rules.json                                   # 40
+  jq '[.[] | select((.bypass_marker // "") != "")] | length' \
+    hooks/rules/rules.json                                             # 35
+  jq '[.[] | select((.bypass_marker // "") != "")
+           | select(.bypass_marker as $m | (.message // "")
+           | contains($m))] | length' hooks/rules/rules.json            # 26
+  ```
+
+  `inline-db-mutation-psql` was the clearest case: it listed
+  `# hook-bypass: db-mutation-rule` in the refusal *and* shipped an
+  `allows-bypass-marker` test with `expected_exit: 0`. The bypass was a tested
+  feature of the refusal text, not a slip of wording.
+
+  **Why that is a defect and not a convenience.** The thing meant to stop you
+  hands you the password: reading the refusal *is* the authorization, and
+  typing the marker becomes a reflex rather than a decision. dojo-os records
+  the same shape in its non-negotiable 2 with an incident —
+  `pre-bash-block-main-target.sh` accepted `DOJO_HOTFIX_TO_MAIN=1` **and**
+  printed that literal in its own refusal, and on 2026-07-28 two agents filed
+  two false P0-hotfix claims under a human's GitHub account with no trace but
+  their own self-report (DOJ-6247). `discard-stderr`, added one version
+  earlier, already refused on exactly this reasoning; this release applies it
+  to the other 39 rules.
+
+  A refusal now says what was blocked, why, and what to do instead, and closes
+  with *"A block is a finding. Report it upward rather than routing around
+  it."* Seven further rules that said "use the bypass marker" without naming
+  it were reworded too — a refusal announcing an exit you then have to go look
+  up is the same invitation with an extra step. **33 messages changed in
+  total** (26 + 7); the two remaining marker-bearing rules that never invited
+  a bypass, `ds-deep-ui-import` and
+  `ds-arbitrary-fixed-width-in-ds-component`, are untouched. The six
+  `inline-db-mutation-*`
+  rules also stop naming their `.no-make-no-mistakes-db-mutation` sentinel,
+  which is the same door one level up. Both remain documented in `README.md`,
+  a file a human opens on purpose.
+
+### Added
+- **Manifest invariants in `hooks/test-hooks.sh`** — three generic assertions
+  that hold over the whole manifest rather than rule by rule, because rule by
+  rule is what drifted in the first place. A message may not contain (1) its
+  own `bypass_marker`, (2) its own `disable_if_repo_file`, or (3) the literal
+  `hook-bypass` in any form — the third catches the `// hook-bypass: <marker>`
+  template even when the marker is renamed or elided. Each failure lists every
+  offending rule id. Runs in CI on every PR touching `hooks/**`.
+
+  Both controls were exercised rather than assumed: on the clean manifest all
+  three pass, and with a leak injected into `rules.json` the matching
+  assertion fails and names the rule (`prod-ops-no-approval` for 1 and 3, a
+  separately injected `inline-db-mutation-psql` for 2) while the others stay
+  green — so each assertion discriminates instead of firing together.
+
+  Ordinary prose is untouched: `ds-deep-ui-import` still says deep imports
+  "bypass the barrel", and `discard-stderr` still says outright that it has no
+  bypass marker.
+
+  Suite: **340/340** hook tests passing (337 before, +3 invariants). Rule
+  count unchanged at 40; no rule gained or lost a `bypass_marker`.
+
 ## [1.36.0] - 2026-07-31
 
 ### Added
@@ -850,6 +924,7 @@ installed caches) but had no representation on `main`; this release lands them.
 
 [Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.38.0...HEAD
 [1.38.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.38.0
+[1.37.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.37.0
 [1.36.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.36.0
 [1.35.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.35.0
 [1.34.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.34.0
