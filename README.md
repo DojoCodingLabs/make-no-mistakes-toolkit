@@ -1,6 +1,6 @@
 # make-no-mistakes
 
-**Version: 1.37.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
+**Version: 1.38.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
 
 The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.
 
@@ -128,7 +128,7 @@ Auto-activate by context — you don't need to remember the command name.
 | [`spike-recommend`](skills/spike-recommend/SKILL.md) | Paste a Linear issue URL or ask to analyze an issue |
 | [`review-open-prs`](skills/review-open-prs/SKILL.md) | Ask about open PRs, merge readiness, or Greptile scores |
 | [`review-active-issues`](skills/review-active-issues/SKILL.md) | Ask about your Linear issues, backlog, or issue status |
-| [`rebase-advisor`](skills/rebase-advisor/SKILL.md) | Mention needing to sync branches after a release (suggests `/make-no-mistakes:rebase`) |
+| [`sync-advisor`](skills/sync-advisor/SKILL.md) | Ask "am I up to date", "is my checkout stale", or mention syncing after a release. Measures the drift with six read-only git predicates, names which **governed** files changed, and routes to the smallest fix — `git pull`, a single-branch rebase, or `/make-no-mistakes:rebase`. Never syncs anything itself |
 | [`audit-engine`](skills/audit-engine/SKILL.md) | Run any of the six repo-health audits (schema-drift, contract-drift, ddd, explicit-architecture, strangler, enforcement-hooks). Hybrid LLM-first detection + deterministic verification + cure-mapping |
 | [`domain-driven-advisor`](skills/domain-driven-advisor/SKILL.md) | Ask "which audit do I need?" / "where do I start with repo health?" — routes you to the right audit(s) and runs a premortem |
 | [`premortem`](skills/premortem/SKILL.md) | Say "premortem this", "what could kill this", "stress test this plan", "what am I missing", or "find the blind spots" on a plan/launch/decision |
@@ -261,6 +261,26 @@ The plugin reads `linear-setup.json` at your repo root for project-specific sett
 ```
 
 If no `linear-setup.json` exists, the plugin auto-detects settings from your environment (GitHub org from current repo, Linear team from MCP, etc.).
+
+Toolkit *behaviour* (as opposed to where things go) is read from an optional
+`make-no-mistakes.config.json`, also at the repo root — see
+[`commands/make-no-mistakes.config.example.json`](commands/make-no-mistakes.config.example.json)
+for every key and its default. Two consumers today: `language` / `diacritics` +
+`explain` for `/explain`, and `syncAdvisor.governedPaths` for the `sync-advisor`
+skill:
+
+```json
+{
+  "syncAdvisor": {
+    "governedPaths": [".claude/hooks/", "scripts/", ".github/workflows/"]
+  }
+}
+```
+
+Those are the directories where a stale checkout silently changes behaviour, so
+`sync-advisor` names them by file when they have moved on the base ref. The key
+has **no default** — unset, the skill reports distance and routing and omits
+that line rather than guessing at paths it cannot know.
 
 ## Verify Installation
 

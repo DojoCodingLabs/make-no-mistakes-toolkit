@@ -14,5 +14,10 @@
     "actionables": true,
     "askUserQuestion": "when-open-decisions"
   },
-  "_explain": "Per-command overrides for /explain. `askUserQuestion` accepts 'when-open-decisions' (default — only call it if the explanation actually leaves a decision open), 'always', or 'never'. Setting 'always' is discouraged: a menu invented to satisfy the format trains the reader to ignore the menus that matter."
+  "_explain": "Per-command overrides for /explain. `askUserQuestion` accepts 'when-open-decisions' (default — only call it if the explanation actually leaves a decision open), 'always', or 'never'. Setting 'always' is discouraged: a menu invented to satisfy the format trains the reader to ignore the menus that matter.",
+
+  "syncAdvisor": {
+    "governedPaths": [".claude/hooks/", "scripts/", ".github/workflows/"]
+  },
+  "_syncAdvisor": "Paths whose changes the `sync-advisor` skill reports by name when it measures drift, so the answer is 'you are missing these three hook fixes' instead of 'you are 12 commits behind'. Repo-relative path prefixes, passed to `git diff --name-only HEAD...origin/<base> -- <path>`. No default — with this key unset the skill still reports distance and routing, and omits the consequence line rather than guessing. Guessing is the worse failure: a built-in list would be wrong in every repo but the one it was copied from, and read as measured. Set it to the directories where a stale checkout silently changes behaviour — hooks, CI workflows, scripts, migrations, lockfiles."
 }
