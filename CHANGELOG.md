@@ -18,6 +18,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-07-31
+
+### Added
+- **`discard-stderr` hook rule** — blocks a `Bash` command that routes stderr to
+  `/dev/null`. A failing command with its stderr discarded is *indistinguishable*
+  from a succeeding one that printed nothing, so the empty result gets read as
+  "none found" rather than "it errored". That is not a hypothetical: on
+  2026-07-31 a `gh api --jq --arg ... 2>/dev/null` — `gh` rejects that flag
+  combination — produced an empty file that was reported to the team as "0 red
+  PRs". Sixteen of 41 were red, twelve of them on TypeScript. The discarded
+  stderr said exactly what was wrong.
+
+  **The rule matches on order, which is the whole difficulty.** `>/dev/null 2>&1`
+  is blocked: stdout is redirected first, then stderr is pointed at wherever
+  stdout now goes, so both die. `2>&1 >/dev/null` is allowed: stderr is
+  duplicated to the *original* stdout before the redirect, so it survives.
+  Identical token sets, opposite outcomes — a matcher that keyed on the tokens
+  alone would get one of the two wrong, and it is the permissive error that
+  costs, because a rule that blocks working commands gets removed.
+
+  Three shapes stay allowed and each has a test pinning it: `cmd >/dev/null`
+  (stderr still reaches you), `command -v x >/dev/null` (the existence probe,
+  which appears throughout these very hooks), and `cmd 2>&1 >/dev/null`. A
+  quoted mention — `git grep '2>/dev/null'` — performs no redirect and is not
+  blocked, because mention is not execution.
+
+  **Ships with `bypass_marker: null`**, the first rule here to do so. Every case
+  a bypass would have covered is already allowed above, so a marker would only
+  buy a way past a rule nobody needs to get past. The precedent is dojo-os
+  `pre-bash-block-main-target.sh`, which accepted `DOJO_HOTFIX_TO_MAIN=1` *and*
+  printed that literal in its own refusal: the thing meant to stop you handed
+  you the way through, and two agents filed false P0-hotfix claims that way
+  (DOJ-6247). A gate whose refusal message prints the way around it is not a
+  gate.
+
+  9 tests (4 blocking, 5 allowing). Rule count: 39 → 40.
+
 ## [1.35.0] - 2026-07-29
 
 ### Added
