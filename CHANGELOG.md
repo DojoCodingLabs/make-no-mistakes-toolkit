@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.37.0] - 2026-07-31
+## [1.38.0] - 2026-07-31
 
 ### Changed
 - **`rebase-advisor` → `sync-advisor`, and it now measures instead of asking.**
@@ -58,6 +58,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   `commands/rebase.md` is untouched and stays a real destination. What changed
   is who decides when it applies — measured, not asked.
+
+  **Minor and not major, decided by reading rather than by habit.** A skill
+  auto-activates on its `description`; it is not invoked by name the way a
+  command is, so a renamed `name:` changes no call site.
+  `grep -rniI "rebase.advisor" . --exclude-dir=node_modules --exclude-dir=.git
+  --exclude=CHANGELOG.md` returns nothing — no command, no doc, no other skill
+  named it. That negative is real rather than a broken search: the same grep
+  for `spike-recommend` returns 10 files, so cross-references of this shape do
+  get found when they exist.
+
+  One surface does break, and it is named here rather than folded into the
+  above: a user who typed `/make-no-mistakes:rebase-advisor` explicitly (README
+  documents that skills can be invoked that way) now gets an unknown skill. It
+  fails loudly, with the replacement one line away in the same table, and the
+  installer prunes the old file rather than leaving both live — but anyone who
+  reads that as breaking should say so on the PR.
 
 ### Added
 - **`syncAdvisor.governedPaths` in `make-no-mistakes.config.json`** (see
@@ -832,8 +848,8 @@ installed caches) but had no representation on `main`; this release lands them.
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.37.0...HEAD
-[1.37.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.37.0
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.38.0...HEAD
+[1.38.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.38.0
 [1.36.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.36.0
 [1.35.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.35.0
 [1.34.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.34.0
