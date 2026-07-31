@@ -102,6 +102,23 @@ installed caches) but had no representation on `main`; this release lands them.
 - `schemas/repo-health-rules.schema.json` — the unified `.repo-health-rules.json` enforcement contract (draft-07): `version`, `enforcementLevel` (`advisory|strict`), and a `families` object keyed by the six namespaces, each an array of `{ id, pattern, message, severity, exemptionMarker }` rules. Superset of `atomic-design-rules.schema.json`. Validated by `repo-health-rules.contract.test.ts`.
 - `proposeHookRule` cure-scaffold emitter (`src/audit/cure-scaffold.ts`) — deterministically maps a confirmed `Finding` whose `cure_map` includes `hook` into a `HookRuleProposal` shaped against the rules schema; returns `null` otherwise. This is the foundation of the Phase-2 "hooks first" enforcement step (v1 *proposes* rules; the live PreToolUse/PostToolUse hooks + apply step are Phase-2-later).
 
+## [1.31.0] - 2026-06-03
+
+### Added
+- **New auto-loading skill `verify-branch-state`** ([`skills/verify-branch-state/SKILL.md`](skills/verify-branch-state/SKILL.md)) — operationalizes the rule "working tree is one projection; the ref is the truth" across every repo the toolkit is installed in. Description tuned to auto-trigger on "verify against develop", "does X exist on `<branch>`", "what's on origin/…", "did this land on main", "re-validate the subagent", "before I claim", "post-merge state". Body covers: the rule statement, the canonical ref-explicit commands (`git fetch origin <ref> --quiet`, `git cat-file -e origin/<ref>:<path>`, `git show origin/<ref>:<path>`, `git ls-tree origin/<ref> -- <path>`, `git grep <pattern> origin/<ref> -- src/`, `git diff origin/<a>..origin/<b>`), the anti-patterns (`ls`, `grep -rn src/`, `find`, `git status`), the pre-flight checklist, the multi-worktree context, and a citation of the 2026-06-03 DOJ-4851/4863/4864 retraction that sourced the rule. Cites memory `feedback_working_tree_is_not_truth`.
+- **New slash command `/verify <ref> <path-or-pattern>`** ([`commands/verify.md`](commands/verify.md)) — runs `git fetch origin <ref> --quiet` then `git ls-tree origin/<ref> -- <path>` for paths or `git grep <pattern> origin/<ref> -- src/` for patterns, and emits a single verdict line citing the ref's short SHA in the shape `origin/<ref> @ <sha7> — <path-or-pattern> <PRESENT|NOT PRESENT|N MATCHES>` so the claim can be re-checked. Handles ref-not-found, shell metacharacters in patterns, and squash-merge cache-staleness (always re-fetches).
+- **New plugin-wide PreToolUse hook `pre-tool-use-claim-verification.sh`** ([`hooks/pre-tool-use-claim-verification.sh`](hooks/pre-tool-use-claim-verification.sh)) — warn-mode only, repo-agnostic, no per-repo manifest required. Detects bare-filesystem verification ops (`ls`, `grep -rn src/`, `find src/`, `cat src/`, `head src/`) and, when combined with intent keywords in the recent context envelope (or `CLAUDE_HOOK_CONTEXT` for smoke tests), prints a stderr warning that includes the local checkout's `HEAD` ref + short SHA, the suggested ref-explicit replacement (specific to the detected op), and pointers to the skill + slash command. Always `exit 0`. Defensive `set +e`. Uses `cd -P` + `pwd -P` for path resolution from day 1 (DOJ-4868 PR #2604 lesson). Trailing-newline-safe `while read`. Honors the documented kill switch `CLAUDE_DISABLE_PLUGIN_HOOKS=1`. Shellcheck clean. Wired into `hooks/hooks.json` under the `Bash` PreToolUse matcher with a 3-second timeout, alongside the existing `pre-bash.sh` dispatcher.
+
+### Changed
+- **README "Start here" section grows a peer entry point.** A new "Also start here: `verify-branch-state` + `/verify`" subsection now sits between the existing `domain-driven-advisor` "Start here" block and "What's Inside", quoting the rule verbatim and linking the skill, the slash command, and the warn-mode hook. The Commands table grows from 29 → 30 (adds `/verify`) and the Skills table grows from 10 → 11 (adds `verify-branch-state`).
+- **Marketplace description references the new peer skill.** `marketplace.json` plugin description now reads "Pair it with /make-no-mistakes:verify-branch-state (and the /verify slash command) before posting any authoritative claim about a branch's contents — working tree is one projection; the ref is the truth." Component counts updated to 30 commands / 11 skills / 2 agents.
+
+### Why
+- Cross-repo enforcement. DOJ-4868 shipped repo-level enforcement of the same rule in `dojo-os` (Level 2 of defense-in-depth). DOJ-4872 is the plugin layer (Level 1): the artifacts travel with the toolkit to any other repo it's installed in. Without it, agents using `make-no-mistakes-toolkit` in any other repo have zero guidance about the rule.
+- Warn-mode, not block-mode — same discipline as DOJ-4868. Erosion of habit if block-mode. The skill + slash command provide the right replacement commands; the hook nudges toward them.
+- Origin incident: 2026-06-03 DOJ-4851/4863/4864. A re-audit subagent correctly flagged `usePathwayViewModel.ts` as deleted on `develop`. The orchestrator "corrected" it by running `ls src/hooks/path/usePathwayViewModel.ts` against a local main checkout that had been switched to a different branch in another session; posted authoritative "FRESH — proceed as briefed" comments to Linear; had to retract publicly. Memory `feedback_working_tree_is_not_truth` documents the failure mode + the rule.
+
+
 ## [1.30.0] - 2026-06-02
 
 ### Changed
@@ -734,6 +751,7 @@ installed caches) but had no representation on `main`; this release lands them.
 [1.34.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.34.0
 [1.33.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.33.0
 [1.32.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.32.0
+[1.31.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.31.0
 [1.30.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.30.0
 [1.29.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.29.0
 [1.28.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.28.0
