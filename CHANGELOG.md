@@ -71,6 +71,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `commands/rebase.md` is untouched and stays a real destination. What changed
   is who decides when it applies — measured, not asked.
 
+  Step 0 resolves the base ref in a bare form (`develop`, never
+  `origin/develop`) and normalises with `${BASE#origin/}` whichever branch of
+  the resolution produced it, because every predicate interpolates
+  `origin/$BASE` and a value carrying the remote becomes `origin/origin/develop`
+  — `fatal: ambiguous argument … unknown revision`, exit 128, measured. It also
+  does **not** resolve the base from `@{upstream}`: on a feature branch that is
+  the branch's own remote copy (`origin/andres/sync-advisor`), so it answers
+  "am I pushed?" — predicate 6's question — and reports `0 behind` on a branch
+  far behind the actual base. Wrong ref, not merely wrong spelling. The
+  `origin/HEAD` step is a fall-through rather than a requirement: it is
+  routinely unset (`fatal: ref refs/remotes/origin/HEAD is not a symbolic ref`,
+  observed in this repo) and the `develop`/`main`/`master`/`trunk` probe covers
+  it. Both branches of the resolution verified, each against a control that
+  fails.
+
   **Minor and not major, decided by reading rather than by habit.** A skill
   auto-activates on its `description`; it is not invoked by name the way a
   command is, so a renamed `name:` changes no call site.

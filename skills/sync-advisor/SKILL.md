@@ -47,19 +47,51 @@ command's job and they invoke it themselves.
 
 ## Step 0 — Resolve the base ref
 
-Do not assume `develop`. Resolve in this order and say which one you used:
+Two things have to be right here, and each one fails silently in its own way:
+**which** branch is the base, and what **form** its name is in.
 
-```bash
-git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'   # 1. what this branch tracks
-git symbolic-ref --short refs/remotes/origin/HEAD               # 2. the remote's default branch
-git show-ref --verify --quiet refs/remotes/origin/develop; echo "exit=$?"  # 3. probe develop, then main
+**`$BASE` is a bare branch name — `develop`, never `origin/develop`.** Every
+predicate below interpolates `origin/$BASE`, so a value that already carries
+the remote becomes `origin/origin/develop`, which is not a ref and takes the
+whole run down:
+
+```
+$ git rev-list --left-right --count "HEAD...origin/origin/develop"
+fatal: ambiguous argument 'HEAD...origin/origin/develop': unknown revision
 ```
 
-Command 1 fails on a branch with no upstream — that is information, not an
-error: an unpushed branch, which predicate 6 covers. Fall through to 2, then 3.
-Repos in this toolkit's audience use `develop`, `main`, `master` and `trunk`; a
-hardcoded `develop` produces a confident measurement against a ref that does
-not exist.
+**Do not resolve the base from `@{upstream}`.** On any feature branch the
+upstream is that branch's *own* remote copy — `origin/andres/sync-advisor`, not
+`origin/develop`. Measuring against it answers *"am I pushed?"*, which is
+predicate 6's question, and it reports `0 behind` on a branch that is fifty
+commits behind the base. It is the wrong ref, not merely the wrong spelling.
+
+Resolve in this order, and say which one you used:
+
+```bash
+# 1. a base the user named explicitly — take it
+# 2. the remote's default branch, when origin/HEAD is set
+git symbolic-ref --short refs/remotes/origin/HEAD
+
+# 3. otherwise probe, in order
+for b in develop main master trunk; do
+  git show-ref --verify --quiet "refs/remotes/origin/$b" && { echo "$b"; break; }
+done
+```
+
+Step 2 is not reliable enough to stand alone — `origin/HEAD` is frequently
+unset in a fresh clone or worktree, and then it fails with
+`fatal: ref refs/remotes/origin/HEAD is not a symbolic ref`. That is a fall-
+through, not an error to report. Repos in this toolkit's audience use
+`develop`, `main`, `master` and `trunk`; a hardcoded `develop` produces a
+confident measurement against a ref that does not exist.
+
+Then normalise unconditionally, whichever branch produced the value:
+
+```bash
+BASE=${BASE#refs/remotes/}
+BASE=${BASE#origin/}
+```
 
 Then fetch, so that `origin/$BASE` is the ref and not a memory of it:
 
