@@ -88,6 +88,67 @@ while IFS=$'\t' read -r RULE_ID TEST_IDX; do
 done <<< "$PAIRS"
 
 # =============================================================================
+# Manifest invariant — a refusal never advertises its own way out (DOJ-6433)
+#
+# The bypass marker still WORKS. What it must not do is appear in the text the
+# hook prints when it refuses you. A refusal that names its own marker hands
+# you the password: reading the block IS the authorization, and typing the
+# marker becomes a reflex instead of a decision.
+#
+# This is the same defect dojo-os records in its non-negotiable 2 (DOJ-6247):
+# `pre-bash-block-main-target.sh` accepted `DOJO_HOTFIX_TO_MAIN=1` AND printed
+# that literal in its own refusal, and on 2026-07-28 two agents filed two false
+# P0-hotfix claims under a human's GitHub account with no trace but their own
+# self-report.
+#
+# Deliberately generic — it holds over every rule in the manifest rather than
+# case-by-case, because the case-by-case version is what drifted in the first
+# place. Three assertions, each listing every offender by id so a failure names
+# the rule to fix:
+#
+#   1. message must not contain the rule's own `bypass_marker`
+#   2. message must not contain the rule's own `disable_if_repo_file`
+#      (the per-repo escape hatch is the same door, one level up)
+#   3. message must not contain the literal `hook-bypass` — catches the
+#      template form (`// hook-bypass: <marker>`) even when the marker itself
+#      was renamed or elided
+#
+# The word "bypass" in ordinary prose is untouched: `ds-deep-ui-import` says
+# deep imports "bypass the barrel", and `discard-stderr` says outright that it
+# has no bypass marker. Both are correct and must keep passing.
+# =============================================================================
+assert_manifest_invariant() {
+  local name="$1" jq_filter="$2" offenders
+
+  offenders="$(jq -r "$jq_filter" "$RULES_JSON" | paste -sd' ' -)"
+
+  if [ -z "$offenders" ]; then
+    PASS=$((PASS + 1))
+    echo "  PASS  manifest-invariant / ${name}"
+  else
+    FAIL=$((FAIL + 1))
+    echo "  FAIL  manifest-invariant / ${name}  --  ${offenders}"
+    FAIL_DETAILS+=("manifest-invariant/${name}: ${offenders}")
+  fi
+}
+
+echo ""
+echo "Running manifest invariants…"
+
+assert_manifest_invariant "message-does-not-name-its-own-bypass-marker" \
+  '.[] | select((.bypass_marker // "") != "")
+       | select(.bypass_marker as $m | (.message // "") | contains($m))
+       | .id'
+
+assert_manifest_invariant "message-does-not-name-its-own-repo-escape-hatch" \
+  '.[] | select((.disable_if_repo_file // "") != "")
+       | select(.disable_if_repo_file as $f | (.message // "") | contains($f))
+       | .id'
+
+assert_manifest_invariant "message-does-not-contain-the-hook-bypass-literal" \
+  '.[] | select((.message // "") | contains("hook-bypass")) | .id'
+
+# =============================================================================
 # Standalone hook tests — pre-bash-stale-push.sh
 #
 # This hook lives outside the rules manifest because its predicate is shell
