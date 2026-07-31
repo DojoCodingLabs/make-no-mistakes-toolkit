@@ -117,30 +117,114 @@
       expected_stderr_contains: 'gcloud-missing-project'
 
 - id: prod-ops-no-approval
-  description: Block production operations without explicit user acknowledgement
+  description: Block production MUTATIONS without explicit user acknowledgement
   applies_to: [Bash]
+  # Three conditions, AND-chained, each reading a different surface of the
+  # command. The rule used to be condition 1 alone, which blocked on the NAME
+  # of the resource — so a pure read like `<tool> services list
+  # --project=acme-web-prod` was refused, and an inventory sweep came back with
+  # that one cell unverified while the non-prod cells filled in fine.
+  #
+  # A guard that blocks reads teaches people to route around it, and the habit
+  # of routing around it does not distinguish the read it over-blocked from the
+  # write it existed to stop. Matching the VERB instead of the resource name is
+  # what keeps the guard narrow enough to stay obeyed.
   match:
+    # 1. Does this name a production target? A question about the FLAGS, so it
+    #    reads the raw command.
     - field: command
       pattern: '--project=([a-z0-9-]+-prod\b|production\b)|--env=prod\b|\bENV=prod\b|--target=prod\b'
+    # 2. Is it a MUTATION? A question about the VERB, so the flags are stripped
+    #    first — otherwise `<tool> --project=x compute instances delete` reads
+    #    differently from `<tool> compute instances delete --project=x`, and
+    #    moving a flag becomes a bypass.
+    #
+    #    This is an explicit block-list, so an unrecognised verb is ALLOWED.
+    #    That direction is deliberate: read verbs are open-ended (list,
+    #    describe, get, read, logs, versions, ...) and enumerating them all is
+    #    the failure this rule is being fixed for. Mutating verbs are a closed,
+    #    reviewable set.
+    - field: command
+      normalize: strip-flags
+      pattern: '(^|[^[:alnum:]_-])(create|delete|destroy|update|patch|replace|deploy|redeploy|apply|start|stop|restart|scale|resize|enable|disable|grant|revoke|import|restore|rollback|migrate|drop|truncate|purge|promote|rotate|(set|add|remove|unset)-[a-z0-9-]+)([^[:alnum:]_-]|$)'
+    # 3. A dry run performs no mutation. Read on the RAW command, since the
+    #    signal is itself a flag and condition 2 has already discarded it.
+    - field: command
+      not_pattern: '--dry-run\b|--dryrun\b'
   action: block
   bypass_marker: prod-ops
   memory_ref: feedback_never_touch_prod_without_approval.md
   references: []
   message: |
-    BLOCKED: production operation detected.
+    BLOCKED: production MUTATION detected.
 
     Production changes require explicit user approval. Once confirmed, add
     "// hook-bypass: prod-ops" to the command to acknowledge.
+
+    Read-only calls against production (list / describe / get / read, or any
+    command carrying --dry-run) are NOT blocked. If you are seeing this for a
+    command that only reads, the verb block-list is too wide — report it rather
+    than reaching for the bypass.
   tests:
-    - name: blocks-prod-project-flag
+    # --- The regression this rule was narrowed for -------------------------
+    # A pure read against a production project. No mutating verb anywhere in
+    # the command; the only thing tying it to production is the resource NAME.
+    # This is the exact shape that was refused in the field.
+    - name: allows-readonly-list-against-prod-project
+      input:
+        tool_input:
+          command: 'gcloud services list --project=acme-web-prod'
+      expected_exit: 0
+    # Its mandatory counterpart. Without this pair, a fix that opened the guard
+    # entirely would satisfy the test above and look green.
+    - name: blocks-mutation-against-same-prod-project
+      input:
+        tool_input:
+          command: 'gcloud run deploy api --project=acme-web-prod'
+      expected_exit: 2
+      expected_stderr_contains: 'BLOCKED: production MUTATION detected.'
+    # --- Flag position must not change the verdict -------------------------
+    - name: allows-read-with-flag-before-verb
       input:
         tool_input:
           command: 'gcloud --project=acme-prod compute instances list'
+      expected_exit: 0
+    - name: blocks-delete-with-flag-before-verb
+      input:
+        tool_input:
+          command: 'gcloud --project=acme-prod compute instances delete vm-1'
       expected_exit: 2
+    # --- Read verbs and read-shaped flags stay open ------------------------
+    - name: allows-describe-against-prod
+      input:
+        tool_input:
+          command: 'gcloud compute instances describe vm-1 --project=acme-prod'
+      expected_exit: 0
+    - name: allows-format-flag-read
+      input:
+        tool_input:
+          command: 'gcloud compute instances list --project=acme-prod --format=json'
+      expected_exit: 0
+    - name: allows-dry-run-of-mutation
+      input:
+        tool_input:
+          command: 'gcloud run deploy api --project=acme-prod --dry-run'
+      expected_exit: 0
+    # --- Mutations stay blocked -------------------------------------------
     - name: blocks-env-prod
       input:
         tool_input:
           command: 'ENV=prod npm run deploy'
+      expected_exit: 2
+    - name: blocks-set-prefixed-mutation
+      input:
+        tool_input:
+          command: 'gcloud run services update api --project=acme-prod --set-env-vars=K=V'
+      expected_exit: 2
+    - name: blocks-stop-against-prod
+      input:
+        tool_input:
+          command: 'gcloud compute instances stop vm-1 --project=acme-prod'
       expected_exit: 2
     - name: allows-staging
       input:

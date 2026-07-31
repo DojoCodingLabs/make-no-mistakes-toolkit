@@ -1,6 +1,6 @@
 # make-no-mistakes
 
-**Version: 1.31.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
+**Version: 1.35.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
 
 The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.
 
@@ -91,7 +91,7 @@ See `skills/verify-branch-state/SKILL.md` for the full anti-pattern catalogue an
 
 ## What's Inside
 
-### Commands (30)
+### Commands (38)
 
 Deliberate actions you invoke explicitly.
 
@@ -108,13 +108,19 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:goodnight [label]`](commands/goodnight.md) | Save full session context as a handoff file for tomorrow |
 | [`/make-no-mistakes:pending-left`](commands/pending-left.md) | Track what's left unfinished across git, Linear, and session context |
 | [`/make-no-mistakes:summarize`](commands/summarize.md) | Structured recap of everything done in the current session |
+| [`/make-no-mistakes:explain <topic>`](commands/explain.md) | Explain something in two layers — plain prose first, then technical detail — closing with a non-obvious insight, ranked actionables, and `AskUserQuestion`. The prose layer answers *what is going on and why it matters*; the technical layer answers *where exactly and how*. If the prose is only the technical layer in smaller words, it is redundant and gets skipped |
 | [`/make-no-mistakes:daily-standup-add-completed [text]`](commands/daily-standup-add-completed.md) | Append completed work items to today's standup file (auto-detects from PRs/issues) |
 | [`/make-no-mistakes:daily-standup-post-slack [draft]`](commands/daily-standup-post-slack.md) | Compose and post today's standup to the configured Slack channel |
+| [`/make-no-mistakes:handover <@person> [#channel] [draft]`](commands/handover.md) | Hand a body of work (PRs, issues, an incident + root cause, a Draft someone must finish) to a specific teammate for review/decision — house Slack style, verify-don't-remember |
 | [`/make-no-mistakes:remind <topic>`](commands/remind.md) | Recall past decisions, instructions, or feedback from memory and project context |
+| [`/make-no-mistakes:resolve-open-questions [scope]`](commands/resolve-open-questions.md) | Sweep the session for open decisions and questions buried in prose, then resolve them in batches via `AskUserQuestion` with options + a recommendation. Executes immediately on the answers — one approval, one action |
+| [`/make-no-mistakes:postmortem <incident>`](commands/postmortem.md) | Compose a blameless post-incident report in the house style — evidence verified against logs/DB *before* writing — with the mandatory Causa Raíz / La Buena Noticia / Plan de Mitigación sections, adapted to a technical or a stakeholder audience |
+| [`/make-no-mistakes:handover-pr <repo> [pr#] <@person>`](commands/handover-pr.md) | Package your open PR(s) / branch work into a structured handover and post it to a Slack thread for a teammate to pick up. The mirror of `/takeover-pr` |
 | [`/make-no-mistakes:takeover-pr <repo> [pr#]`](commands/takeover-pr.md) | Pick a random open PR from a teammate, check it out, review it, and take over the work |
 | [`/make-no-mistakes:secret-input`](commands/secret-input.md) | Stage a secret/password via OS-native GUI dialog (Linux zenity/kdialog/pinentry, macOS osascript, Windows Get-Credential). The value never appears in the conversation log or terminal history. Cross-platform via `.sh` (Linux/macOS/WSL/Git Bash) + `.ps1` (native Windows) |
 | [`/make-no-mistakes:secret-use ENVVAR -- <cmd>`](commands/secret-use.md) | Run one command with the staged secret loaded as an environment variable. Env var lives only inside the consuming process and is unset on completion |
 | [`/make-no-mistakes:secret-clear`](commands/secret-clear.md) | Wipe the staged secret (shred/rm-P/random-overwrite per OS). Idempotent — safe to call when no secret is staged. Always run when done with credentials |
+| [`/make-no-mistakes:audit [path]`](commands/audit.md) | **Meta-dispatcher** — runs the full repo-health sweep (all six families `SCH→CDC→DDD→ARC→STR→ENF` via `audit-engine`) and delegates the component layer to `atomic-design-toolkit` when installed; aggregates one report + emits cure-scaffold proposals per `schemas/repo-health-rules.schema.json` |
 | [`/make-no-mistakes:domain-driven-advisor`](commands/domain-driven-advisor.md) | **Guided entry point** — inspects the repo, recommends which audit(s) to run (or the full sequence), runs them, and finishes with a premortem. Start here for repo health. |
 | [`/make-no-mistakes:audit-schema-drift`](commands/audit-schema-drift.md) | Audit for schema drift — 1NF violations + the same logical column duplicated across tables without a single source of truth |
 | [`/make-no-mistakes:audit-contract-drift`](commands/audit-contract-drift.md) | Audit consumer-driven contract drift — producer↔consumer validation schemas that have silently diverged |
@@ -126,9 +132,11 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:atomic-rules-init`](commands/atomic-rules-init.md) | Scaffold a `.atomic-design-rules.json` at the repo root so the atomic-design hooks (PreToolUse ownership enforcement + PostToolUse drift telemetry) start enforcing. No-op if the file already exists |
 | [`/make-no-mistakes:e2e-test-preview [path]`](commands/e2e-test-preview.md) | Launch a Qt-based visual previewer for `test-suite.json` — interactive table with filtering, detail pane, and CSV export (auto-installs PySide6) |
 | [`/make-no-mistakes:gemini-code-review [target]`](commands/gemini-code-review.md) | Cheap first-pass code review (one-shot via liteLLM) on a parametrizable model — Gemini 3.5 Flash by default; supports `--model` and `--adversarial`, curated against the repo's CLAUDE.md |
+| [`/make-no-mistakes:observability-audit [target]`](commands/observability-audit.md) | Runtime audit of whether observability actually **works** rather than exists — measures events *received* per emitting surface, matches the configured credential to a live destination, finds init paths that silently disable monitoring, checks alert-channel liveness/ownership, and flags every alert never demonstrated capable of firing |
+| [`/make-no-mistakes:parallelize <work>`](commands/parallelize.md) | Decompose a body of work and fan it out across named, worktree-isolated agents. Opens with a mandatory capability gate that reads the agent-teams flag **and** the live tool surface (a retired `TeamCreate` is the healthy case, never an abort), splits streams by *who can execute them* as well as by topic, and converges the results into one report |
 | [`/make-no-mistakes:verify <ref> <path-or-pattern>`](commands/verify.md) | Verify whether a file, directory, or pattern exists on a named git ref. Runs `git fetch origin <ref> --quiet` then `git ls-tree` / `git grep` against `origin/<ref>` and emits a verdict line citing the ref's SHA. Use before posting any authoritative claim about a branch's contents (working tree is one projection; the ref is the truth) |
 
-### Skills (11)
+### Skills (12)
 
 Auto-activate by context — you don't need to remember the command name.
 
@@ -202,8 +210,9 @@ Tool: Scanning… found supabase/migrations and FE+edge validation.
       Q1: ¿Varios equipos escriben en la misma base de datos? > yes
       Q2: ¿El frontend y el backend validan los mismos datos por separado? > yes
       → Recommended: /audit-schema-drift + /audit-contract-drift, then enforcement.
-      Tip: enable agent teams for parallel audits — add
-           "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" to ~/.claude/settings.json
+      Tip: fan-out is on by default; for mid-run coordination between
+           verifiers, add "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+           to ~/.claude/settings.json
       Run them now? > yes
       … findings written to docs/repo-health/… + premortem report on ~/Escritorio.
 ```
@@ -215,14 +224,25 @@ remediation change, Bilingual-Layer Linear issues, and 4-cure scaffold
 proposals — plus a single premortem report (HTML + transcript) over the combined
 plan.
 
-### Faster with agent teams
+### Faster with parallel fan-out
 
-The audits fan out one verifier per finding, so they're much faster with a
-parallel agent team. The advisor will recommend enabling
-`"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` in `~/.claude/settings.json`
+The audits fan out one verifier per finding, so they're much faster in parallel.
+The parallelism itself comes from the `Agent` tool (`name` +
+`isolation: "worktree"`, coordinated by `SendMessage`) and needs no flag —
+there is no `TeamCreate` tool in current harnesses, and its absence is expected
+rather than a problem.
+
+What `"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` adds is the **coordination**
+layer on top: the teammate mailbox, shared team context, and assigning a task to
+a teammate. The advisor recommends enabling it in `~/.claude/settings.json`
 (it shows the exact one-line change; it never edits your settings without
-consent). If you decline, it falls back to subagent-driven-development on the
-latest Opus rather than a slow sequential crawl.
+consent). Decline and you still get the fan-out — you lose mid-run coordination,
+so each verifier is briefed self-contained and reports once at the end. Note the
+flag is ANDed with a server-side gate, so setting it locally doesn't guarantee
+the layer is live; the tool surface is what to believe.
+
+See [`/make-no-mistakes:parallelize`](commands/parallelize.md) for the full
+capability gate.
 
 ### Run a single audit directly
 
@@ -355,7 +375,7 @@ make-no-mistakes-toolkit/
 │   ├── cli.ts
 │   ├── index.ts
 │   └── lib/
-├── commands/           # 29 explicit commands
+├── commands/           # 30 explicit commands
 ├── agents/             # 2 specialized subagents
 ├── skills/             # 10 auto-activating skills
 │   └── */SKILL.md

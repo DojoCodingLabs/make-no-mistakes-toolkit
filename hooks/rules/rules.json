@@ -124,7 +124,7 @@
   },
   {
     "id": "prod-ops-no-approval",
-    "description": "Block production operations without explicit user acknowledgement",
+    "description": "Block production MUTATIONS without explicit user acknowledgement",
     "applies_to": [
       "Bash"
     ],
@@ -132,28 +132,110 @@
       {
         "field": "command",
         "pattern": "--project=([a-z0-9-]+-prod\\b|production\\b)|--env=prod\\b|\\bENV=prod\\b|--target=prod\\b"
+      },
+      {
+        "field": "command",
+        "normalize": "strip-flags",
+        "pattern": "(^|[^[:alnum:]_-])(create|delete|destroy|update|patch|replace|deploy|redeploy|apply|start|stop|restart|scale|resize|enable|disable|grant|revoke|import|restore|rollback|migrate|drop|truncate|purge|promote|rotate|(set|add|remove|unset)-[a-z0-9-]+)([^[:alnum:]_-]|$)"
+      },
+      {
+        "field": "command",
+        "not_pattern": "--dry-run\\b|--dryrun\\b"
       }
     ],
     "action": "block",
     "bypass_marker": "prod-ops",
     "memory_ref": "feedback_never_touch_prod_without_approval.md",
     "references": [],
-    "message": "BLOCKED: production operation detected.\n\nProduction changes require explicit user approval. Once confirmed, add\n\"// hook-bypass: prod-ops\" to the command to acknowledge.\n",
+    "message": "BLOCKED: production MUTATION detected.\n\nProduction changes require explicit user approval. Once confirmed, add\n\"// hook-bypass: prod-ops\" to the command to acknowledge.\n\nRead-only calls against production (list / describe / get / read, or any\ncommand carrying --dry-run) are NOT blocked. If you are seeing this for a\ncommand that only reads, the verb block-list is too wide — report it rather\nthan reaching for the bypass.\n",
     "tests": [
       {
-        "name": "blocks-prod-project-flag",
+        "name": "allows-readonly-list-against-prod-project",
+        "input": {
+          "tool_input": {
+            "command": "gcloud services list --project=acme-web-prod"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "blocks-mutation-against-same-prod-project",
+        "input": {
+          "tool_input": {
+            "command": "gcloud run deploy api --project=acme-web-prod"
+          }
+        },
+        "expected_exit": 2,
+        "expected_stderr_contains": "BLOCKED: production MUTATION detected."
+      },
+      {
+        "name": "allows-read-with-flag-before-verb",
         "input": {
           "tool_input": {
             "command": "gcloud --project=acme-prod compute instances list"
           }
         },
+        "expected_exit": 0
+      },
+      {
+        "name": "blocks-delete-with-flag-before-verb",
+        "input": {
+          "tool_input": {
+            "command": "gcloud --project=acme-prod compute instances delete vm-1"
+          }
+        },
         "expected_exit": 2
+      },
+      {
+        "name": "allows-describe-against-prod",
+        "input": {
+          "tool_input": {
+            "command": "gcloud compute instances describe vm-1 --project=acme-prod"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-format-flag-read",
+        "input": {
+          "tool_input": {
+            "command": "gcloud compute instances list --project=acme-prod --format=json"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-dry-run-of-mutation",
+        "input": {
+          "tool_input": {
+            "command": "gcloud run deploy api --project=acme-prod --dry-run"
+          }
+        },
+        "expected_exit": 0
       },
       {
         "name": "blocks-env-prod",
         "input": {
           "tool_input": {
             "command": "ENV=prod npm run deploy"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-set-prefixed-mutation",
+        "input": {
+          "tool_input": {
+            "command": "gcloud run services update api --project=acme-prod --set-env-vars=K=V"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-stop-against-prod",
+        "input": {
+          "tool_input": {
+            "command": "gcloud compute instances stop vm-1 --project=acme-prod"
           }
         },
         "expected_exit": 2

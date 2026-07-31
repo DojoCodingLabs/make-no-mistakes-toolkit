@@ -1,5 +1,5 @@
 ---
-description: Generate a structured recap of everything accomplished in the current session, including tasks completed, files changed, decisions made, and pending items.
+description: Generate a structured recap of everything accomplished in the current session, then ALWAYS chain into the session plan, pending-left and resolve-open-questions — what happened, what remains, and what has to be decided.
 priority: 80
 ---
 
@@ -8,7 +8,9 @@ priority: 80
 You are a **session summarizer**. The user wants a structured recap of everything that happened in this conversation.
 
 **Input**: None required
-**Output**: A comprehensive summary of the current session's work
+**Output**: A recap of the session, followed — always, without being asked — by
+what remains pending and what decisions are open. Steps 1-3 produce the recap;
+**Step 4 is not optional and is part of the deliverable.**
 
 ---
 
@@ -79,15 +81,57 @@ Present the summary in this format:
 
 ---
 
-## Step 4: Offer Next Actions
+## Step 4: Chain — SIEMPRE, y en una sola tanda
 
-After the summary, ask:
+Un resumen contesta **qué pasó**. No contesta **qué queda** ni **qué hay que
+decidir**, que son las dos preguntas por las que alguien pide un resumen. Pedir
+los tres comandos a mano, uno por turno, es el síntoma de que el contrato
+estaba incompleto — no una forma de usarlo.
 
-```
-¿Quieres que:
-1. Guarde algo de esta sesión en memoria para futuras conversaciones?
-2. Postee un resumen en Slack (#daily-status-updates)?
-3. Comente progreso en los Linear issues tocados?
-```
+Así que después de emitir el resumen, sin preguntar y sin esperar,
+**emití estas TRES lecturas en UNA sola tanda de tool calls paralelos**:
 
-Only offer options that are relevant (e.g., don't offer Slack if no meaningful work was done).
+### 4a. El plan de la sesión
+
+Leelo con `Read`. La UI lo muestra como `Reading Plan` cuando el archivo cae
+bajo un directorio `plans/` de Claude.
+
+Resolución de la ruta, en este orden:
+
+1. La que da el mensaje de sistema del modo plan. Es la autoritativa.
+2. Si no la tenés a mano: `$CLAUDE_CONFIG_DIR/plans/`.
+
+**Nunca hardcodees `~/.claude/plans`.** Coexisten varios perfiles en la misma
+máquina — `.claude`, `.claude-andres`, `.claude-hello` en una instalación real,
+cada uno con su `plans/` — y `CLAUDE_CONFIG_DIR` es lo único que dice cuál
+corresponde a esta sesión. Una ruta fija lee el plan de otro perfil.
+
+**Los planes persisten entre sesiones.** El archivo más reciente del directorio
+NO es necesariamente el de esta sesión. Si esta sesión nunca entró en modo
+plan, no hay plan que leer: decilo en una línea y seguí. Leer el de otra sesión
+como si describiera esta es peor que no leer ninguno, porque un plan viejo se
+lee igual de fluido que uno vigente.
+
+### 4b. El contrato de `pending-left`
+
+`commands/pending-left.md`, de este mismo plugin.
+
+### 4c. El contrato de `resolve-open-questions`
+
+`skills/resolve-open-questions/SKILL.md`, de este mismo plugin.
+
+### Después de las tres lecturas
+
+Ejecutá `pending-left` y después `resolve-open-questions`, en ese orden — los
+pendientes son el insumo de las decisiones, no al revés.
+
+**Por qué esta sección reemplazó a un menú numerado.** Este paso decía antes
+"¿Quieres que: 1. guarde memoria, 2. postee en Slack, 3. comente en Linear?".
+Eso contradecía a `resolve-open-questions`, que es el dueño de convertir
+decisiones abiertas en `AskUserQuestion` — opción recomendada primera,
+trade-off en cada descripción, `multiSelect` cuando no son exclusivas. Un menú
+numerado en prosa no es ninguna de esas cosas, y tener los dos significaba que
+la calidad de la pregunta dependía de cuál de los dos caminos tomara el agente.
+Las tres ofertas viejas siguen vivas: salen del sweep de
+`resolve-open-questions`, que las va a encontrar si de verdad quedaron
+abiertas, y no las va a inventar si no.
