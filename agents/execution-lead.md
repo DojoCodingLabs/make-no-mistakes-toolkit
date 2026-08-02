@@ -43,7 +43,7 @@ For EACH issue in the sequence:
 2. Determine branch type from issue labels/title
 3. Create NEW branch + worktree (MANDATORY):
    ```bash
-   git branch -D {type}/{issue-id}-{short-description} 2>/dev/null || true
+   git branch -D {type}/{issue-id}-{short-description} 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}" || true
    git worktree add .claude/worktrees/{issue-id} -b {type}/{issue-id}-{short-description} {baseBranch}
    cd .claude/worktrees/{issue-id}
    ```

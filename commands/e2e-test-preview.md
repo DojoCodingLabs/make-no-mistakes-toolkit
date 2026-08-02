@@ -45,7 +45,7 @@ If it does NOT exist, create the directory and generate it from the embedded tem
 ### Step 3: Ensure PySide6 is installed
 
 ```bash
-python3 -c "import PySide6" 2>/dev/null
+python3 -c "import PySide6" 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
 ```
 
 If that fails, install it:

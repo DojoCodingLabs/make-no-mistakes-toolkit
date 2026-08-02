@@ -18,12 +18,12 @@ Detect the GitHub organization dynamically. Try these methods in order:
 
 **Method A** — Infer from the current repo:
 ```bash
-ORG=$(gh repo view --json owner --jq '.owner.login' 2>/dev/null)
+ORG=$(gh repo view --json owner --jq '.owner.login' 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}")
 ```
 
 **Method B** — Read from `linear-setup.json` if it exists at the repo root:
 ```bash
-ORG=$(cat linear-setup.json 2>/dev/null | jq -r '.github.org // empty')
+ORG=$(cat linear-setup.json 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}" | jq -r '.github.org // empty')
 ```
 
 **Method C** — If neither works, ask the user which org to use.
@@ -131,7 +131,7 @@ If found, fetch the issue context using `mcp__claude_ai_Linear__get_issue`.
 
 ```bash
 gh api "repos/$ORG/$REPO/issues/NUMBER/comments" \
-  --jq '.[] | select(.user.login | test("greptile"; "i")) | .body' 2>/dev/null
+  --jq '.[] | select(.user.login | test("greptile"; "i")) | .body' 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
 ```
 
 Parse Greptile confidence score from `<h3>Confidence Score: X/5</h3>` and Path to 5/5 items if present.

@@ -18,6 +18,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.40.0] - 2026-08-02
+
+### Fixed
+- **The toolkit was blocking what its own commands taught.** It ships a
+  `discard-stderr` hook that refuses a command an agent RUNS, and that hook has
+  no reach at all over the same shape written into a command or a skill — which
+  are files that exist to be copied and executed. Measured across the tree:
+  **164 discard sites, 152 of them in a refused form**, of which **34 sat in
+  `commands/`, `skills/` and `agents/`**, instructing the reader to write
+  exactly what the hook refuses.
+
+  A discarded stream makes a FAILING command indistinguishable from a
+  SUCCEEDING one that printed nothing, and the empty result then reads as
+  "none found" rather than "it errored".
+
+  All 34 replaced with `2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"` — a form
+  that is self-contained, so no site depends on a variable some earlier step was
+  supposed to define. Two files were deliberately left alone and are not
+  oversights: `commands/parallelize.md` STATES the rule in prose, and
+  `skills/merge-advisor/SKILL.md` uses the legal reverse order.
+
+### Added
+- **`scripts/check-discard-stderr.mjs`** — the mechanism, because a sweep with
+  no gate undoes itself. Wired into `npm run check-discard-stderr` and into
+  `prepublishOnly`, and asserted by the suite, so it is not a gate that nothing
+  runs.
+
+  **Mention is not execution, and this is the hard part.** In markdown only
+  FENCED blocks are read as commands; inline backticks are prose, because a rule
+  that says "never write X" has to be able to write X. That is not a
+  hypothetical: while building this, a sibling guard blocked the command that
+  was *counting the violations*, and separately blocked a PR body that merely
+  QUOTED a redirect while explaining why its order is the safe one. A guard that
+  refuses ordinary work gets bypassed, and a bypassed guard carries no
+  information at all. Outside markdown every line is a command, comments
+  included — a comment demonstrating the bad form is still the line a reader
+  copies.
+
+  **Order is the whole distinction**, and the suite's central assertion is that
+  the two spellings sharing a token set get opposite verdicts.
+  `cmd 2>&1 >/dev/null` duplicates stderr to the ORIGINAL stdout before stdout
+  moves, so diagnostics survive — allowed. `cmd >/dev/null 2>&1` retargets
+  stdout first and both are gone — refused. Bare `cmd >/dev/null` is refused
+  too: stderr does survive, and that is not the whole harm, because it throws
+  away the ANSWER along with the noise and `grep -c x f >/dev/null` cannot then
+  tell "zero matches" from "many".
+
+  **Scope is split on purpose.** `commands/ skills/ agents/` is a hard gate at
+  zero. `hooks/ scripts/` is real shell with **113 remaining sites**, counted
+  and reported but not enforced: a gate that reds the repo it guards is one that
+  gets deleted. Making that half a ratchet on added lines is the next step, and
+  it is named here as intended rather than as existing.
+
+  An unreadable file is reported as a finding rather than skipped, so a
+  permissions problem cannot read as a passing scan — the same
+  found-nothing-versus-errored collapse the checker exists to prevent, one level
+  up.
+
+  Tests: 12 new (72 total), including one negative control per refused form.
+
 ## [1.38.0] - 2026-07-31
 
 ### Changed
@@ -950,6 +1010,7 @@ installed caches) but had no representation on `main`; this release lands them.
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
 [Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.38.0...HEAD
+[1.40.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.40.0
 [1.38.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.38.0
 [1.37.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.37.0
 [1.36.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.36.0

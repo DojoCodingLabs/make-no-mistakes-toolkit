@@ -17,8 +17,8 @@ You are a **session bootstrap assistant**. The user just started their day and w
 Search for `next-day-*.md` files in these locations:
 
 ```bash
-find ~/Desktop -maxdepth 1 -name "next-day-*.md" -type f 2>/dev/null
-find .claude/next-day -maxdepth 1 -name "next-day-*.md" -type f 2>/dev/null
+find ~/Desktop -maxdepth 1 -name "next-day-*.md" -type f 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
+find .claude/next-day -maxdepth 1 -name "next-day-*.md" -type f 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
 ```
 
 If no files are found in either location, say:

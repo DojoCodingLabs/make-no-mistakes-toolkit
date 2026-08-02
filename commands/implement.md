@@ -264,7 +264,7 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
 1. **Resolve the configured changes directory** and check for an existing OpenSpec change that references this issue. The grep MUST use the configured path — projects may set `openspec.changesPath` to anything (e.g., `specs/changes/`) and a hardcoded `openspec/changes/` would silently miss every existing spec there:
    ```bash
    CHANGES_PATH=$(jq -r '.openspec.changesPath' linear-setup.json)
-   grep -r "{issue-id}" "$CHANGES_PATH"/*/proposal.md 2>/dev/null
+   grep -r "{issue-id}" "$CHANGES_PATH"/*/proposal.md 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
    ```
    In all references below, `<changes>` denotes that resolved `$CHANGES_PATH` value, NOT the literal string `openspec/changes/`.
 
@@ -300,7 +300,7 @@ Run this BEFORE Phase 1 (Setup). If `linear-setup.json` has `openspec.changesPat
 3. **Create NEW branch + worktree** (MANDATORY — never skip):
    ```bash
    # Delete stale branch if it exists from a previous attempt
-   git branch -D {type}/{issue-id}-{short-description} 2>/dev/null || true
+   git branch -D {type}/{issue-id}-{short-description} 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}" || true
 
    # Create fresh worktree with new branch
    git worktree add .claude/worktrees/{issue-id} -b {type}/{issue-id}-{short-description} {baseBranch}

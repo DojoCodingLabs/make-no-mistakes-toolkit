@@ -1,6 +1,6 @@
 {
   "name": "@lapc506/make-no-mistakes",
-  "version": "1.38.0",
+  "version": "1.40.0",
   "description": "The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, manage sessions, stash secrets, and enforce manifest-driven tool-call hooks (no SSH+DB, no manual prod, no minified build, no secret leaks, Slack format). OpenCode + Claude Code plugin.",
   "type": "module",
   "main": "./dist/index.js",
@@ -39,9 +39,10 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean && tsup src/cli.ts --format esm --clean false",
     "build-rules": "node scripts/build-rules.mjs",
+    "check-discard-stderr": "node scripts/check-discard-stderr.mjs",
     "test-hooks": "bash hooks/test-hooks.sh",
     "test": "vitest run",
-    "prepublishOnly": "npm run build && npm run build-rules"
+    "prepublishOnly": "npm run check-discard-stderr && npm run build && npm run build-rules"
   },
   "keywords": [
     "opencode",
