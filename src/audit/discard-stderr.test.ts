@@ -1,19 +1,18 @@
 /**
  * Tests for `scripts/check-discard-stderr.mjs`.
  *
- * The suite is built around the two distinctions the checker must not get
- * wrong, because getting either wrong turns it into a guard that gets
- * bypassed — and a bypassed guard carries no information at all.
+ * The checker applies the SHARED `discard-stderr` rule from
+ * `hooks/rules/rules.yaml` (via its generated `rules.json`) to FILES rather
+ * than to a single command string. So the suite covers two different things,
+ * and keeping them apart is the point:
  *
- *   ORDER      `2>&1 >/dev/null` duplicates stderr to the ORIGINAL stdout
- *              before stdout is retargeted, so diagnostics survive. The
- *              reverse spelling discards both. Identical token sets.
+ *   SHARED     the pattern itself. Not owned here, and the tests assert that
+ *              it is not owned here — a second copy would drift, and it would
+ *              drift silently, which is the exact defect the checker exists to
+ *              catch.
  *
- *   MENTION    A rule that says "never write X" has to be able to write X.
- *              In markdown only FENCED blocks are commands; inline backticks
- *              are prose. Both failures were observed for real while building
- *              this: a sibling guard blocked the command COUNTING the
- *              violations, and a PR body that merely quoted a redirect.
+ *   OWNED      which lines of a document are commands. The rule cannot answer
+ *              that: a hook receives one command, this receives a file.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -22,8 +21,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { scan } from '../../scripts/check-discard-stderr.mjs';
+import { commandLines, loadRule, posixToJs, scan } from '../../scripts/check-discard-stderr.mjs';
 
+const rule = loadRule();
 let dir: string;
 
 beforeEach(() => {
@@ -32,87 +32,112 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-/** Write a markdown file whose body is a single fenced command block. */
+/** A markdown file whose body is a single fenced command block. */
 function fenced(name: string, command: string): string {
   const p = path.join(dir, 'commands', name);
   writeFileSync(p, `# doc\n\nSome prose.\n\n\`\`\`bash\n${command}\n\`\`\`\n`);
   return p;
 }
 
-/** Write a markdown file that only MENTIONS the shape, in inline backticks. */
-function prose(name: string, mention: string): string {
-  const p = path.join(dir, 'commands', name);
-  writeFileSync(p, `# doc\n\nNever append \`${mention}\`. It hides failures.\n`);
-  return p;
-}
-
-describe('refuses every discarding form', () => {
-  it('flags stderr-only discard', () => {
-    const f = fenced('a.md', 'gh pr list 2>/dev/null');
-    expect(scan([f])).toHaveLength(1);
-    expect(scan([f])[0].why).toMatch(/stderr discarded/);
+describe('the pattern is NOT owned here', () => {
+  it('loads the rule from the shared rules.json', () => {
+    expect(rule.source).toBe('hooks/rules/rules.json#discard-stderr');
+    expect(rule.refuse).toBeInstanceOf(RegExp);
   });
 
-  it('flags the ampersand form', () => {
-    expect(scan([fenced('b.md', 'gh pr list &>/dev/null')])).toHaveLength(1);
+  it('uses the SAME expression the hook uses, modulo the POSIX translation', () => {
+    // The one assertion that makes drift impossible. If someone tightens the
+    // rule, this checker tightens with it; if someone reintroduces a private
+    // copy here, this fails.
+    const raw = JSON.parse(
+      execFileSync('cat', ['hooks/rules/rules.json'], { encoding: 'utf8' }),
+    );
+    const rules = Array.isArray(raw) ? raw : raw.rules;
+    const shared = rules.find((r: { id: string }) => r.id === 'discard-stderr');
+    const pattern = shared.match.find((m: { pattern?: string }) => m.pattern).pattern;
+    expect(rule.refuse.source).toBe(new RegExp(posixToJs(pattern)).source);
   });
 
-  it('flags stdout-then-both, which is the WRONG order', () => {
-    const f = fenced('c.md', 'command -v jq >/dev/null 2>&1');
-    expect(scan([f])).toHaveLength(1);
-    expect(scan([f])[0].why).toMatch(/wrong order/);
+  it('translates the only POSIX class the rule uses, and nothing else', () => {
+    expect(posixToJs('a[[:space:]]b')).toBe('a\\sb');
+    expect(posixToJs('a\\s+b')).toBe('a\\s+b');
   });
 
-  it('flags bare stdout discard, because it throws away the ANSWER', () => {
-    const f = fenced('d.md', 'grep -c pattern file >/dev/null');
-    expect(scan([f])).toHaveLength(1);
-    expect(scan([f])[0].why).toMatch(/ANSWER/);
+  it('THROWS when the rule is missing rather than falling back to a private copy', () => {
+    // A checker that substituted its own pattern would report PASS while
+    // checking something nobody approved.
+    expect(() => loadRule(dir)).toThrow();
   });
 });
 
 describe('ORDER is the whole distinction', () => {
-  it('ALLOWS the reverse order, where stderr survives', () => {
-    expect(scan([fenced('e.md', 'git merge-tree a b 2>&1 >/dev/null')])).toHaveLength(0);
+  it('refuses stderr-only discard', () => {
+    expect(scan([fenced('a.md', 'gh pr list 2>/dev/null')], rule)).toHaveLength(1);
   });
 
-  it('allows the existence probe in its correct spelling', () => {
-    expect(scan([fenced('f.md', 'command -v jq 2>&1 >/dev/null')])).toHaveLength(0);
+  it('refuses the ampersand form', () => {
+    expect(scan([fenced('b.md', 'gh pr list &>/dev/null')], rule)).toHaveLength(1);
+  });
+
+  it('refuses stdout-then-both, which is the WRONG order', () => {
+    expect(scan([fenced('c.md', 'command -v jq >/dev/null 2>&1')], rule)).toHaveLength(1);
+  });
+
+  it('ALLOWS the reverse order, where stderr survives', () => {
+    expect(scan([fenced('d.md', 'git merge-tree a b 2>&1 >/dev/null')], rule)).toHaveLength(0);
   });
 
   it('separates the two spellings that share a token set', () => {
-    // The single assertion this whole file exists for. Same tokens, opposite
-    // verdicts — if these ever agree, the checker is matching text and not
-    // semantics.
-    const good = scan([fenced('g.md', 'cmd 2>&1 >/dev/null')]);
-    const bad = scan([fenced('h.md', 'cmd >/dev/null 2>&1')]);
-    expect(good).toHaveLength(0);
-    expect(bad).toHaveLength(1);
+    // Same tokens, opposite verdicts. If these ever agree, the rule is matching
+    // text and not semantics.
+    expect(scan([fenced('e.md', 'cmd 2>&1 >/dev/null')], rule)).toHaveLength(0);
+    expect(scan([fenced('f.md', 'cmd >/dev/null 2>&1')], rule)).toHaveLength(1);
+  });
+
+  it('documents that bare stdout discard is NOT in this toolkit rule', () => {
+    // A consuming repo may refuse `cmd >/dev/null` locally; this rule does not.
+    // The divergence is asserted rather than papered over, so adopting it becomes
+    // a deliberate edit to rules.yaml (which changes the hook too) instead of a
+    // silent difference between the two consumers.
+    expect(scan([fenced('g.md', 'grep -c x f >/dev/null')], rule)).toHaveLength(0);
   });
 });
 
-describe('MENTION is not execution', () => {
-  it('does not flag a rule stating what not to write', () => {
-    expect(scan([prose('i.md', '2>/dev/null')])).toHaveLength(0);
+describe('which lines are commands — the part this file DOES own', () => {
+  it('reads only fenced blocks in markdown, so prose can state the rule', () => {
+    const p = path.join(dir, 'commands', 'h.md');
+    writeFileSync(p, '# doc\n\nNever append `2>/dev/null`. It hides failures.\n');
+    expect(scan([p], rule)).toHaveLength(0);
   });
 
-  it('does not flag the fence markers themselves', () => {
-    const p = path.join(dir, 'commands', 'j.md');
+  it('does not treat the fence markers themselves as commands', () => {
+    const p = path.join(dir, 'commands', 'i.md');
     writeFileSync(p, '# doc\n\n```bash\necho ok\n```\n');
-    expect(scan([p])).toHaveLength(0);
+    expect(scan([p], rule)).toHaveLength(0);
   });
 
-  it('treats EVERY line of a shell script as a command, comments included', () => {
-    // No prose/code split outside markdown: a comment demonstrating the bad
-    // form is still the line a reader copies.
-    const p = path.join(dir, 'commands', 'k.sh');
+  it('treats EVERY line of a shell file as a command, comments included', () => {
+    const p = path.join(dir, 'commands', 'j.sh');
     writeFileSync(p, '#!/bin/sh\n# example: foo 2>/dev/null\n');
-    expect(scan([p])).toHaveLength(1);
+    expect(scan([p], rule)).toHaveLength(1);
+  });
+
+  it('reports line numbers against the original document, not the block', () => {
+    const p = fenced('k.md', 'cmd 2>/dev/null');
+    // "# doc"(1) ""(2) "Some prose."(3) ""(4) fence(5) command(6)
+    expect(scan([p], rule)[0].line).toBe(6);
+  });
+
+  it('closes an unterminated fence rather than scanning the rest as prose', () => {
+    const p = path.join(dir, 'commands', 'l.md');
+    writeFileSync(p, '# doc\n\n```bash\ncmd 2>/dev/null\n');
+    expect(commandLines(p, '# doc\n\n```bash\ncmd 2>/dev/null\n')).toHaveLength(2);
   });
 });
 
 describe('unreadable is unverifiable, never clean', () => {
   it('reports a missing file as a finding rather than passing it', () => {
-    const found = scan([path.join(dir, 'commands', 'does-not-exist.md')]);
+    const found = scan([path.join(dir, 'commands', 'nope.md')], rule);
     expect(found).toHaveLength(1);
     expect(found[0].why).toMatch(/could not read/);
   });
@@ -120,10 +145,8 @@ describe('unreadable is unverifiable, never clean', () => {
 
 describe('the real tree', () => {
   it('finds nothing in the shipped instructing surface', () => {
-    // The positive control for the sweep itself. If this ever goes red, a
-    // command started teaching the shape again.
-    // execFileSync, not execSync: no shell, so the argument array is passed
-    // straight to node and no metacharacter can be interpreted.
+    // The positive control for the sweep. If this goes red, a command started
+    // teaching the shape again.
     const out = execFileSync('node', ['scripts/check-discard-stderr.mjs'], { encoding: 'utf8' });
     expect(out).toMatch(/gate\s+commands skills agents -> 0 finding/);
   });

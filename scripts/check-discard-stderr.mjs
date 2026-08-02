@@ -3,12 +3,12 @@
  * Refuse a discarded stream in the toolkit's INSTRUCTING surface.
  *
  *   node scripts/check-discard-stderr.mjs            # gate + ratchet report
- *   node scripts/check-discard-stderr.mjs --all      # include the ratchet dirs
+ *   node scripts/check-discard-stderr.mjs --all      # list the ratchet dirs too
  *
  * ## Why this exists
  *
- * The toolkit already ships a `discard-stderr` hook that refuses a command an
- * agent RUNS. It has no reach at all over the same shape written into a command
+ * The toolkit already ships a `discard-stderr` rule that refuses a command an
+ * agent RUNS. It has no reach at all over the same shape written INTO a command
  * or a skill — and those files exist to be copied and executed. So the toolkit
  * was blocking what its own commands taught: 34 sites across `commands/`,
  * `skills/` and `agents/` instructed the reader to write the exact redirect the
@@ -18,69 +18,110 @@
  * SUCCEEDING one that printed nothing, and the empty result then reads as
  * "none found" rather than "it errored".
  *
- * ## Mention is not execution, and this check must not confuse them
+ * ## THE PATTERN IS NOT DEFINED HERE. It is read from the rule.
  *
- * That distinction is the hard part, and getting it wrong is not hypothetical:
- * building this, a sibling guard blocked the command that was *counting the
- * violations* and, separately, a PR body that merely QUOTED a redirect while
- * explaining why its order is the safe one. A guard that refuses ordinary work
- * gets bypassed, and a bypassed guard carries no information at all.
+ * `hooks/rules/rules.yaml` is the SSoT for what counts as a discard, and
+ * `hooks/rules/rules.json` is the runtime artifact generated from it (CI fails
+ * if they drift). This file reads that rule and applies it to FILES.
  *
- * So in markdown, only FENCED CODE BLOCKS are read as commands. Inline
- * backticks are prose — that is where a rule states what not to write, and
- * stating the rule must never trip the rule.
+ * The first draft of this checker carried its own copy of the regex. That is a
+ * second implementation of a measurement, and a second implementation drifts —
+ * the rule would tighten in one place and the other would keep passing what it
+ * had started refusing, silently, which is the exact class of defect this
+ * checker exists to catch. If a form is missing, add it to `rules.yaml`; both
+ * consumers inherit it and neither can disagree with the other.
  *
- * ## Order is the whole distinction
+ * ## What this file DOES own: which lines are commands
  *
- * Two identical token sets, opposite outcomes:
+ * That is genuinely not the rule's job. The rule is applied by a hook to a
+ * single command string; here the input is a document, so something has to
+ * decide which of its lines are commands at all.
  *
- *   cmd >/dev/null 2>&1   stdout is retargeted FIRST, then stderr is pointed at
- *                         the same place. Both are gone.  REFUSED.
- *   cmd 2>&1 >/dev/null   stderr is duplicated to the ORIGINAL stdout first,
- *                         then stdout moves. Diagnostics survive.  ALLOWED.
+ * In markdown, only FENCED code blocks are. Inline backticks are prose, because
+ * a rule that says "never write X" has to be able to write X. Not hypothetical:
+ * while this was being built, a sibling guard blocked the command that was
+ * COUNTING the violations, and separately blocked a PR body that merely QUOTED
+ * a redirect while explaining why its order is the safe one. A guard that
+ * refuses ordinary work gets bypassed, and a bypassed guard carries no
+ * information at all.
  *
- * Bare `cmd >/dev/null` is refused too. Its stderr does survive, and that is
- * not the whole harm: it throws away the ANSWER along with the noise, so
- * `grep -c x f >/dev/null` cannot tell "zero matches" from "many". If only the
- * exit code is wanted, `out=$(cmd)` costs one variable.
+ * Outside markdown every line is a command, comments included: a comment
+ * demonstrating the bad form is still the line a reader copies.
+ *
+ * ## Order is the whole distinction, and the rule already encodes it
+ *
+ *   cmd >/dev/null 2>&1   stdout retargeted FIRST, stderr follows it. Both
+ *                         gone. Matched by the rule.  REFUSED.
+ *   cmd 2>&1 >/dev/null   stderr duplicated to the ORIGINAL stdout before
+ *                         stdout moves, so it survives. Deliberately NOT
+ *                         matched by the rule.  ALLOWED.
+ *
+ * Bare `cmd >/dev/null` is NOT in this rule today. A consuming repo may hold a
+ * stricter local policy, and that divergence is reported rather than resolved
+ * here: adopting it means editing `rules.yaml`, which changes the hook too, and
+ * that is a decision for the rule's owner, not a side effect of a file scan.
  *
  * ## Scope, and why it is split
  *
  * GATE (must be zero)   commands/ skills/ agents/ — the instructing surface.
- * RATCHET (reported)    hooks/ scripts/ — real shell, ~126 sites. A gate that
- *                       reds the repo it guards is one that gets deleted, so
- *                       this half is counted and not enforced yet.
+ * RATCHET (reported)    hooks/ scripts/ — real shell. A gate that reds the repo
+ *                       it guards is one that gets deleted, so this half is
+ *                       counted and not enforced yet.
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
+const RULE_ID = 'discard-stderr';
+const RULES_JSON = 'hooks/rules/rules.json';
+
 /** Directories whose files must contain ZERO discards. */
 const GATE_DIRS = ['commands', 'skills', 'agents'];
 /** Real shell, counted but not enforced. See the header. */
 const RATCHET_DIRS = ['hooks', 'scripts'];
 
-const NULL_SINK = String.raw`/dev/null`;
+/**
+ * Translate POSIX ERE to JavaScript RegExp.
+ *
+ * This is the ONLY transformation applied to the rule's pattern, and it is
+ * spelled out rather than hidden because every character of divergence between
+ * what the hook matches and what this matches is a place they can disagree.
+ * JavaScript has no POSIX bracket expressions; `[[:space:]]` is the only one
+ * the rule uses.
+ */
+export function posixToJs(pattern) {
+  return pattern.replaceAll('[[:space:]]', '\\s');
+}
 
 /**
- * The allowed form, checked FIRST so it can claim a line before any refusal
- * pattern sees it. `2>&1` must come BEFORE the stdout redirect.
+ * Load the shared rule.
+ *
+ * Throws rather than falling back to a built-in pattern. A checker that
+ * silently substituted its own copy when the rule went missing would report
+ * PASS while checking something nobody approved — the found-nothing-versus-
+ * errored collapse, one level up from the thing being checked.
  */
-const ALLOWED = new RegExp(String.raw`2>&1\s+>\s*${NULL_SINK}`);
+export function loadRule(root = process.cwd()) {
+  const raw = JSON.parse(readFileSync(path.join(root, RULES_JSON), 'utf8'));
+  const rules = Array.isArray(raw) ? raw : (raw.rules ?? []);
+  const rule = rules.find((r) => r.id === RULE_ID);
+  if (!rule) throw new Error(`${RULES_JSON} has no rule "${RULE_ID}" — cannot check what is not defined`);
 
-const REFUSED = [
-  { re: new RegExp(String.raw`2>\s*${NULL_SINK}`), why: 'stderr discarded' },
-  { re: new RegExp(String.raw`&>\s*${NULL_SINK}`), why: 'both streams discarded' },
-  {
-    re: new RegExp(String.raw`>\s*${NULL_SINK}\s+2>&1`),
-    why: 'both discarded (wrong order: stdout moves before stderr is duplicated)',
-  },
-  {
-    re: new RegExp(String.raw`(^|[^&12])>\s*${NULL_SINK}`),
-    why: 'stdout discarded, so the ANSWER is thrown away with the noise',
-  },
-];
+  const match = rule.match ?? [];
+  const positive = match.find((m) => m.pattern)?.pattern;
+  const negative = match.find((m) => m.not_pattern)?.not_pattern;
+  if (!positive) throw new Error(`rule "${RULE_ID}" declares no pattern`);
+
+  return {
+    refuse: new RegExp(posixToJs(positive)),
+    // The rule's own mention exemption (a quoted occurrence performs no
+    // redirect). Kept even though the fenced-block selector already removes
+    // most prose, so the two consumers stay aligned on every clause.
+    exempt: negative ? new RegExp(posixToJs(negative)) : null,
+    source: `${RULES_JSON}#${RULE_ID}`,
+  };
+}
 
 function walk(dir, out = []) {
   let entries;
@@ -97,16 +138,8 @@ function walk(dir, out = []) {
   return out;
 }
 
-/**
- * Lines that are COMMANDS rather than prose.
- *
- * Markdown: only inside fenced blocks. Everything else is prose, and a rule
- * that says "never write X" has to be able to write X.
- *
- * Everything else: every line is code. A comment demonstrating the bad form in
- * a shell script is still the thing a reader copies.
- */
-function commandLines(file, text) {
+/** Lines that are COMMANDS rather than prose. See the header. */
+export function commandLines(file, text) {
   const lines = text.split('\n');
   if (!file.endsWith('.md')) return lines.map((l, i) => [i + 1, l]);
 
@@ -122,22 +155,23 @@ function commandLines(file, text) {
   return out;
 }
 
-export function scan(files) {
+export function scan(files, rule = loadRule()) {
   const findings = [];
   for (const file of files) {
     let text;
     try {
       text = readFileSync(file, 'utf8');
     } catch (err) {
-      // Unreadable is UNVERIFIABLE, never clean. Surface it as a finding so a
-      // permissions problem cannot read as a passing scan.
+      // Unreadable is UNVERIFIABLE, never clean. Surface it so a permissions
+      // problem cannot read as a passing scan.
       findings.push({ file, line: 0, why: `could not read: ${err.message}`, text: '' });
       continue;
     }
     for (const [line, content] of commandLines(file, text)) {
-      if (ALLOWED.test(content)) continue;
-      const hit = REFUSED.find((r) => r.re.test(content));
-      if (hit) findings.push({ file, line, why: hit.why, text: content.trim().slice(0, 100) });
+      if (rule.exempt?.test(content)) continue;
+      if (rule.refuse.test(content)) {
+        findings.push({ file, line, why: 'stderr discarded', text: content.trim().slice(0, 100) });
+      }
     }
   }
   return findings;
@@ -145,11 +179,18 @@ export function scan(files) {
 
 function main() {
   const all = process.argv.includes('--all');
+  let rule;
+  try {
+    rule = loadRule();
+  } catch (err) {
+    console.error(`discard-stderr check could not load its rule: ${err.message}`);
+    process.exit(2); // not 1: this is "could not determine", not "found violations"
+  }
 
-  const gate = scan(GATE_DIRS.flatMap((d) => walk(d)));
-  const ratchet = scan(RATCHET_DIRS.flatMap((d) => walk(d)));
+  const gate = scan(GATE_DIRS.flatMap((d) => walk(d)), rule);
+  const ratchet = scan(RATCHET_DIRS.flatMap((d) => walk(d)), rule);
 
-  console.log(`discard-stderr check`);
+  console.log(`discard-stderr check  (pattern from ${rule.source})`);
   console.log(`  gate    ${GATE_DIRS.join(' ')} -> ${gate.length} finding(s)`);
   console.log(`  ratchet ${RATCHET_DIRS.join(' ')} -> ${ratchet.length} finding(s), not enforced`);
 
@@ -160,7 +201,7 @@ function main() {
     console.log(`\nFAIL — ${gate.length} discard(s) in the instructing surface.`);
     console.log(`These files are copied and executed, so the shape ships to every user.`);
     console.log(`\n  keep stderr:   cmd 2>>"\${MNM_LOG:-/tmp/make-no-mistakes.log}"`);
-    console.log(`  stdout noisy:  cmd 2>&1 > ${NULL_SINK}     (this order ONLY)`);
+    console.log(`  stdout noisy:  cmd 2>&1 > /dev/null     (this order ONLY)`);
     console.log(`  exit code:     out=$(cmd); rc=$?`);
     process.exit(1);
   }

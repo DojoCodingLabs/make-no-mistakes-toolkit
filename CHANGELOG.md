@@ -45,9 +45,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `prepublishOnly`, and asserted by the suite, so it is not a gate that nothing
   runs.
 
-  **Mention is not execution, and this is the hard part.** In markdown only
-  FENCED blocks are read as commands; inline backticks are prose, because a rule
-  that says "never write X" has to be able to write X. That is not a
+  **The pattern is NOT defined in the checker.** It is read from the shared
+  `discard-stderr` rule in `hooks/rules/rules.yaml`, via the `rules.json` the
+  build already generates and CI already guards against drift. The first draft
+  carried its own copy of the regex, which is a second implementation of a
+  measurement: the rule would tighten in one place and the other would keep
+  passing what it had started refusing — silently, which is the exact class of
+  defect the checker exists to catch. Adding a form now means editing
+  `rules.yaml`; both consumers inherit it and neither can disagree with the
+  other. The only transformation applied is `[[:space:]]` → `\s`, because
+  JavaScript has no POSIX bracket expressions, and it is spelled out rather than
+  hidden. A missing rule **throws** rather than falling back to a private
+  pattern — a checker that substituted its own copy would report PASS while
+  checking something nobody approved.
+
+  **What the checker does own is which lines are commands**, which the rule
+  genuinely cannot answer: a hook receives one command string, this receives a
+  document. In markdown only FENCED blocks count; inline backticks are prose,
+  because a rule that says "never write X" has to be able to write X. Not
   hypothetical: while building this, a sibling guard blocked the command that
   was *counting the violations*, and separately blocked a PR body that merely
   QUOTED a redirect while explaining why its order is the safe one. A guard that
@@ -59,11 +74,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Order is the whole distinction**, and the suite's central assertion is that
   the two spellings sharing a token set get opposite verdicts.
   `cmd 2>&1 >/dev/null` duplicates stderr to the ORIGINAL stdout before stdout
-  moves, so diagnostics survive — allowed. `cmd >/dev/null 2>&1` retargets
-  stdout first and both are gone — refused. Bare `cmd >/dev/null` is refused
-  too: stderr does survive, and that is not the whole harm, because it throws
-  away the ANSWER along with the noise and `grep -c x f >/dev/null` cannot then
-  tell "zero matches" from "many".
+  moves, so diagnostics survive — deliberately unmatched by the rule.
+  `cmd >/dev/null 2>&1` retargets stdout first and both are gone — matched.
+  Bare `cmd >/dev/null` is **not** in this toolkit's rule. A consuming repo may
+  hold a stricter local policy, and that divergence is asserted by a test rather
+  than papered over, so adopting it stays a deliberate edit to `rules.yaml`
+  instead of a silent difference between two consumers.
 
   **Scope is split on purpose.** `commands/ skills/ agents/` is a hard gate at
   zero. `hooks/ scripts/` is real shell with **113 remaining sites**, counted
@@ -76,7 +92,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   found-nothing-versus-errored collapse the checker exists to prevent, one level
   up.
 
-  Tests: 12 new (72 total), including one negative control per refused form.
+  Tests: **17 new (77 total)**. Beyond a negative control per refused form, two
+  mutants prove the de-duplication is real rather than claimed: loosening the
+  SHARED rule breaks 6 tests (the checker genuinely inherits), and restoring a
+  private copy inside the checker breaks 7. Unmutated control, 17/17.
 
 ## [1.38.0] - 2026-07-31
 
