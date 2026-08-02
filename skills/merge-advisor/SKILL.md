@@ -100,21 +100,93 @@ Run all of them. Predicates 4 and 5 are the two that no per-PR view can produce.
 | 6 | Base-anchored artifacts | What every other PR must regenerate after a merge |
 | 7 | Queue capacity | How many can be in flight without starving CI |
 
-### 1. Eligibility
+### 1. Eligibility — and you must FORCE the mergeable calculation
+
+GitHub computes mergeability **lazily**, and the shape of that laziness is worse
+than "it might be stale". Measured against a live repo with 8 open PRs on
+2026-08-02:
 
 ```bash
-gh pr view "$N" --json isDraft,reviewDecision,mergeStateStatus,statusCheckRollup
+gh api "repos/$OWNER/$REPO/pulls?state=open&per_page=8" \
+  --jq '.[] | {n: .number, mergeable, state: .mergeable_state}'
+#  {"mergeable":null,"n":4309,"state":null}
+#  {"mergeable":null,"n":4308,"state":null}      ... all 8 null
 ```
 
-Three states, and the third is the one that must not collapse into either
-neighbour: **eligible**, **blocked**, and **not yet computed**. GitHub reports
-`mergeable: UNKNOWN` while it is still calculating, and `UNKNOWN` means *"not
-computed yet"* — it does not mean *"clean"*. Reading a PR forces the
-calculation, so re-read after a few seconds rather than recording the first
-answer.
+```bash
+gh api "repos/$OWNER/$REPO/pulls/4309" --jq '{mergeable, mergeable_state}'
+#  {"mergeable":true,"mergeable_state":"unstable"}
+```
+
+**The list endpoint never populates these fields.** Not "not yet" — never. They
+exist only in the individual-PR representation, and the two calls above were
+made seconds apart, so 4309's value was already computed when the list returned
+`null` for it. Anything built from `gh pr list` reads `null` on every row, and a
+consumer that treats `null` as a value gets eight PRs that look identical.
+
+This matters more here than in a status report. `review-open-prs` reading a
+stale field produces one wrong row; **merge-advisor reading it produces a wrong
+ORDER**, and the order is the whole output.
+
+So force it, per PR, and poll rather than guessing at a sleep:
+
+```bash
+force_mergeable() {                       # $1 = PR number
+  local n="$1" try=0 delay=2 out
+  while [ "$try" -lt 5 ]; do
+    # The individual endpoint is what STARTS the background job. Reading it is
+    # the trigger, so the first call is expected to come back uncomputed.
+    out=$(gh api "repos/$OWNER/$REPO/pulls/$n" \
+            --jq '{mergeable, mergeable_state}' 2>>"$MNM_LOG")
+    case "$out" in
+      *'"mergeable":null'*|'') ;;         # still computing, or the call failed
+      *) printf '%s\n' "$out"; return 0 ;;
+    esac
+    sleep "$delay"; delay=$(( delay * 2 )); try=$(( try + 1 ))
+  done
+  printf '{"mergeable":"unverifiable","after":%d}\n' "$try"; return 2
+}
+```
+
+Three properties of that loop, each load-bearing:
+
+- **Backoff, not a fixed `sleep 5`.** The job takes as long as the diff is
+  large, so a constant wait is either wasted time on small PRs or a premature
+  give-up on big ones — and big PRs are exactly the ones this skill orders first.
+- **stderr goes to a log, never to `/dev/null`.** A failing `gh` call and a PR
+  that is genuinely still computing both return empty, and discarding stderr
+  makes them the same event. `$MNM_LOG` is `${TMPDIR:-/tmp}/merge-advisor.log`.
+- **Exhausting the retries returns `unverifiable`, not a guess.** Not `"clean"`,
+  not `"calculating"` — a fourth adjective is how three states become two again.
+
+Then read the rest, which are cheap and not lazily computed:
+
+```bash
+gh pr view "$N" --json isDraft,reviewDecision,statusCheckRollup
+```
+
+**`mergeable: true` is not `CLEAN`.** In the same measurement, 4 of 8 PRs read
+`mergeable_state: "unstable"` — the branch applies, and its checks are failing
+or pending. `unstable` is a merge that *works* and *should not happen yet*. Use
+`mergeable` for the ordering constraint and `mergeable_state` for eligibility;
+collapsing them produces an order that is technically applicable and wrong.
 
 A draft is not a candidate. Say so as a row rather than dropping it silently:
 a PR missing from the plan reads as "already handled".
+
+### 1b. Re-force it between tiers — the value expires on every merge
+
+This is the part a per-PR tool never needs and this one cannot skip.
+
+`mergeable` is computed **against the base as it stands**. The instant Tier 1
+lands, every value measured for Tier 2 describes a base that no longer exists —
+which is the premise of this whole skill, applied to its own inputs. GitHub does
+not proactively recompute; it invalidates and waits to be asked again.
+
+So `force_mergeable` runs again for every remaining PR **after each tier**, and
+a plan printed once and followed for an hour is a plan whose later tiers were
+computed against the wrong base. If the recomputation changes the shape, the
+remaining tiers are re-derived rather than executed as printed.
 
 ### 2. Check freshness — the green mark's expiry date
 
