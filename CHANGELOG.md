@@ -18,6 +18,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> No version bump in this entry, deliberately. `andres/ban-discard-stderr`
+> (v1.40.0) is open and unmerged on `main` at 1.38.0, so picking a number here
+> either collides with it or leaves a hole. Whichever lands second takes the
+> next number.
+
+### Added
+- **`/make-no-mistakes:disk-cleanup-merged-worktrees`** + the `worktree-cleanup`
+  skill + `scripts/worktree-cleanup.mjs` — reclaim disk from git worktrees
+  without destroying work.
+
+  The measurement that motivated it, on one real checkout: **60 worktrees,
+  20 GB under `.claude/worktrees`, 38 `node_modules`, the largest 1.6 GB.**
+
+  The value is in what it REFUSES, so every refusal is a predicate with a test
+  rather than a bullet point: the main checkout, a locked worktree, uncommitted
+  changes (untracked files included), **unpushed commits**, and anything
+  unmerged. A branch that is AHEAD of its remote is not stale, it is unfinished,
+  and that is the single most likely way to lose work.
+
+  **"Merged" is measured three ways**, because a squash merge leaves the branch
+  neither an ancestor of the base nor patch-equivalent to it — so an ancestry
+  test alone reports `not-merged` for work that certainly landed, and in a
+  squash-merge repo that is the majority case, not an edge case. Ancestry,
+  `git cherry`, and a GitHub PR with `state == MERGED`. Losing `gh` therefore
+  downgrades a verdict to `unverifiable`, never to `not-merged`.
+
+  **`unverifiable` is a third verdict and never collapses into "safe".** Five
+  states report and skip: a sibling process re-checked the worktree out mid-run,
+  commits landed after the PR merged, a squash merge with no `gh` to confirm it,
+  an unreadable `git status`, a missing gitdir.
+
+  Dry-run by default. `node_modules` reclaim is the default action and is fully
+  reversible with one install; worktree removal is opt-in behind `--worktrees`,
+  deletion is opt-in behind `--apply`, and `--force` is never passed unless the
+  user asks for it in that invocation. Branch refs are never deleted — only
+  directories, so even a wrong removal is recoverable with `git worktree add`.
+
+  Verified in dry-run against those 60 worktrees: **2 removable (3.6 GB),
+  41 refused, 17 unverifiable, 59.1 GB of `node_modules`** — including a
+  worktree refused for 410 lines of uncommitted changes and one refused for
+  4 unpushed commits. 35 tests, and the two load-bearing refusals were
+  mutation-checked: disabling the `uncommitted` and `unpushed` predicates turns
+  5 tests red.
+
+### Fixed
+- **README skill count and table.** The header read `Skills (10)` and the table
+  had 10 rows while `skills/` shipped 11 — `resolve-open-questions` had no row.
+  Both now read 12, matching the directory. Incidental to the above, and noted
+  rather than folded in silently.
+
 ## [1.38.0] - 2026-07-31
 
 ### Changed

@@ -73,7 +73,7 @@ After the audit(s), it runs a **premortem** on the aggregated remediation plan, 
 
 ## What's Inside
 
-### Commands (37)
+### Commands (38)
 
 Deliberate actions you invoke explicitly.
 
@@ -116,8 +116,9 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:gemini-code-review [target]`](commands/gemini-code-review.md) | Cheap first-pass code review (one-shot via liteLLM) on a parametrizable model — Gemini 3.5 Flash by default; supports `--model` and `--adversarial`, curated against the repo's CLAUDE.md |
 | [`/make-no-mistakes:observability-audit [target]`](commands/observability-audit.md) | Runtime audit of whether observability actually **works** rather than exists — measures events *received* per emitting surface, matches the configured credential to a live destination, finds init paths that silently disable monitoring, checks alert-channel liveness/ownership, and flags every alert never demonstrated capable of firing |
 | [`/make-no-mistakes:parallelize <work>`](commands/parallelize.md) | Decompose a body of work and fan it out across named, worktree-isolated agents. Opens with a mandatory capability gate that reads the agent-teams flag **and** the live tool surface (a retired `TeamCreate` is the healthy case, never an abort), splits streams by *who can execute them* as well as by topic, and converges the results into one report |
+| [`/make-no-mistakes:disk-cleanup-merged-worktrees [repo]`](commands/disk-cleanup-merged-worktrees.md) | Reclaim disk from git worktrees, refusing every one that still holds work. Dry-run by default; reclaims `node_modules` from **live** worktrees (reversible with one install) and removes merged worktrees only on `--worktrees`. Refuses the main checkout, uncommitted changes, **unpushed commits**, locks, and anything unmerged — where "merged" is measured three ways because ancestry alone reports *not merged* for every squash merge |
 
-### Skills (10)
+### Skills (12)
 
 Auto-activate by context — you don't need to remember the command name.
 
@@ -133,6 +134,8 @@ Auto-activate by context — you don't need to remember the command name.
 | [`domain-driven-advisor`](skills/domain-driven-advisor/SKILL.md) | Ask "which audit do I need?" / "where do I start with repo health?" — routes you to the right audit(s) and runs a premortem |
 | [`premortem`](skills/premortem/SKILL.md) | Say "premortem this", "what could kill this", "stress test this plan", "what am I missing", or "find the blind spots" on a plan/launch/decision |
 | [`prioritize`](skills/prioritize/SKILL.md) | Ask to "prioritize issues", "rank the backlog", "apply MoSCoW", or "RICE scoring" for a product pillar (suggests `/make-no-mistakes:prioritize`) |
+| [`resolve-open-questions`](skills/resolve-open-questions/SKILL.md) | Have open decisions or questions buried in the session's prose. Sweeps them out and resolves them in batches via `AskUserQuestion` with options + a recommendation |
+| [`worktree-cleanup`](skills/worktree-cleanup/SKILL.md) | Say "my worktrees are eating disk", "clean up merged worktrees", or "reclaim node_modules". Classifies every worktree deterministically and reports what it **refused** and why — `unverifiable` is its own verdict and never collapses into "safe to delete" |
 
 Skills can also be invoked explicitly: `/make-no-mistakes:spec-recommend T0-4`
 
