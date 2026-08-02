@@ -1573,6 +1573,86 @@
     ]
   },
   {
+    "id": "block-no-verify",
+    "description": "Block a commit or push that skips the hooks",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "(git[[:space:]]+(commit|push)[^|;&]*--no-verify|git[[:space:]]+commit[^|;&]*[[:space:]]-n([[:space:]]|$))"
+      },
+      {
+        "field": "command",
+        "not_pattern": "['\\\"]--no-verify"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": null,
+    "memory_ref": "feedback_agents_never_self_authorize_documented_overrides.md",
+    "references": [
+      "dojo-os CLAUDE.md non-negotiable 21"
+    ],
+    "message": "BLOCKED: this skips the hooks.\n\nThe hooks are the only thing standing between a commit and the checks it\nwas supposed to pass. Skipping them does not make a commit faster -- it\nmakes an UNVERIFIED commit indistinguishable from a verified one, and\nnothing downstream can tell them apart afterwards.\n\nNon-negotiable 21 names this flag alongside --admin and --force. Those\nthree had rules; this one did not, which is why you are reading a new\nmessage. An agent used it on 2026-08-02, reported it, and reverted it.\n\nTHE HOOKS FAILING IS NOT A REASON TO SKIP THEM. In that same incident the\nhonest attempt failed with `vitest: command not found` because a fresh\nworktree had no dependencies. The fix was:\n\n    bun install --frozen-lockfile\n\nA hook that cannot run is a broken toolchain, not a gate to step over. If\nthe hooks are wrong, fix the hooks or say so -- both leave a trace, and\nthat trace is the entire point.\n\nThere is deliberately NO bypass marker. A gate whose refusal hands you the\nway around it is not a gate (DOJ-6247).\n",
+    "tests": [
+      {
+        "name": "commit-long-flag-blocked",
+        "input": {
+          "tool_input": {
+            "command": "git commit --no-verify -m 'wip'"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "commit-short-flag-blocked",
+        "input": {
+          "tool_input": {
+            "command": "git commit -n -m 'wip'"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "push-long-flag-blocked",
+        "input": {
+          "tool_input": {
+            "command": "git push --no-verify origin main"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "push-dry-run-allowed",
+        "input": {
+          "tool_input": {
+            "command": "git push -n origin main"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "ordinary-commit-allowed",
+        "input": {
+          "tool_input": {
+            "command": "git commit -m 'feat: add thing'"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "quoted-mention-allowed",
+        "input": {
+          "tool_input": {
+            "command": "grep -rn '--no-verify' docs/"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
     "id": "block-git-force-push-no-lease",
     "description": "Block `git push --force` / `-f` without `--force-with-lease` (overwrites collaborator pushes silently)",
     "applies_to": [
