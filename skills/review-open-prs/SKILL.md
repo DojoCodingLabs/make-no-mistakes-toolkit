@@ -27,12 +27,12 @@ Detect the GitHub organization dynamically. Try these methods in order:
 
 **Method A** — Infer from the current repo:
 ```bash
-ORG=$(gh repo view --json owner --jq '.owner.login' 2>/dev/null)
+ORG=$(gh repo view --json owner --jq '.owner.login' 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}")
 ```
 
 **Method B** — Read from `linear-setup.json` if it exists at the repo root:
 ```bash
-ORG=$(cat linear-setup.json 2>/dev/null | jq -r '.github.org // empty')
+ORG=$(cat linear-setup.json 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}" | jq -r '.github.org // empty')
 ```
 
 **Method C** — If neither works, ask the user which org to scan.
@@ -44,7 +44,7 @@ REPOS=$(gh repo list "$ORG" --limit 50 --json name --jq '.[].name')
 
 Also read the issue prefix from `linear-setup.json` if available:
 ```bash
-TEAM_PREFIX=$(cat linear-setup.json 2>/dev/null | jq -r '.team.key // empty')
+TEAM_PREFIX=$(cat linear-setup.json 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}" | jq -r '.team.key // empty')
 ```
 
 If `TEAM_PREFIX` is empty, infer it from the Linear issues fetched in Step 1 (use the most common prefix).
@@ -64,7 +64,7 @@ For each repo discovered in Step 0, run:
 ```bash
 for repo in $REPOS; do
   echo "=== $repo ==="
-  gh pr list --repo "$ORG/$repo" --state open --json title,number,url,headRefName,author,updatedAt,isDraft --limit 50 2>/dev/null
+  gh pr list --repo "$ORG/$repo" --state open --json title,number,url,headRefName,author,updatedAt,isDraft --limit 50 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
 done
 ```
 
@@ -78,7 +78,7 @@ GitHub calculates mergeability lazily — it only computes when requested. Force
 ```bash
 # First pass: trigger calculation on all my PRs
 for pr_number in <list of my PR numbers>; do
-  gh pr view "$pr_number" --repo "$ORG/<repo>" --json number,mergeable --jq '{number, mergeable}' 2>/dev/null &
+  gh pr view "$pr_number" --repo "$ORG/<repo>" --json number,mergeable --jq '{number, mergeable}' 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}" &
 done
 wait
 ```
@@ -89,7 +89,7 @@ After the first pass, collect any PRs that returned `mergeable: "UNKNOWN"`. Wait
 sleep 5
 # Second pass: retry UNKNOWN ones
 for pr_number in <UNKNOWN PR numbers>; do
-  gh pr view "$pr_number" --repo "$ORG/<repo>" --json number,mergeable --jq '{number, mergeable}' 2>/dev/null
+  gh pr view "$pr_number" --repo "$ORG/<repo>" --json number,mergeable --jq '{number, mergeable}' 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
 done
 ```
 
@@ -103,7 +103,7 @@ For each of my open PRs, extract BOTH the Greptile confidence score AND the revi
 ```bash
 for pr_number in <list of my PR numbers>; do
   state=$(gh api "repos/$ORG/<repo>/pulls/$pr_number/reviews" \
-    --jq '[.[] | select(.user.login | test("greptile"; "i")) | .state] | last' 2>/dev/null)
+    --jq '[.[] | select(.user.login | test("greptile"; "i")) | .state] | last' 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}")
   echo "PR #$pr_number: $state"
 done
 ```
@@ -114,7 +114,7 @@ for pr_number in <list of my PR numbers>; do
   echo "=== PR #$pr_number ==="
   # Greptile posts as greptile-apps[bot] in issue comments (not PR review comments)
   gh api "repos/$ORG/<repo>/issues/$pr_number/comments" \
-    --jq '.[] | select(.user.login | test("greptile"; "i")) | .body' 2>/dev/null
+    --jq '.[] | select(.user.login | test("greptile"; "i")) | .body' 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
 done
 ```
 
@@ -136,7 +136,7 @@ For each of my open PRs, get the full check status:
 for pr_number in <list of my PR numbers>; do
   echo "=== PR #$pr_number ==="
   gh pr view "$pr_number" --repo "$ORG/<repo>" \
-    --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.name != null) | {name, status, conclusion}]' 2>/dev/null
+    --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.name != null) | {name, status, conclusion}]' 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
 done
 ```
 
@@ -209,7 +209,7 @@ For each candidate PR, collect the behind-by count using the GitHub Compare API 
 # Inside the per-PR loop in Step 5 — after fetching CI status:
 base_branch=$(gh pr view "$pr_number" --repo "$ORG/<repo>" --json baseRefName --jq '.baseRefName')
 head_sha=$(gh pr view "$pr_number" --repo "$ORG/<repo>" --json headRefOid --jq '.headRefOid')
-behind=$(gh api "repos/$ORG/<repo>/compare/${base_branch}...${head_sha}" --jq '.behind_by' 2>/dev/null)
+behind=$(gh api "repos/$ORG/<repo>/compare/${base_branch}...${head_sha}" --jq '.behind_by' 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}")
 ```
 
 A PR qualifies for this section if:

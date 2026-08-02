@@ -101,7 +101,7 @@ gh pr list --repo {org}/{repo} --head {branch} --state merged --json number,url 
 
 3. If no PR at all, check if branch exists:
 ```bash
-gh api repos/{org}/{repo}/branches/{branch} --jq .name 2>/dev/null
+gh api repos/{org}/{repo}/branches/{branch} --jq .name 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
 ```
 
 Classify each issue:
@@ -119,7 +119,7 @@ Sources (in this order):
 1. **Git commits** on the branch (if exists) — use GitHub API:
 ```bash
 gh api "repos/{org}/{repo}/commits?sha={branch}&since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)&per_page=10" \
-  --jq '.[].commit.message' 2>/dev/null
+  --jq '.[].commit.message' 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
 ```
 Falls back to `git log` if the branch is in the local repo.
 

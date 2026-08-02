@@ -25,7 +25,7 @@ Run these commands in parallel:
 git rev-parse --show-toplevel
 
 # Detect the components root by checking the two most common conventions
-ls -d src/components 2>/dev/null || ls -d components 2>/dev/null || echo "no components root found"
+ls -d src/components 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}" || ls -d components 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}" || echo "no components root found"
 
 # Check if a config already exists
 test -f .atomic-design-rules.json && echo "EXISTS" || echo "MISSING"
@@ -43,7 +43,7 @@ Run:
 
 ```bash
 # Each first-level subfolder under the components root is a pillar candidate
-ls -d $COMPONENTS_ROOT/*/ 2>/dev/null | xargs -n1 basename
+ls -d $COMPONENTS_ROOT/*/ 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}" | xargs -n1 basename
 ```
 
 For each candidate, ask the user:
@@ -65,8 +65,8 @@ Run:
 # Folders directly under components root that have > 5 loose files and
 # no atomic subfolders are likely junk drawers.
 for d in $COMPONENTS_ROOT/*/; do
-  loose=$(find "$d" -maxdepth 1 -type f \( -name '*.tsx' -o -name '*.ts' \) 2>/dev/null | wc -l)
-  has_atomic=$(ls -d "$d"{atoms,molecules,organisms,templates} 2>/dev/null | wc -l)
+  loose=$(find "$d" -maxdepth 1 -type f \( -name '*.tsx' -o -name '*.ts' \) 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}" | wc -l)
+  has_atomic=$(ls -d "$d"{atoms,molecules,organisms,templates} 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}" | wc -l)
   if [ "$loose" -gt 5 ] && [ "$has_atomic" -eq 0 ]; then
     echo "candidate junk drawer: $d (loose=$loose)"
   fi

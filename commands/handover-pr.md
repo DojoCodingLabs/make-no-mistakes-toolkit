@@ -48,11 +48,11 @@ Same as `/takeover-pr`. Try in order:
 
 **Method A** — infer from the current repo:
 ```bash
-ORG=$(gh repo view --json owner --jq '.owner.login' 2>/dev/null)
+ORG=$(gh repo view --json owner --jq '.owner.login' 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}")
 ```
 **Method B** — read from `linear-setup.json` at repo root:
 ```bash
-ORG=$(cat linear-setup.json 2>/dev/null | jq -r '.github.org // empty')
+ORG=$(cat linear-setup.json 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}" | jq -r '.github.org // empty')
 ```
 **Method C** — if neither works, ask the user which org to use.
 
@@ -79,7 +79,7 @@ Determine which PR(s) the handover covers. In priority order:
 1. **Explicit PR number(s)** in args → use those directly.
 2. **Current branch** → if running inside the repo, resolve the open PR for the current branch:
    ```bash
-   gh pr view --json number,title,url --jq '{number,title,url}' 2>/dev/null
+   gh pr view --json number,title,url --jq '{number,title,url}' 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
    ```
 3. **The user's open PRs in the repo** (multi-PR handover, like a session handover) → list the current user's open PRs:
    ```bash

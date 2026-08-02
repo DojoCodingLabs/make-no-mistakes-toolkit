@@ -25,7 +25,7 @@ Your job is to perform the heavy lifting of PR cross-referencing: scanning multi
 2. **Gather open PRs** across all repos:
 ```bash
 for repo in $REPOS; do
-  gh pr list --repo "{org}/$repo" --state open --json title,number,url,headRefName,author,updatedAt,isDraft --limit 50 2>/dev/null
+  gh pr list --repo "{org}/$repo" --state open --json title,number,url,headRefName,author,updatedAt,isDraft --limit 50 2>>"${MNM_LOG:-/tmp/make-no-mistakes.log}"
 done
 ```
 
