@@ -18,6 +18,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.39.0] - 2026-08-02
+
+### Added
+- **`merge-advisor` — the order, not the status.** A pile of PRs is open against
+  one base, and every one of them was measured green against a base that no
+  longer exists by the time its turn comes. The toolkit had two skills looking at
+  PRs and neither answered ordering: `review-open-prs` reads one PR at a time,
+  `sync-advisor` reads one branch against its base. Nothing read the **set**.
+
+  The distinction is not bookkeeping. **"Mergeable" is not a property of a PR; it
+  is a property of the pair (PR, base-it-will-land-on).** A per-PR report reads
+  every row against today's base, and the moment the first merge lands, every
+  other row describes a base that is gone. Ten green PRs is not ten merges.
+
+  **Seven read-only predicates**, of which two cannot be produced by any per-PR
+  view. Predicate 4 intersects the changed-file sets pairwise and reports the
+  overlap **by filename** rather than as a count, because "three files overlap"
+  is unactionable while naming `lefthook.yml` tells the reader which of the two
+  is the cheap rebase. Predicate 5 is the one that matters: `git merge-tree`
+  between two PR heads, not between a head and the base — **the dangerous
+  conflict is not the one blocking a PR today, it is the one that appears only
+  after an earlier PR lands, in a PR that is green right now.** That pair is
+  invisible to `gh pr list`, to every status report, and to both authors.
+
+  **Predicate 6 generalises typecheck-baseline drift** without hardcoding any
+  project's artifact. Some checked-in files are derived from the base and carry
+  the base SHA they were derived from; when a squash merge rewrites the base,
+  that anchor points at a commit that no longer exists and the artifact breaks on
+  **every open PR at once** — one merge, N failures, none caused by the PR they
+  appear on. The skill discovers such files (`baseSha`, `sourceSha`, `baseline`,
+  `__snapshots__`, lockfiles), then applies the two questions that decide whether
+  one constrains the order: is it touched by more than one open PR, and is it
+  regenerated rather than authored. If no regeneration command exists, that is
+  reported as a defect to file, not a step to improvise.
+
+  **Ties break by fragility, highest first — not by importance**, and that rule
+  ships with its reason because it reads backwards. Fragility is how likely a PR
+  is to stop applying while it waits, approximated by breadth of change times
+  distance behind base. The wide, old PR goes first not because it matters more
+  but because its window is the shortest, and every merge ahead of it narrows
+  that window further. Merging the small clean ones first *feels* like progress
+  and spends the exact resource the large one is running out of.
+
+  Capacity (predicate 7) is measured rather than assumed: idle runners and queue
+  depth from the Actions API, because each merge into the base re-triggers checks
+  on every remaining PR that auto-syncs, and on a FIFO fleet four at once can
+  queue deeper than the fleet drains.
+
+  Three-state discipline throughout. GitHub's `mergeable: UNKNOWN` means *"not
+  computed yet"*, never *"clean"*; reading the PR forces the calculation, so the
+  skill re-reads instead of recording the first answer. A `git merge-tree` exit
+  that is neither 0 nor 1 is `unverifiable`, and an unfetchable PR head is
+  `unverifiable` with its reason — never "clean". Degraded modes are declared
+  rather than hidden: with no `gh` auth it reports collisions from git alone and
+  says the check states are unmeasured; finding no anchored artifacts is reported
+  as a search that ran, because silence reads as "not checked".
+
+  Like `sync-advisor`, it **never acts** — every fix is printed for the user to
+  run — and it never offers a bypass as an option. `--admin`, `--force`, and
+  merging past a check that is red or has not answered are not rows in a menu; if
+  the ordering is blocked, the block is the finding.
+
+  `/make-no-mistakes:merge-advisor [<base>] [--repo <owner/name>] [--only <prs>]`,
+  backed by `skills/merge-advisor/SKILL.md`. Requires only `gh` and `git`; no
+  `linear-setup.json` and no toolkit config.
+
 ## [1.38.0] - 2026-07-31
 
 ### Changed
@@ -950,6 +1016,7 @@ installed caches) but had no representation on `main`; this release lands them.
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
 [Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.38.0...HEAD
+[1.39.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.39.0
 [1.38.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.38.0
 [1.37.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.37.0
 [1.36.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.36.0
