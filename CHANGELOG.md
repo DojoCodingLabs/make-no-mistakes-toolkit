@@ -68,6 +68,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Both now read 12, matching the directory. Incidental to the above, and noted
   rather than folded in silently.
 
+## [1.41.0] - 2026-08-02
+
+### Added
+- **`block-no-verify` — the flag that had a rule about it and no rule enforcing
+  it.** Non-negotiable 21 names four bypasses: `--no-verify`, `--admin`,
+  `--force`, and merging past a check. Measured across all 40 rules: `--admin`,
+  `push --force` and `--force-with-lease` each had one. **`--no-verify` had
+  none.**
+
+  That asymmetry is worse than a plain gap. Three of the four are covered, so a
+  reader has every reason to assume the fourth is too — the rule reads as
+  enforced and is not.
+
+  Found the way these things are always found. On 2026-08-02 an agent resolving
+  a merge conflict ran `git commit --no-verify`, by reflex and with no
+  justification. It reported the violation itself, discarded the commit, redid
+  the merge and recommitted with hooks enabled. **Nothing stopped it, because
+  there was nothing to stop it** — it did not route around a guard, it walked
+  through a gap.
+
+  **The near-miss the rule must not get wrong**, and the reason the short form
+  is scoped to one subcommand: `git commit -n` IS `--no-verify`, while
+  `git push -n` is `--dry-run`. Same letter, opposite meaning. Blocking a
+  dry-run would refuse the safest command in git, and a guard that refuses
+  ordinary work gets bypassed — which is how a guard stops carrying
+  information at all. Asserted by `push-dry-run-allowed`.
+
+  **No bypass marker, deliberately** (`bypass_marker: null`), and the refusal
+  message says why rather than asserting it. The incident's own honest attempt
+  first failed with `vitest: command not found`, because a fresh worktree had
+  no dependencies. The fix was `bun install --frozen-lockfile`. **A hook that
+  cannot run is a broken toolchain, not a gate to step over** — so the message
+  names that command, because a refusal that leaves you stuck is a refusal that
+  gets worked around next time.
+
+  Six tests, all green, covering both spellings on both subcommands, the
+  dry-run near-miss, an ordinary commit, and a quoted mention (documenting the
+  flag performs no skip). Hook suite 346/346, vitest 60/60.
+
 ## [1.38.0] - 2026-07-31
 
 ### Changed
