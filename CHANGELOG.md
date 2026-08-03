@@ -18,6 +18,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-08-03
+
+### Added
+- **`/secret-generate` — the CSPRNG half of the secret flow.** The toolkit had
+  three secret commands and they assumed the value already existed somewhere: a
+  human types it (`/secret-input`), one command consumes it (`/secret-use`),
+  `shred` removes it (`/secret-clear`). Nothing MADE one.
+
+  The gap is not cosmetic, because the obvious substitute defeats the other
+  three. `openssl rand -base64 32` prints the value on stdout, and when an agent
+  runs it that stdout is in the agent's context and in the session transcript on
+  disk — a place the value cannot be recalled from. The whole reason
+  `/secret-input` reaches for an OS-native dialog is to keep a typed secret out
+  of exactly those places; a generator that prints hands that property back.
+
+  So the invariant is structural rather than a matter of care: **the generated
+  value never goes to stdout.** It is written STRAIGHT into the same staged file
+  `/secret-input` uses, never assigned to a variable at the script's top scope,
+  and shown only in a GUI window a human is looking at. stdout carries length,
+  alphabet size and entropy — enough to audit a run without being a disclosure.
+  A negative control is part of the change: with a leak deliberately added, the
+  check finds the value in stdout; with the real script it does not.
+
+  **Rejection sampling, not `byte % n`.** 256 is not a multiple of most alphabet
+  sizes, so the modulo makes the first `256 mod n` symbols more likely — for the
+  89-symbol default, 78 of them at about 1.35x. Small, real, and avoidable for
+  the price of a loop. `/dev/urandom` throughout, never `$RANDOM`, which is a
+  15-bit generator seeded from pid and time.
+
+  **The symbol class excludes `'`, `"`, `` ` `` and `\`** on purpose. A generated
+  secret gets pasted into shell one-liners, JSON and YAML, and a backtick inside
+  a double-quoted shell string is command substitution. A generator that can emit
+  a value its consumer cannot safely carry fails at 3am, in a way that looks like
+  the consumer's bug.
+
+  **`--fingerprint` answers the question a secret store cannot.** A store will
+  not read a value back — that is the point of it — so after loading the same
+  value into two of them there is no way to confirm they match. A truncated
+  SHA-256 settles it with neither end printing anything sensitive, the same move
+  as an SSH key fingerprint. It is labelled in the code as what it is: a
+  comparison handle, NOT encryption and NOT protection. And the one case where it
+  is unsafe is named rather than left implicit — for a human-chosen password the
+  hash IS dictionary-attackable, which is precisely what a salt exists for. It is
+  safe here only because the input came from a CSPRNG.
+
+  Also carries the control `/secret-input` already had and `gh secret set` does
+  not: it refuses to stage an empty value. An empty staged secret is
+  indistinguishable from a good one to every consumer downstream, and that is how
+  an empty value reaches a store and then reads as configured.
+
+  Linux/macOS/WSL/Git Bash via bash; the GUI needs `zenity` and says so rather
+  than silently falling back to a different alphabet. There is no PowerShell twin
+  yet, so native Windows without bash has no `/secret-generate` — stated in the
+  command doc rather than discovered.
+
 ## [1.42.0] - 2026-08-02
 
 ### Added
