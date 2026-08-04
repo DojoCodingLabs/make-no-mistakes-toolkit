@@ -18,6 +18,386 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-08-03
+
+### Added
+- **`/secret-generate` — the CSPRNG half of the secret flow.** The toolkit had
+  three secret commands and they assumed the value already existed somewhere: a
+  human types it (`/secret-input`), one command consumes it (`/secret-use`),
+  `shred` removes it (`/secret-clear`). Nothing MADE one.
+
+  The gap is not cosmetic, because the obvious substitute defeats the other
+  three. `openssl rand -base64 32` prints the value on stdout, and when an agent
+  runs it that stdout is in the agent's context and in the session transcript on
+  disk — a place the value cannot be recalled from. The whole reason
+  `/secret-input` reaches for an OS-native dialog is to keep a typed secret out
+  of exactly those places; a generator that prints hands that property back.
+
+  So the invariant is structural rather than a matter of care: **the generated
+  value never goes to stdout.** It is written STRAIGHT into the same staged file
+  `/secret-input` uses, never assigned to a variable at the script's top scope,
+  and shown only in a GUI window a human is looking at. stdout carries length,
+  alphabet size and entropy — enough to audit a run without being a disclosure.
+  A negative control is part of the change: with a leak deliberately added, the
+  check finds the value in stdout; with the real script it does not.
+
+  **Rejection sampling, not `byte % n`.** 256 is not a multiple of most alphabet
+  sizes, so the modulo makes the first `256 mod n` symbols more likely — for the
+  89-symbol default, 78 of them at about 1.35x. Small, real, and avoidable for
+  the price of a loop. `/dev/urandom` throughout, never `$RANDOM`, which is a
+  15-bit generator seeded from pid and time.
+
+  **The symbol class excludes `'`, `"`, `` ` `` and `\`** on purpose. A generated
+  secret gets pasted into shell one-liners, JSON and YAML, and a backtick inside
+  a double-quoted shell string is command substitution. A generator that can emit
+  a value its consumer cannot safely carry fails at 3am, in a way that looks like
+  the consumer's bug.
+
+  **`--fingerprint` answers the question a secret store cannot.** A store will
+  not read a value back — that is the point of it — so after loading the same
+  value into two of them there is no way to confirm they match. A truncated
+  SHA-256 settles it with neither end printing anything sensitive, the same move
+  as an SSH key fingerprint. It is labelled in the code as what it is: a
+  comparison handle, NOT encryption and NOT protection. And the one case where it
+  is unsafe is named rather than left implicit — for a human-chosen password the
+  hash IS dictionary-attackable, which is precisely what a salt exists for. It is
+  safe here only because the input came from a CSPRNG.
+
+  Also carries the control `/secret-input` already had and `gh secret set` does
+  not: it refuses to stage an empty value. An empty staged secret is
+  indistinguishable from a good one to every consumer downstream, and that is how
+  an empty value reaches a store and then reads as configured.
+
+  Linux/macOS/WSL/Git Bash via bash; the GUI needs `zenity` and says so rather
+  than silently falling back to a different alphabet. There is no PowerShell twin
+  yet, so native Windows without bash has no `/secret-generate` — stated in the
+  command doc rather than discovered.
+
+## [1.42.0] - 2026-08-02
+
+### Added
+- **`merge-advisor` — the order, not the status.** A pile of PRs is open against
+  one base, and every one of them was measured green against a base that no
+  longer exists by the time its turn comes. The toolkit had two skills looking at
+  PRs and neither answered ordering: `review-open-prs` reads one PR at a time,
+  `sync-advisor` reads one branch against its base. Nothing read the **set**.
+
+  The distinction is not bookkeeping. **"Mergeable" is not a property of a PR; it
+  is a property of the pair (PR, base-it-will-land-on).** A per-PR report reads
+  every row against today's base, and the moment the first merge lands, every
+  other row describes a base that is gone. Ten green PRs is not ten merges.
+
+  **Seven read-only predicates**, of which two cannot be produced by any per-PR
+  view. Predicate 4 intersects the changed-file sets pairwise and reports the
+  overlap **by filename** rather than as a count, because "three files overlap"
+  is unactionable while naming `lefthook.yml` tells the reader which of the two
+  is the cheap rebase. Predicate 5 is the one that matters: `git merge-tree`
+  between two PR heads, not between a head and the base — **the dangerous
+  conflict is not the one blocking a PR today, it is the one that appears only
+  after an earlier PR lands, in a PR that is green right now.** That pair is
+  invisible to `gh pr list`, to every status report, and to both authors.
+
+  **Predicate 6 generalises typecheck-baseline drift** without hardcoding any
+  project's artifact. Some checked-in files are derived from the base and carry
+  the base SHA they were derived from; when a squash merge rewrites the base,
+  that anchor points at a commit that no longer exists and the artifact breaks on
+  **every open PR at once** — one merge, N failures, none caused by the PR they
+  appear on. The skill discovers such files (`baseSha`, `sourceSha`, `baseline`,
+  `__snapshots__`, lockfiles), then applies the two questions that decide whether
+  one constrains the order: is it touched by more than one open PR, and is it
+  regenerated rather than authored. If no regeneration command exists, that is
+  reported as a defect to file, not a step to improvise.
+
+  **Ties break by fragility, highest first — not by importance**, and that rule
+  ships with its reason because it reads backwards. Fragility is how likely a PR
+  is to stop applying while it waits, approximated by breadth of change times
+  distance behind base. The wide, old PR goes first not because it matters more
+  but because its window is the shortest, and every merge ahead of it narrows
+  that window further. Merging the small clean ones first *feels* like progress
+  and spends the exact resource the large one is running out of.
+
+  Capacity (predicate 7) is measured rather than assumed: idle runners and queue
+  depth from the Actions API, because each merge into the base re-triggers checks
+  on every remaining PR that auto-syncs, and on a FIFO fleet four at once can
+  queue deeper than the fleet drains.
+
+  Three-state discipline throughout. GitHub's `mergeable: UNKNOWN` means *"not
+  computed yet"*, never *"clean"*; reading the PR forces the calculation, so the
+  skill re-reads instead of recording the first answer. A `git merge-tree` exit
+  that is neither 0 nor 1 is `unverifiable`, and an unfetchable PR head is
+  `unverifiable` with its reason — never "clean". Degraded modes are declared
+  rather than hidden: with no `gh` auth it reports collisions from git alone and
+  says the check states are unmeasured; finding no anchored artifacts is reported
+  as a search that ran, because silence reads as "not checked".
+
+  Like `sync-advisor`, it **never acts** — every fix is printed for the user to
+  run — and it never offers a bypass as an option. `--admin`, `--force`, and
+  merging past a check that is red or has not answered are not rows in a menu; if
+  the ordering is blocked, the block is the finding.
+
+  `/make-no-mistakes:merge-advisor [<base>] [--repo <owner/name>] [--only <prs>]`,
+  backed by `skills/merge-advisor/SKILL.md`. Requires only `gh` and `git`; no
+  `linear-setup.json` and no toolkit config.
+
+## [1.41.0] - 2026-08-02
+
+### Added
+- **`block-no-verify` — the flag that had a rule about it and no rule enforcing
+  it.** Non-negotiable 21 names four bypasses: `--no-verify`, `--admin`,
+  `--force`, and merging past a check. Measured across all 40 rules: `--admin`,
+  `push --force` and `--force-with-lease` each had one. **`--no-verify` had
+  none.**
+
+  That asymmetry is worse than a plain gap. Three of the four are covered, so a
+  reader has every reason to assume the fourth is too — the rule reads as
+  enforced and is not.
+
+  Found the way these things are always found. On 2026-08-02 an agent resolving
+  a merge conflict ran `git commit --no-verify`, by reflex and with no
+  justification. It reported the violation itself, discarded the commit, redid
+  the merge and recommitted with hooks enabled. **Nothing stopped it, because
+  there was nothing to stop it** — it did not route around a guard, it walked
+  through a gap.
+
+  **The near-miss the rule must not get wrong**, and the reason the short form
+  is scoped to one subcommand: `git commit -n` IS `--no-verify`, while
+  `git push -n` is `--dry-run`. Same letter, opposite meaning. Blocking a
+  dry-run would refuse the safest command in git, and a guard that refuses
+  ordinary work gets bypassed — which is how a guard stops carrying
+  information at all. Asserted by `push-dry-run-allowed`.
+
+  **No bypass marker, deliberately** (`bypass_marker: null`), and the refusal
+  message says why rather than asserting it. The incident's own honest attempt
+  first failed with `vitest: command not found`, because a fresh worktree had
+  no dependencies. The fix was `bun install --frozen-lockfile`. **A hook that
+  cannot run is a broken toolchain, not a gate to step over** — so the message
+  names that command, because a refusal that leaves you stuck is a refusal that
+  gets worked around next time.
+
+  Six tests, all green, covering both spellings on both subcommands, the
+  dry-run near-miss, an ordinary commit, and a quoted mention (documenting the
+  flag performs no skip). Hook suite 346/346, vitest 60/60.
+
+## [1.38.0] - 2026-07-31
+
+### Changed
+- **`rebase-advisor` → `sync-advisor`, and it now measures instead of asking.**
+  The old skill was 43 lines and measured nothing: step 1 was *"Confirm the user
+  wants a full team sync"* — a question back to the user about something three
+  git commands answer. Its `description` then over-routed, triggering on
+  `"align with develop"` and `"branches are behind"` — both `git pull` cases —
+  and sending them all to `/make-no-mistakes:rebase`, which stashes every
+  worktree, rebases every local branch and auto-merges PRs. Between `git pull`
+  and that, the toolkit offered nothing, and nothing read-only at all.
+
+  **Six read-only predicates** now run before anything is named: distance
+  (`git rev-list --left-right --count`), whether a fast-forward is possible
+  (`git merge-base --is-ancestor`), a dirty tree split into staged vs unstaged,
+  untracked files that the base ref already tracks, worktrees behind, and
+  branches carrying unpushed commits. The fifth is the threshold that decides
+  between a plain pull and the team command: one branch behind is a pull;
+  several worktrees behind is what `/rebase` was built for.
+
+  **The fourth predicate is the one nothing else reports.** An untracked local
+  file at a path the ref tracks aborts the pull outright, and it is invisible
+  everywhere else — verified on a throwaway pair of repos: `git status` shows
+  only `?? newfile.txt`, distance reports a clean `0 ahead, 1 behind`, and
+  `git merge-base --is-ancestor` says a fast-forward is possible. The pull then
+  exits 1 with *"The following untracked working tree files would be
+  overwritten by merge … Please move or remove them before you merge"* — the
+  message names the user's own file and offers deletion as the remedy, which is
+  the one irreversible move available. The skill reports these by name and
+  recommends copying them out of the repo; it never recommends deleting them.
+
+  The collision check carries `--full-name -- :/` and `--full-tree` because the
+  predicate is otherwise silently wrong when run from a subdirectory, in two
+  independent ways. **Format:** without the flags both commands print
+  prefix-relative paths, and adding `--full-name` on its own is worse than
+  adding nothing — `ls-files` emits `sub/newfile.txt` while `ls-tree` emits
+  `newfile.txt`, they stop matching, and `comm -12` returns empty for a tree
+  that is about to abort the pull. **Scope:** `--full-name` changes how a path
+  prints, never which paths are considered, so without `-- :/` a collision at
+  the repo root is invisible to a run started from `sub/`. Both controls run,
+  from the repo root and from a subdirectory, with the command extracted
+  verbatim from the SKILL.md so the test cannot drift from the doc.
+
+  **It never acts.** Every fix is printed for the user to run — `git pull`,
+  `git stash`, `git rebase`, `/make-no-mistakes:rebase`. The single write is
+  `git fetch origin --quiet`, which touches remote-tracking refs and nothing
+  else, and the skill says so out loud when it runs: without it every
+  measurement is taken against a stale `origin/<base>` and reports a drift that
+  stopped being true days ago, which is the failure the skill exists to catch.
+
+  `commands/rebase.md` is untouched and stays a real destination. What changed
+  is who decides when it applies — measured, not asked.
+
+  Step 0 resolves the base ref in a bare form (`develop`, never
+  `origin/develop`) and normalises with `${BASE#origin/}` whichever branch of
+  the resolution produced it, because every predicate interpolates
+  `origin/$BASE` and a value carrying the remote becomes `origin/origin/develop`
+  — `fatal: ambiguous argument … unknown revision`, exit 128, measured. It also
+  does **not** resolve the base from `@{upstream}`: on a feature branch that is
+  the branch's own remote copy (`origin/andres/sync-advisor`), so it answers
+  "am I pushed?" — predicate 6's question — and reports `0 behind` on a branch
+  far behind the actual base. Wrong ref, not merely wrong spelling. The
+  `origin/HEAD` step is a fall-through rather than a requirement: it is
+  routinely unset (`fatal: ref refs/remotes/origin/HEAD is not a symbolic ref`,
+  observed in this repo) and the `develop`/`main`/`master`/`trunk` probe covers
+  it. Both branches of the resolution verified, each against a control that
+  fails.
+
+  **Minor and not major, decided by reading rather than by habit.** A skill
+  auto-activates on its `description`; it is not invoked by name the way a
+  command is, so a renamed `name:` changes no call site.
+  `grep -rniI "rebase.advisor" . --exclude-dir=node_modules --exclude-dir=.git
+  --exclude=CHANGELOG.md` returns nothing — no command, no doc, no other skill
+  named it. That negative is real rather than a broken search: the same grep
+  for `spike-recommend` returns 10 files, so cross-references of this shape do
+  get found when they exist.
+
+  One surface does break, and it is named here rather than folded into the
+  above: a user who typed `/make-no-mistakes:rebase-advisor` explicitly (README
+  documents that skills can be invoked that way) now gets an unknown skill. It
+  fails loudly, with the replacement one line away in the same table, and the
+  installer prunes the old file rather than leaving both live — but anyone who
+  reads that as breaking should say so on the PR.
+
+### Added
+- **`syncAdvisor.governedPaths` in `make-no-mistakes.config.json`** (see
+  `commands/make-no-mistakes.config.example.json`) — the paths whose changes
+  `sync-advisor` reports **by name**, turning "you are 12 commits behind" into
+  "three hooks changed, two of them fix defects you may be looking at right
+  now". Repo-relative prefixes, fed to
+  `git diff --name-only HEAD...origin/<base> -- <path>` (three dots, so it
+  diffs from the merge base and shows what landed on the ref rather than what
+  the user changed locally).
+
+  **No default, and the degraded path omits the line rather than guessing.**
+  With the key unset the skill still reports distance and routing and simply
+  drops the consequence section. A built-in fallback list would be wrong in
+  every repo but the one it was copied from — and it would read as measured,
+  which is worse than a missing section. The key lives in the behaviour config
+  rather than in a domain config for the reason that file's own `_boundary`
+  note gives: a preference parked in a domain config is invisible to every
+  command that does not touch that domain.
+
+  Origin (2026-07-31, as reported): a developer filed two bug reports against a
+  hook, both with clean reproductions. One was a real defect; the other
+  described behaviour fixed days earlier against a stale checkout, and nothing
+  in the report separated them. A commit count alone would not have separated
+  them either — naming the changed hooks would have.
+
+## [1.37.0] - 2026-07-31
+
+### Changed
+- **No refusal prints its own bypass marker** (DOJ-6433). The markers still
+  *work* — a human who knows one exists can type it deliberately, and the
+  `allows-bypass-marker` test on every rule that has one (34 of them, all
+  `expected_exit: 0`) pins that mechanic in place unchanged. What is gone is
+  the hook **announcing** it.
+
+  Measured on `origin/main` @ `ee0ba47`, before this change: **40 rules, 35
+  with a `bypass_marker`, and 26 of those quoting that marker inside their own
+  refusal text** — `prod-ops-no-approval`, `destructive-db-ops`,
+  `secrets-hardcoded` and `block-git-force-push-no-lease` among them.
+
+  ```bash
+  jq 'length' hooks/rules/rules.json                                   # 40
+  jq '[.[] | select((.bypass_marker // "") != "")] | length' \
+    hooks/rules/rules.json                                             # 35
+  jq '[.[] | select((.bypass_marker // "") != "")
+           | select(.bypass_marker as $m | (.message // "")
+           | contains($m))] | length' hooks/rules/rules.json            # 26
+  ```
+
+  `inline-db-mutation-psql` was the clearest case: it listed
+  `# hook-bypass: db-mutation-rule` in the refusal *and* shipped an
+  `allows-bypass-marker` test with `expected_exit: 0`. The bypass was a tested
+  feature of the refusal text, not a slip of wording.
+
+  **Why that is a defect and not a convenience.** The thing meant to stop you
+  hands you the password: reading the refusal *is* the authorization, and
+  typing the marker becomes a reflex rather than a decision. dojo-os records
+  the same shape in its non-negotiable 2 with an incident —
+  `pre-bash-block-main-target.sh` accepted `DOJO_HOTFIX_TO_MAIN=1` **and**
+  printed that literal in its own refusal, and on 2026-07-28 two agents filed
+  two false P0-hotfix claims under a human's GitHub account with no trace but
+  their own self-report (DOJ-6247). `discard-stderr`, added one version
+  earlier, already refused on exactly this reasoning; this release applies it
+  to the other 39 rules.
+
+  A refusal now says what was blocked, why, and what to do instead, and closes
+  with *"A block is a finding. Report it upward rather than routing around
+  it."* Seven further rules that said "use the bypass marker" without naming
+  it were reworded too — a refusal announcing an exit you then have to go look
+  up is the same invitation with an extra step. **33 messages changed in
+  total** (26 + 7); the two remaining marker-bearing rules that never invited
+  a bypass, `ds-deep-ui-import` and
+  `ds-arbitrary-fixed-width-in-ds-component`, are untouched. The six
+  `inline-db-mutation-*`
+  rules also stop naming their `.no-make-no-mistakes-db-mutation` sentinel,
+  which is the same door one level up. Both remain documented in `README.md`,
+  a file a human opens on purpose.
+
+### Added
+- **Manifest invariants in `hooks/test-hooks.sh`** — three generic assertions
+  that hold over the whole manifest rather than rule by rule, because rule by
+  rule is what drifted in the first place. A message may not contain (1) its
+  own `bypass_marker`, (2) its own `disable_if_repo_file`, or (3) the literal
+  `hook-bypass` in any form — the third catches the `// hook-bypass: <marker>`
+  template even when the marker is renamed or elided. Each failure lists every
+  offending rule id. Runs in CI on every PR touching `hooks/**`.
+
+  Both controls were exercised rather than assumed: on the clean manifest all
+  three pass, and with a leak injected into `rules.json` the matching
+  assertion fails and names the rule (`prod-ops-no-approval` for 1 and 3, a
+  separately injected `inline-db-mutation-psql` for 2) while the others stay
+  green — so each assertion discriminates instead of firing together.
+
+  Ordinary prose is untouched: `ds-deep-ui-import` still says deep imports
+  "bypass the barrel", and `discard-stderr` still says outright that it has no
+  bypass marker.
+
+  Suite: **340/340** hook tests passing (337 before, +3 invariants). Rule
+  count unchanged at 40; no rule gained or lost a `bypass_marker`.
+
+## [1.36.0] - 2026-07-31
+
+### Added
+- **`discard-stderr` hook rule** — blocks a `Bash` command that routes stderr to
+  `/dev/null`. A failing command with its stderr discarded is *indistinguishable*
+  from a succeeding one that printed nothing, so the empty result gets read as
+  "none found" rather than "it errored". That is not a hypothetical: on
+  2026-07-31 a `gh api --jq --arg ... 2>/dev/null` — `gh` rejects that flag
+  combination — produced an empty file that was reported to the team as "0 red
+  PRs". Sixteen of 41 were red, twelve of them on TypeScript. The discarded
+  stderr said exactly what was wrong.
+
+  **The rule matches on order, which is the whole difficulty.** `>/dev/null 2>&1`
+  is blocked: stdout is redirected first, then stderr is pointed at wherever
+  stdout now goes, so both die. `2>&1 >/dev/null` is allowed: stderr is
+  duplicated to the *original* stdout before the redirect, so it survives.
+  Identical token sets, opposite outcomes — a matcher that keyed on the tokens
+  alone would get one of the two wrong, and it is the permissive error that
+  costs, because a rule that blocks working commands gets removed.
+
+  Three shapes stay allowed and each has a test pinning it: `cmd >/dev/null`
+  (stderr still reaches you), `command -v x >/dev/null` (the existence probe,
+  which appears throughout these very hooks), and `cmd 2>&1 >/dev/null`. A
+  quoted mention — `git grep '2>/dev/null'` — performs no redirect and is not
+  blocked, because mention is not execution.
+
+  **Ships with `bypass_marker: null`**, the first rule here to do so. Every case
+  a bypass would have covered is already allowed above, so a marker would only
+  buy a way past a rule nobody needs to get past. The precedent is dojo-os
+  `pre-bash-block-main-target.sh`, which accepted `DOJO_HOTFIX_TO_MAIN=1` *and*
+  printed that literal in its own refusal: the thing meant to stop you handed
+  you the way through, and two agents filed false P0-hotfix claims that way
+  (DOJ-6247). A gate whose refusal message prints the way around it is not a
+  gate.
+
+  9 tests (4 blocking, 5 allowing). Rule count: 39 → 40.
+
 ## [1.35.0] - 2026-07-29
 
 ### Added
@@ -729,7 +1109,11 @@ installed caches) but had no representation on `main`; this release lands them.
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.35.0...HEAD
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.38.0...HEAD
+[1.42.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.42.0
+[1.38.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.38.0
+[1.37.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.37.0
+[1.36.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.36.0
 [1.35.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.35.0
 [1.34.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.34.0
 [1.33.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.33.0

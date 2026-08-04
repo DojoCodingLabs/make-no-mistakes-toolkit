@@ -1,0 +1,134 @@
+name: Shellcheck
+
+# Nothing in this repo examined a shell script until now, and the repo ships
+# them: `secret-store.sh` is 248 lines and handles credentials. The gap was
+# found the honest way — a PR adding a new script came back `mergeable=MERGEABLE,
+# 0 failures` with ZERO checks having looked at it, because `test-hooks.yml`
+# filters on `paths: hooks/**` and a script under `scripts/` matches nothing.
+#
+# "0 failures" and "nothing ran" render identically in the checks list. That is
+# the whole reason this file exists.
+#
+# A RATCHET ON CHANGED FILES, not a whole-tree gate — and the reason is measured
+# rather than assumed. Run over the 20 tracked `.sh` files at the time this
+# landed, `shellcheck -S warning` reports 17 clean and 3 carrying 9 findings
+# between them:
+#
+#   hooks/cross-cutting/lib/jq-input.sh      4
+#   hooks/cross-cutting/lib/load-config.sh   3
+#   hooks/test-hooks.sh                      2
+#
+# A whole-tree gate would therefore open RED on its own repository on day one,
+# and a gate that reds the repo it guards is one that gets deleted or routed
+# around within a week. Scoping to the diff means it is green from the first run
+# and every NEW script is held to the standard.
+#
+# The known cost of diff-scoping, stated rather than discovered: an untouched
+# file never gets re-checked, so the three above stay as they are until someone
+# opens a PR against them. The `debt` job below keeps that visible — it prints
+# the whole-tree result on every run and FAILS if the count grows past the three
+# recorded here, so the backlog can shrink but cannot quietly expand.
+
+on:
+  pull_request:
+    paths:
+      - '**.sh'
+      - '.github/workflows/shellcheck.yml'
+  push:
+    branches: [main]
+    paths:
+      - '**.sh'
+
+jobs:
+  changed:
+    name: changed scripts
+    # Same runner as test-hooks.yml, for the same billing reason.
+    runs-on: blacksmith-2vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The diff needs the base commit, and a shallow clone does not have
+          # it. Full history is cheap on a repo this size.
+          fetch-depth: 0
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Collect the .sh files this change touches
+        id: collect
+        env:
+          # Through `env` and read as `$VAR`: never interpolate a ref name into
+          # a `run:` body.
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          # `--diff-filter=d` drops deletions: a removed file cannot be linted,
+          # and treating its absence as a failure is how a cleanup PR goes red.
+          git diff --name-only --diff-filter=d "$BASE_SHA" "$HEAD_SHA" -- '*.sh' > changed.txt
+          count=$(wc -l < changed.txt | tr -d ' ')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "### Shell scripts in this change: $count" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$count" -gt 0 ]; then
+            sed 's/^/- `/;s/$/`/' changed.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: shellcheck
+        if: steps.collect.outputs.count != '0'
+        run: |
+          set -euo pipefail
+          # `-S warning` matches what was measured to produce the 17/3 split
+          # above. Raising it to `style` is a separate decision with its own
+          # backlog, and making it here silently would change what the numbers
+          # in this file's header mean.
+          xargs -r -a changed.txt shellcheck -S warning
+
+      - name: nothing to check
+        if: steps.collect.outputs.count == '0'
+        run: |
+          # Reported explicitly rather than passing silently. A job that says
+          # "checked nothing" and one that says "found nothing" must not read
+          # the same, which is the defect this whole workflow exists for.
+          echo "::notice::No .sh files changed — this job checked NOTHING. That is not a clean bill of health."
+
+  debt:
+    name: known debt has not grown
+    runs-on: blacksmith-2vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Count files with findings across the whole tree
+        env:
+          # Measured 2026-08-03 over 20 tracked .sh files. Lower it when the
+          # backlog shrinks; the job fails if it grows, so it cannot drift up
+          # without somebody deciding to edit this number.
+          BASELINE: '3'
+        run: |
+          set -euo pipefail
+          failing=0
+          while IFS= read -r f; do
+            if ! shellcheck -S warning "$f" > /tmp/sc.out 2>&1; then
+              failing=$((failing + 1))
+              {
+                echo "<details><summary>$f</summary>"
+                echo
+                echo '```'
+                cat /tmp/sc.out
+                echo '```'
+                echo "</details>"
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done < <(git ls-files '*.sh')
+
+          echo "### Whole-tree: $failing file(s) with findings (baseline $BASELINE)" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$failing" -gt "$BASELINE" ]; then
+            echo "::error::Shellcheck debt grew: $failing files carry findings, baseline is $BASELINE. A new script must be clean; the ratchet only exempts files this change did not touch."
+            exit 1
+          fi
+          if [ "$failing" -lt "$BASELINE" ]; then
+            echo "::notice::Debt shrank to $failing. Lower BASELINE in .github/workflows/shellcheck.yml so the gain is locked in."
+          fi

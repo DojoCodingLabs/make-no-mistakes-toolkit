@@ -1,6 +1,6 @@
 # make-no-mistakes
 
-**Version: 1.35.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
+**Version: 1.38.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
 
 The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.
 
@@ -82,6 +82,7 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:implement <ISSUE-ID>`](commands/implement.md) | Disciplined execution of Linear issues — worktree isolation, all-reviewer loops, CI verification, clean merges |
 | [`/make-no-mistakes:prioritize <pillar-slug>`](commands/prioritize.md) | MoSCoW + RICE-adapted applied to a pillar's Linear issues, traceable to its PIBER+IDCF sub-spike and the latest vision audit. Outputs priority report + description-footer per issue + snapshot comment on the sub-spike. Chain: `product-vision-audit → prioritize → spike-recommend → implement` |
 | [`/make-no-mistakes:rebase <repo>`](commands/rebase.md) | Team release sync — rebase all branches, auto-merge ready PRs, health report |
+| [`/make-no-mistakes:merge-advisor [<base>]`](commands/merge-advisor.md) | The ORDER a set of open PRs must be merged in so each is still mergeable at its turn. "Mergeable" is a property of the pair (PR, base-it-lands-on), not of the PR — so ten green PRs is not ten merges. Read-only; prints the plan, merges nothing |
 | [`/make-no-mistakes:linear-projects-setup`](commands/linear-projects-setup.md) | Bootstrap Linear workspace with full label taxonomy, projects, and integrations |
 | [`/make-no-mistakes:e2e-test-builder <source>`](commands/e2e-test-builder.md) | Generate a TestSprite-compatible `test-suite.json` from docs or PRDs |
 | [`/make-no-mistakes:e2e-test-runner [filter]`](commands/e2e-test-runner.md) | Execute E2E tests from `test-suite.json` with runner selection and reporting |
@@ -100,6 +101,7 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:handover-pr <repo> [pr#] <@person>`](commands/handover-pr.md) | Package your open PR(s) / branch work into a structured handover and post it to a Slack thread for a teammate to pick up. The mirror of `/takeover-pr` |
 | [`/make-no-mistakes:takeover-pr <repo> [pr#]`](commands/takeover-pr.md) | Pick a random open PR from a teammate, check it out, review it, and take over the work |
 | [`/make-no-mistakes:secret-input`](commands/secret-input.md) | Stage a secret/password via OS-native GUI dialog (Linux zenity/kdialog/pinentry, macOS osascript, Windows Get-Credential). The value never appears in the conversation log or terminal history. Cross-platform via `.sh` (Linux/macOS/WSL/Git Bash) + `.ps1` (native Windows) |
+| [`/make-no-mistakes:secret-generate`](commands/secret-generate.md) | Mint a random secret with a CSPRNG and stage it, via a password-generator GUI (length slider, character-class toggles, regenerate). The value never reaches stdout — only length, alphabet and entropy do. `--fingerprint` prints a truncated SHA-256 so two stores can be compared without either revealing its value |
 | [`/make-no-mistakes:secret-use ENVVAR -- <cmd>`](commands/secret-use.md) | Run one command with the staged secret loaded as an environment variable. Env var lives only inside the consuming process and is unset on completion |
 | [`/make-no-mistakes:secret-clear`](commands/secret-clear.md) | Wipe the staged secret (shred/rm-P/random-overwrite per OS). Idempotent — safe to call when no secret is staged. Always run when done with credentials |
 | [`/make-no-mistakes:audit [path]`](commands/audit.md) | **Meta-dispatcher** — runs the full repo-health sweep (all six families `SCH→CDC→DDD→ARC→STR→ENF` via `audit-engine`) and delegates the component layer to `atomic-design-toolkit` when installed; aggregates one report + emits cure-scaffold proposals per `schemas/repo-health-rules.schema.json` |
@@ -128,7 +130,8 @@ Auto-activate by context — you don't need to remember the command name.
 | [`spike-recommend`](skills/spike-recommend/SKILL.md) | Paste a Linear issue URL or ask to analyze an issue |
 | [`review-open-prs`](skills/review-open-prs/SKILL.md) | Ask about open PRs, merge readiness, or Greptile scores |
 | [`review-active-issues`](skills/review-active-issues/SKILL.md) | Ask about your Linear issues, backlog, or issue status |
-| [`rebase-advisor`](skills/rebase-advisor/SKILL.md) | Mention needing to sync branches after a release (suggests `/make-no-mistakes:rebase`) |
+| [`sync-advisor`](skills/sync-advisor/SKILL.md) | Ask "am I up to date", "is my checkout stale", or mention syncing after a release. Measures the drift with six read-only git predicates, names which **governed** files changed, and routes to the smallest fix — `git pull`, a single-branch rebase, or `/make-no-mistakes:rebase`. Never syncs anything itself |
+| [`merge-advisor`](skills/merge-advisor/SKILL.md) | Ask "in what order do I merge these", "which PR goes first", or "will merging this break the others". Computes the merge ORDER for a SET of PRs with seven read-only predicates — pairwise file collisions, **latent conflicts that only appear after an earlier PR lands**, and artifacts anchored to a base SHA that a squash merge orphans on every open PR at once. Ties break by fragility, not importance. Never merges anything |
 | [`audit-engine`](skills/audit-engine/SKILL.md) | Run any of the six repo-health audits (schema-drift, contract-drift, ddd, explicit-architecture, strangler, enforcement-hooks). Hybrid LLM-first detection + deterministic verification + cure-mapping |
 | [`domain-driven-advisor`](skills/domain-driven-advisor/SKILL.md) | Ask "which audit do I need?" / "where do I start with repo health?" — routes you to the right audit(s) and runs a premortem |
 | [`premortem`](skills/premortem/SKILL.md) | Say "premortem this", "what could kill this", "stress test this plan", "what am I missing", or "find the blind spots" on a plan/launch/decision |
@@ -262,6 +265,26 @@ The plugin reads `linear-setup.json` at your repo root for project-specific sett
 
 If no `linear-setup.json` exists, the plugin auto-detects settings from your environment (GitHub org from current repo, Linear team from MCP, etc.).
 
+Toolkit *behaviour* (as opposed to where things go) is read from an optional
+`make-no-mistakes.config.json`, also at the repo root — see
+[`commands/make-no-mistakes.config.example.json`](commands/make-no-mistakes.config.example.json)
+for every key and its default. Two consumers today: `language` / `diacritics` +
+`explain` for `/explain`, and `syncAdvisor.governedPaths` for the `sync-advisor`
+skill:
+
+```json
+{
+  "syncAdvisor": {
+    "governedPaths": [".claude/hooks/", "scripts/", ".github/workflows/"]
+  }
+}
+```
+
+Those are the directories where a stale checkout silently changes behaviour, so
+`sync-advisor` names them by file when they have moved on the base ref. The key
+has **no default** — unset, the skill reports distance and routing and omits
+that line rather than guessing at paths it cannot know.
+
 ## Verify Installation
 
 **Claude Code:**
@@ -391,6 +414,7 @@ ships 10 rules:
 - `destructive-db-ops` — blocks `supabase db reset|push|repair` and inline `DROP/TRUNCATE/DELETE FROM`
 - `manual-edge-fn-deploy` — blocks `supabase functions deploy` (forces CI-only deploys)
 - `gcloud-missing-project` — warns when a `gcloud` subcommand is missing `--project=`
+- `discard-stderr` (v1.36.0) — blocks a command that routes stderr to `/dev/null` (`2>/dev/null`, `&>/dev/null`, `>/dev/null 2>&1`). A failing command with its stderr discarded is indistinguishable from a succeeding one that printed nothing, so the empty result reads as *"none found"* rather than *"it errored"*. `cmd >/dev/null` alone is untouched — stderr still reaches you — and so is `cmd 2>&1 >/dev/null`, where stderr is duplicated to the original stdout *before* stdout is redirected and therefore survives. Same tokens, opposite outcomes; the rule matches on order. **No bypass marker** — see below.
 
 **PreToolUse on `Edit | Write | MultiEdit` (block):**
 - `minified-build-output` — blocks writing minified content to `amd/build/*.min.js` or `dist/*.min.{js,css}`
@@ -429,6 +453,58 @@ becomes a no-op in that repo. The current sentinel filenames are:
 
 Bypasses are explicit acknowledgements — they sit inside the command/content
 itself, not as silent flags.
+
+**Not every rule has one, on purpose.** `discard-stderr` (v1.36.0) ships with
+`bypass_marker: null`, because the legitimate cases it might otherwise need a
+bypass for are already *allowed* by the rule itself: `cmd >/dev/null` for noisy
+stdout, `cmd 2>&1 >/dev/null` when stderr must survive, `command -v x >/dev/null`
+for existence probes, and `cmd 2>>"$log"` to keep stderr somewhere readable.
+With no case left over, a marker would only buy a way past a rule nobody needs
+to get past.
+
+The general shape matters beyond this one rule: a gate whose refusal message
+*prints the way around it* is not a gate. `pre-bash-block-main-target.sh` in
+dojo-os accepted `DOJO_HOTFIX_TO_MAIN=1` **and** quoted that literal in its own
+refusal, so typing the string it handed you WAS the authorization; two agents
+filed false P0-hotfix claims that way on 2026-07-28 (DOJ-6247). A bypass is
+worth its cost when it names a real case the rule cannot express. When it does
+not, it is a password printed on the lock.
+
+**And as of v1.37.0, no refusal prints its own marker.** The markers still
+work, exactly as before — a human who knows one exists can type it
+deliberately, and the `allows-bypass-marker` test on every rule that has one
+pins that mechanic in place. What changed is that the hook no longer
+*announces* it. Measured on `origin/main` @ `ee0ba47`: of 40 rules, 35 carried
+a `bypass_marker` and **26 quoted that marker inside their own refusal text**
+— including `prod-ops-no-approval`, `destructive-db-ops`, `secrets-hardcoded`
+and `block-git-force-push-no-lease`.
+
+```bash
+jq '[.[] | select((.bypass_marker // "") != "")
+         | select(.bypass_marker as $m | (.message // "") | contains($m))] | length' \
+  hooks/rules/rules.json
+```
+
+That is the DOJ-6247 shape reproduced 26 times: reading the refusal *is* the
+authorization, and typing the marker becomes a reflex rather than a decision.
+A refusal now says what was blocked and why, and closes with *a block is a
+finding — report it upward rather than routing around it.* The markers are
+documented here, in a file you open on purpose, which is a different act from
+being handed one at the moment you are trying to get past something.
+
+Held in place by three generic assertions in `hooks/test-hooks.sh` (run by CI
+on every PR touching `hooks/**`), which hold over the whole manifest rather
+than rule by rule — because rule by rule is what drifted the first time:
+
+- a message may not contain its own `bypass_marker`
+- a message may not contain its own `disable_if_repo_file` (the per-repo
+  escape hatch is the same door, one level up)
+- no message may contain the literal `hook-bypass`, which catches the template
+  form even when the marker is renamed
+
+Ordinary prose is untouched: `ds-deep-ui-import` still says deep imports
+"bypass the barrel", and `discard-stderr` still says outright that it has no
+bypass marker.
 
 ### Adding your own rules
 

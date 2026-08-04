@@ -14,7 +14,7 @@
     "action": "block",
     "bypass_marker": "ssh-db-rule",
     "memory_ref": "feedback_scripts_not_db.md",
-    "message": "BLOCKED: gcloud compute ssh + inline DB/Moodle command detected.\n\nUse a versioned script in scripts/ instead. If none fits, write+commit\none first. Bypass: add \"// hook-bypass: ssh-db-rule\" to the command.\n",
+    "message": "BLOCKED: gcloud compute ssh + inline DB/Moodle command detected.\n\nUse a versioned script in scripts/ instead. If none fits, write+commit\none first.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-ssh-php-r",
@@ -147,7 +147,7 @@
     "bypass_marker": "prod-ops",
     "memory_ref": "feedback_never_touch_prod_without_approval.md",
     "references": [],
-    "message": "BLOCKED: production MUTATION detected.\n\nProduction changes require explicit user approval. Once confirmed, add\n\"// hook-bypass: prod-ops\" to the command to acknowledge.\n\nRead-only calls against production (list / describe / get / read, or any\ncommand carrying --dry-run) are NOT blocked. If you are seeing this for a\ncommand that only reads, the verb block-list is too wide — report it rather\nthan reaching for the bypass.\n",
+    "message": "BLOCKED: production MUTATION detected.\n\nProduction changes require explicit user approval, and the approval is\nthe user's to give — not the agent's to assume.\n\nRead-only calls against production (list / describe / get / read, or any\ncommand carrying --dry-run) are NOT blocked. If you are seeing this for a\ncommand that only reads, the verb block-list is too wide — that is a\ndefect in this rule, and reporting it is the fix.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "allows-readonly-list-against-prod-project",
@@ -276,7 +276,7 @@
     "bypass_marker": "db-destructive",
     "memory_ref": "feedback_db_ops_explicit_permission.md",
     "references": [],
-    "message": "BLOCKED: destructive DB operation.\n\nEven with --local, ask explicit user permission first. Once confirmed,\nadd \"// hook-bypass: db-destructive\" to the command.\n",
+    "message": "BLOCKED: destructive DB operation.\n\nEven with --local, ask explicit user permission first. The permission is\nthe user's to give — not the agent's to assume.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-supabase-reset",
@@ -341,7 +341,7 @@
     "bypass_marker": "edge-fn-manual",
     "memory_ref": "feedback_edge_functions_via_ci.md",
     "references": [],
-    "message": "BLOCKED: manual Edge Function deploy.\n\nDeploy via CI workflow (push to develop for staging, main for prod).\nBypass: add \"// hook-bypass: edge-fn-manual\" if a hotfix justifies it.\n",
+    "message": "BLOCKED: manual Edge Function deploy.\n\nDeploy via CI workflow (push to develop for staging, main for prod).\nA hotfix that genuinely cannot wait for CI is a decision the user makes,\nwith the reason recorded.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-functions-deploy",
@@ -394,7 +394,7 @@
     "bypass_marker": "minified-build",
     "memory_ref": "feedback_no_minified_build.md",
     "references": [],
-    "message": "BLOCKED: minified content being written to build/.\n\nBuild artifacts must stay human-readable. Replace with a readable copy\nof src/. Bypass: \"// hook-bypass: minified-build\" inside the content.\n",
+    "message": "BLOCKED: minified content being written to build/.\n\nBuild artifacts must stay human-readable. Replace with a readable copy\nof src/.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-minified-amd-build",
@@ -451,7 +451,7 @@
     "bypass_marker": "secret-leak",
     "memory_ref": "feedback_never_leak_secrets.md",
     "references": [],
-    "message": "POTENTIAL SECRET LEAK: hardcoded credential pattern detected.\n\nUse Secret Manager / .env / local memory for real values. If this is a\nplaceholder or test fixture, prefix with \"EXAMPLE_\" / \"CHANGEME_\", move\nto .env.example, or add \"// hook-bypass: secret-leak\" near the line.\n",
+    "message": "POTENTIAL SECRET LEAK: hardcoded credential pattern detected.\n\nUse Secret Manager / .env / local memory for real values. If this is a\nplaceholder or test fixture, prefix with \"EXAMPLE_\" / \"CHANGEME_\" or\nmove it to .env.example.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-hardcoded-password-in-src",
@@ -643,7 +643,7 @@
     "action": "block",
     "bypass_marker": "ds-arbitrary-breakpoint",
     "memory_ref": "feedback_design_system_no_arbitrary_breakpoints.md",
-    "message": "BLOCKED: arbitrary Tailwind breakpoint detected (min-[Xpx]).\n\nUse Tailwind's preset breakpoints instead: sm: (640px), md: (768px),\nlg: (1024px), xl: (1280px), 2xl: (1536px). Arbitrary values fragment\nthe responsive design language and break consistency across the app.\n\nIf a non-preset breakpoint is genuinely required, add\n\"// hook-bypass: ds-arbitrary-breakpoint\" to the line and justify\nin the PR description.\n",
+    "message": "BLOCKED: arbitrary Tailwind breakpoint detected (min-[Xpx]).\n\nUse Tailwind's preset breakpoints instead: sm: (640px), md: (768px),\nlg: (1024px), xl: (1280px), 2xl: (1536px). Arbitrary values fragment\nthe responsive design language and break consistency across the app.\n\nIf a non-preset breakpoint is genuinely required, that is a design\ndecision to raise and justify, not a hook to get past.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-min-1200px-in-tsx",
@@ -879,7 +879,7 @@
     "action": "warn",
     "bypass_marker": "ds-raw-hex-color",
     "memory_ref": "feedback_design_system_token_only_colors.md",
-    "message": "WARNING: raw hex color literal found in source.\n\nUse a Tailwind token instead (e.g., bg-dojo-primary-lilac, text-dojo-foreground).\nThe token system is the single source of truth for color and theming.\n\nExempt paths (NOT flagged): tailwind.config.*, theme/, design-system/,\ndesign-tokens, .test.*, .stories.*. Use the bypass marker if a hex is\ngenuinely required outside those paths (e.g. embedding a brand color\nin a logo SVG that the design system doesn't yet expose).\n",
+    "message": "WARNING: raw hex color literal found in source.\n\nUse a Tailwind token instead (e.g., bg-dojo-primary-lilac, text-dojo-foreground).\nThe token system is the single source of truth for color and theming.\n\nExempt paths (NOT flagged): tailwind.config.*, theme/, design-system/,\ndesign-tokens, .test.*, .stories.*. A hex genuinely required outside\nthose paths (e.g. a brand color in a logo SVG the design system doesn't\nyet expose) is a gap in the token set — raise it.\n",
     "tests": [
       {
         "name": "warns-on-raw-hex-in-tsx",
@@ -988,7 +988,7 @@
     "action": "block",
     "bypass_marker": "schema-sql-outside-migrations",
     "memory_ref": "feedback_scripts_not_db.md",
-    "message": "BLOCKED: schema-changing SQL in a file outside supabase/migrations/.\n\nEvery schema mutation (ALTER/CREATE/DROP/GRANT/POLICY) MUST live in a\ntimestamped migration file, never in ad-hoc scripts or runtime queries.\n\nCreate a new file:\n  supabase/migrations/$(date -u +%Y%m%d%H%M%S)_<slug>.sql\n\nLegitimate exceptions (use the bypass marker):\n- Schema docs / examples in READMEs — should not be executable SQL\n- Test fixtures under supabase/tests/ — already exempt via not_pattern\n",
+    "message": "BLOCKED: schema-changing SQL in a file outside supabase/migrations/.\n\nEvery schema mutation (ALTER/CREATE/DROP/GRANT/POLICY) MUST live in a\ntimestamped migration file, never in ad-hoc scripts or runtime queries.\n\nCreate a new file:\n  supabase/migrations/$(date -u +%Y%m%d%H%M%S)_<slug>.sql\n\nTwo shapes are not real violations and should be fixed at the source:\n- Schema docs / examples in READMEs — should not be executable SQL\n- Test fixtures under supabase/tests/ — already exempt via not_pattern\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-create-table-in-script",
@@ -1078,7 +1078,7 @@
     "action": "warn",
     "bypass_marker": "psql-supabase-remote",
     "memory_ref": "feedback_scripts_not_db.md",
-    "message": "WARNING: direct psql / pg_dump / pg_restore execution against a Supabase\nremote host.\n\nSQL Editor / direct-Postgres-CLI workflows create drift between the\nversioned migrations directory and other devs' local databases.\n\nCorrect workflow:\n  1. Add a migration in supabase/migrations/<timestamp>_<slug>.sql\n  2. Test locally:  supabase db reset --local\n  3. Push to develop — CI applies the migration to staging automatically\n  4. For production: follow the create-release SOP\n\nUse the bypass marker only for legitimate hotfixes where the PR cycle\nis too slow.\n",
+    "message": "WARNING: direct psql / pg_dump / pg_restore execution against a Supabase\nremote host.\n\nSQL Editor / direct-Postgres-CLI workflows create drift between the\nversioned migrations directory and other devs' local databases.\n\nCorrect workflow:\n  1. Add a migration in supabase/migrations/<timestamp>_<slug>.sql\n  2. Test locally:  supabase db reset --local\n  3. Push to develop — CI applies the migration to staging automatically\n  4. For production: follow the create-release SOP\n\nA hotfix that genuinely cannot wait for the PR cycle is a decision the\nuser makes, with the reason recorded.\n",
     "tests": [
       {
         "name": "warns-on-psql-supabase-remote",
@@ -1171,7 +1171,7 @@
     "action": "warn",
     "bypass_marker": "pr-create-no-migration-note",
     "memory_ref": "feedback_scripts_not_db.md",
-    "message": "WARNING: gh pr create body does not mention migrations.\n\nIf your PR modifies files under supabase/migrations/, the body MUST\ninclude a \"Migration deployment\" section that lists:\n  1. Which envs need supabase db push (staging auto via CI; prod via release)\n  2. Backfill order if the migrations depend on existing data\n  3. Post-merge verification steps\n\nThis rule does NOT inspect the diff — it only reads the command, and it\nintentionally skips --body-file invocations because it cannot read the\nreferenced file. Use the bypass marker if your PR has no migrations.\n",
+    "message": "WARNING: gh pr create body does not mention migrations.\n\nIf your PR modifies files under supabase/migrations/, the body MUST\ninclude a \"Migration deployment\" section that lists:\n  1. Which envs need supabase db push (staging auto via CI; prod via release)\n  2. Backfill order if the migrations depend on existing data\n  3. Post-merge verification steps\n\nThis rule does NOT inspect the diff — it only reads the command, and it\nintentionally skips --body-file invocations because it cannot read the\nreferenced file. If your PR has no migrations, this warning is noise and\nsaying so is more useful than silencing it.\n",
     "tests": [
       {
         "name": "warns-on-pr-create-body-without-migration-mention",
@@ -1236,7 +1236,7 @@
     "action": "block",
     "bypass_marker": "prod-db-push-approved",
     "memory_ref": "feedback_never_touch_prod_without_approval.md",
-    "message": "BLOCKED: supabase db push targeting either the PRODUCTION project ref\nor the currently-linked project (which may be production).\n\nNEVER run against production without explicit user approval — see\nfeedback_never_touch_prod_without_approval.md.\n\nCorrect workflow:\n  1. Merge to main\n  2. The release owner runs the create-release SOP that ships\n     migrations to production through CI, not from a developer machine.\n\nUse the bypass marker ONLY when the user has verbally approved the\noperation. For --linked, double-check the active link first:\n  supabase status --output json | jq -r '.project_ref'\n\nMarketplace consumers: the production project ref is configured per\ninstall via .private/substitutions.json (PROD_SUPABASE_REF token). See\nhooks/rules/README.md for the substitution workflow.\n",
+    "message": "BLOCKED: supabase db push targeting either the PRODUCTION project ref\nor the currently-linked project (which may be production).\n\nNEVER run against production without explicit user approval — see\nfeedback_never_touch_prod_without_approval.md.\n\nCorrect workflow:\n  1. Merge to main\n  2. The release owner runs the create-release SOP that ships\n     migrations to production through CI, not from a developer machine.\n\nIf you reached this on --linked, the first thing to check is which\nproject is actually linked:\n  supabase status --output json | jq -r '.project_ref'\n\nA block is a finding. Report it upward rather than routing around it.\n\nMarketplace consumers: the production project ref is configured per\ninstall via .private/substitutions.json (PROD_SUPABASE_REF token). See\nhooks/rules/README.md for the substitution workflow.\n",
     "tests": [
       {
         "name": "blocks-supabase-db-push-prod",
@@ -1328,7 +1328,7 @@
     "action": "warn",
     "bypass_marker": "curl-supabase-rest-mutation",
     "memory_ref": "feedback_scripts_not_db.md",
-    "message": "WARNING: mutating curl against the Supabase PostgREST endpoint.\n\nDirect REST mutations bypass:\n  - the versioned migrations workflow (drift across local DBs / envs),\n  - the RLS + admin-role checks the Supabase clients enforce, and\n  - the access pattern already encapsulated in src/services/api/.\n\nCorrect outlets:\n  - Schema changes      -> supabase/migrations/<timestamp>_<slug>.sql\n  - Data mutations      -> an Edge Function or a committed script\n  - One-shot fixes      -> use the API client from a versioned script\n\nUse the bypass marker (curl-supabase-rest-mutation) only for documented\nhotfixes that the team has explicitly approved.\n",
+    "message": "WARNING: mutating curl against the Supabase PostgREST endpoint.\n\nDirect REST mutations bypass:\n  - the versioned migrations workflow (drift across local DBs / envs),\n  - the RLS + admin-role checks the Supabase clients enforce, and\n  - the access pattern already encapsulated in src/services/api/.\n\nCorrect outlets:\n  - Schema changes      -> supabase/migrations/<timestamp>_<slug>.sql\n  - Data mutations      -> an Edge Function or a committed script\n  - One-shot fixes      -> use the API client from a versioned script\n\nA hotfix that genuinely needs a direct REST mutation is a decision the\nteam makes, with the reason recorded.\n",
     "tests": [
       {
         "name": "warns-curl-post-supabase-rest",
@@ -1478,7 +1478,7 @@
     "action": "block",
     "bypass_marker": "playwright-headless-allowed",
     "memory_ref": "feedback_no_headless.md",
-    "message": "BLOCKED: `playwright test` without --headed / --ui / --debug.\n\nPer feedback_no_headless.md the browser must be visible during E2E:\nheadless runs hide visual regressions and UI race conditions, and\nthe in-focus requirement only holds when a window is up.\n\nUse one of:\n  - --headed   browser visible\n  - --ui       Playwright UI mode (interactive)\n  - --debug    step-through debugger\n\nBypass marker (playwright-headless-allowed) is reserved for\nexplicitly-documented CI runs (e.g. a Vercel preview workflow).\n",
+    "message": "BLOCKED: `playwright test` without --headed / --ui / --debug.\n\nPer feedback_no_headless.md the browser must be visible during E2E:\nheadless runs hide visual regressions and UI race conditions, and\nthe in-focus requirement only holds when a window is up.\n\nUse one of:\n  - --headed   browser visible\n  - --ui       Playwright UI mode (interactive)\n  - --debug    step-through debugger\n\nA CI run with no display (e.g. a Vercel preview workflow) is the one\ncase this rule does not apply to — and a CI workflow is a reviewed file,\nnot an ad-hoc command.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-playwright-test-bare",
@@ -1573,6 +1573,86 @@
     ]
   },
   {
+    "id": "block-no-verify",
+    "description": "Block a commit or push that skips the hooks",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "(git[[:space:]]+(commit|push)[^|;&]*--no-verify|git[[:space:]]+commit[^|;&]*[[:space:]]-n([[:space:]]|$))"
+      },
+      {
+        "field": "command",
+        "not_pattern": "['\\\"]--no-verify"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": null,
+    "memory_ref": "feedback_agents_never_self_authorize_documented_overrides.md",
+    "references": [
+      "dojo-os CLAUDE.md non-negotiable 21"
+    ],
+    "message": "BLOCKED: this skips the hooks.\n\nThe hooks are the only thing standing between a commit and the checks it\nwas supposed to pass. Skipping them does not make a commit faster -- it\nmakes an UNVERIFIED commit indistinguishable from a verified one, and\nnothing downstream can tell them apart afterwards.\n\nNon-negotiable 21 names this flag alongside --admin and --force. Those\nthree had rules; this one did not, which is why you are reading a new\nmessage. An agent used it on 2026-08-02, reported it, and reverted it.\n\nTHE HOOKS FAILING IS NOT A REASON TO SKIP THEM. In that same incident the\nhonest attempt failed with `vitest: command not found` because a fresh\nworktree had no dependencies. The fix was:\n\n    bun install --frozen-lockfile\n\nA hook that cannot run is a broken toolchain, not a gate to step over. If\nthe hooks are wrong, fix the hooks or say so -- both leave a trace, and\nthat trace is the entire point.\n\nThere is deliberately NO bypass marker. A gate whose refusal hands you the\nway around it is not a gate (DOJ-6247).\n",
+    "tests": [
+      {
+        "name": "commit-long-flag-blocked",
+        "input": {
+          "tool_input": {
+            "command": "git commit --no-verify -m 'wip'"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "commit-short-flag-blocked",
+        "input": {
+          "tool_input": {
+            "command": "git commit -n -m 'wip'"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "push-long-flag-blocked",
+        "input": {
+          "tool_input": {
+            "command": "git push --no-verify origin main"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "push-dry-run-allowed",
+        "input": {
+          "tool_input": {
+            "command": "git push -n origin main"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "ordinary-commit-allowed",
+        "input": {
+          "tool_input": {
+            "command": "git commit -m 'feat: add thing'"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "quoted-mention-allowed",
+        "input": {
+          "tool_input": {
+            "command": "grep -rn '--no-verify' docs/"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
     "id": "block-git-force-push-no-lease",
     "description": "Block `git push --force` / `-f` without `--force-with-lease` (overwrites collaborator pushes silently)",
     "applies_to": [
@@ -1591,7 +1671,7 @@
     "action": "block",
     "bypass_marker": "git-force-push-bare-allowed",
     "memory_ref": "feedback_resolve_merge_conflicts.md",
-    "message": "BLOCKED: `git push --force` without --force-with-lease.\n\nBare --force overwrites the remote without verifying that what is\nthere is what you last fetched — it silently destroys collaborator\npushes. --force-with-lease aborts when the remote has advanced since\nyour last fetch, which is the safety net you want.\n\nUse:\n  git push --force-with-lease origin <branch>\n\nBypass marker (git-force-push-bare-allowed) ONLY when you have\nverified that no other contributor has pushed to the branch.\n",
+    "message": "BLOCKED: `git push --force` without --force-with-lease.\n\nBare --force overwrites the remote without verifying that what is\nthere is what you last fetched — it silently destroys collaborator\npushes. --force-with-lease aborts when the remote has advanced since\nyour last fetch, which is the safety net you want.\n\nUse:\n  git push --force-with-lease origin <branch>\n\nIf --force-with-lease is itself refusing, the remote HAS advanced —\nthat is the collaborator push you were about to destroy, and it is\ninformation, not an obstacle.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-force-short-flag",
@@ -1664,7 +1744,7 @@
     "action": "block",
     "bypass_marker": "git-rebase-skip-acknowledged",
     "memory_ref": "feedback_resolve_merge_conflicts.md",
-    "message": "BLOCKED: `git rebase --skip` drops the conflicting commit silently.\n\nPer feedback_resolve_merge_conflicts.md: never skip; resolve each\nconflict one by one, verify the result, and `git rebase --continue`.\n\nCorrect moves:\n  - Resolve manually, `git add`, `git rebase --continue`\n  - If the commit is genuinely obsolete, `git rebase --abort` and\n    cherry-pick the commits you want\n  - Bypass marker (git-rebase-skip-acknowledged) ONLY with explicit\n    acknowledgement of the data loss\n",
+    "message": "BLOCKED: `git rebase --skip` drops the conflicting commit silently.\n\nPer feedback_resolve_merge_conflicts.md: never skip; resolve each\nconflict one by one, verify the result, and `git rebase --continue`.\n\nCorrect moves:\n  - Resolve manually, `git add`, `git rebase --continue`\n  - If the commit is genuinely obsolete, `git rebase --abort` and\n    cherry-pick the commits you want\n\nDropping a commit is data loss. That is the user's call to make with the\nloss named out loud.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-rebase-skip",
@@ -1731,7 +1811,7 @@
     "action": "block",
     "bypass_marker": "standup-non-desktop-acknowledged",
     "memory_ref": "feedback_standup_desktop.md",
-    "message": "BLOCKED: daily-standup file being written outside ~/Escritorio.\n\nPer feedback_standup_desktop.md the standup lives in ~/Escritorio,\nNEVER inside a repo (commit-by-accident risk + cross-repo\nfragmentation). The standup-post-slack skill always resolves the\npath from ~/Escritorio.\n\nUse the absolute path:\n  ~/Escritorio/daily-standup.md\n(or ~/Desktop/daily-standup.md on English-locale machines).\n\nBypass marker is intentionally NOT recommended — there is no\nlegitimate path outside the desktop.\n",
+    "message": "BLOCKED: daily-standup file being written outside ~/Escritorio.\n\nPer feedback_standup_desktop.md the standup lives in ~/Escritorio,\nNEVER inside a repo (commit-by-accident risk + cross-repo\nfragmentation). The standup-post-slack skill always resolves the\npath from ~/Escritorio.\n\nUse the absolute path:\n  ~/Escritorio/daily-standup.md\n(or ~/Desktop/daily-standup.md on English-locale machines).\n\nThere is no legitimate path outside the desktop.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-standup-in-repo",
@@ -1839,7 +1919,7 @@
     "action": "block",
     "bypass_marker": "goodnight-non-desktop-acknowledged",
     "memory_ref": "feedback_goodnight_desktop.md",
-    "message": "BLOCKED: /goodnight handoff file being written outside ~/Escritorio.\n\nPer feedback_goodnight_desktop.md the /goodnight skill must save\nnext-day handoff files to ~/Escritorio, NOT inside .claude/next-day/\nor any repo path.\n\nUse the absolute path:\n  ~/Escritorio/<filename>.md\n(or ~/Desktop/<filename>.md on English-locale machines).\n\nBypass marker is intentionally NOT recommended.\n",
+    "message": "BLOCKED: /goodnight handoff file being written outside ~/Escritorio.\n\nPer feedback_goodnight_desktop.md the /goodnight skill must save\nnext-day handoff files to ~/Escritorio, NOT inside .claude/next-day/\nor any repo path.\n\nUse the absolute path:\n  ~/Escritorio/<filename>.md\n(or ~/Desktop/<filename>.md on English-locale machines).\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-next-day-in-claude-dir",
@@ -1946,7 +2026,7 @@
     "action": "warn",
     "bypass_marker": "console-log-deletion-verified",
     "memory_ref": "feedback_never_delete_debug_logs.md",
-    "message": "WARNING: Edit removes a line containing a debug-log call.\n\nPer feedback_never_delete_debug_logs.md NEVER delete debug logs;\ngate them with an env var (e.g. DEBUG_TOOLS), disable for prod,\nre-enable when needed.\n\nPer feedback_never_remove_debug_logs_early.md even when converting\nto env-gating, NEVER delete before verifying the fix in prod.\n\nUse the bypass marker (console-log-deletion-verified) ONLY when:\n  - Converting to env-gating (the new gate replaces the log)\n  - The fix has been verified in prod for >24h\n  - The log was a documented debug-temp called out in the original\n    commit message\n",
+    "message": "WARNING: Edit removes a line containing a debug-log call.\n\nPer feedback_never_delete_debug_logs.md NEVER delete debug logs;\ngate them with an env var (e.g. DEBUG_TOOLS), disable for prod,\nre-enable when needed.\n\nPer feedback_never_remove_debug_logs_early.md even when converting\nto env-gating, NEVER delete before verifying the fix in prod.\n\nThe three cases where removal is defensible — and each is a claim you\nhave to be able to back:\n  - Converting to env-gating (the new gate replaces the log)\n  - The fix has been verified in prod for >24h\n  - The log was a documented debug-temp called out in the original\n    commit message\n",
     "tests": [
       {
         "name": "warns-on-edit-deleting-console-log",
@@ -2091,7 +2171,7 @@
     "action": "warn",
     "bypass_marker": "time-estimates-allowed",
     "memory_ref": "feedback_no_time_estimates.md",
-    "message": "WARNING: time-based estimate (X days/weeks/sprints) in plan/spec.\n\nPer feedback_no_time_estimates.md never use days/sprints/cycles;\nuse sequential ordering with conceptual milestones.\n\nReplace with:\n  - \"Phase 1, Phase 2, Phase 3\"\n  - \"After X ships -> Y starts\"\n  - \"Once Greptile 5/5 + CI green -> merge\"\n\nBypass marker (time-estimates-allowed) ONLY when the doc is\nmarketing / external-facing (where calendar dates are expected).\n",
+    "message": "WARNING: time-based estimate (X days/weeks/sprints) in plan/spec.\n\nPer feedback_no_time_estimates.md never use days/sprints/cycles;\nuse sequential ordering with conceptual milestones.\n\nReplace with:\n  - \"Phase 1, Phase 2, Phase 3\"\n  - \"After X ships -> Y starts\"\n  - \"Once Greptile 5/5 + CI green -> merge\"\n\nCalendar dates belong in marketing / external-facing docs, where a\nreader expects them. An internal plan is not one of those.\n",
     "tests": [
       {
         "name": "warns-on-3-days-in-plan",
@@ -2194,7 +2274,7 @@
     "action": "warn",
     "bypass_marker": "pr-file-count-verified",
     "memory_ref": "feedback_split_large_prs.md",
-    "message": "WARNING: `gh pr create`.\n\nPer feedback_split_large_prs.md / the 15-file rule (DOJ-2482):\nPRs with >15 files get abandoned more easily — split by domain\nbefore opening.\n\nVerify with:\n  git diff --stat <base>..HEAD | tail -1\n\nIf the diff touches <=15 files, use bypass marker\n`pr-file-count-verified`. If it touches >15 files, abort and split.\n",
+    "message": "WARNING: `gh pr create`.\n\nPer feedback_split_large_prs.md / the 15-file rule (DOJ-2482):\nPRs with >15 files get abandoned more easily — split by domain\nbefore opening.\n\nVerify with:\n  git diff --stat <base>..HEAD | tail -1\n\nIf it touches >15 files, abort and split before opening.\n",
     "tests": [
       {
         "name": "warns-on-pr-create-bare",
@@ -2271,7 +2351,7 @@
     "action": "warn",
     "bypass_marker": "posthog-mention-approved",
     "memory_ref": "feedback_no_posthog_nag.md",
-    "message": "WARNING: PostHog / dashboard / instrumentation mention in Slack.\n\nPer feedback_no_posthog_nag.md the agent / automation must EXCLUDE\nPostHog / dashboards / instrumentation from alerts; Juan owns that\nsurface, other POs explicitly told it is out of scope.\n\nUse the bypass marker (posthog-mention-approved) ONLY when:\n  - The alert is addressed to Juan directly (his Slack user-id)\n  - You confirmed with Juan that the alert is welcome\n",
+    "message": "WARNING: PostHog / dashboard / instrumentation mention in Slack.\n\nPer feedback_no_posthog_nag.md the agent / automation must EXCLUDE\nPostHog / dashboards / instrumentation from alerts; Juan owns that\nsurface, other POs explicitly told it is out of scope.\n\nThe mention is only welcome when both hold:\n  - The alert is addressed to Juan directly (his Slack user-id)\n  - You confirmed with Juan that the alert is welcome\n",
     "tests": [
       {
         "name": "warns-posthog-in-slack",
@@ -2339,7 +2419,7 @@
     "action": "block",
     "bypass_marker": "sibling-suffix-storage-allowed",
     "memory_ref": "feedback_explicit_storage_prefixes.md",
-    "message": "BLOCKED: storage upload with a sibling-suffix layout.\n\nPer feedback_explicit_storage_prefixes.md pipelines that transform\nartefacts must use <bucket>/originals/ + <bucket>/processed/\n(or stage-specific names), never siblings like foo.zip +\nfoo.processed.zip in the same folder.\n\nUse:\n  <bucket>/originals/foo.zip\n  <bucket>/processed/foo.zip\n\nBypass marker (sibling-suffix-storage-allowed) ONLY for legacy\nbuckets in active migration.\n",
+    "message": "BLOCKED: storage upload with a sibling-suffix layout.\n\nPer feedback_explicit_storage_prefixes.md pipelines that transform\nartefacts must use <bucket>/originals/ + <bucket>/processed/\n(or stage-specific names), never siblings like foo.zip +\nfoo.processed.zip in the same folder.\n\nUse:\n  <bucket>/originals/foo.zip\n  <bucket>/processed/foo.zip\n\nA legacy bucket still in active migration is the one case this layout\nsurvives in — and that migration is tracked work, not a per-command\ndecision.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-supabase-storage-processed-suffix",
@@ -2425,7 +2505,7 @@
     "action": "warn",
     "bypass_marker": "localhost-in-pr-body-allowed",
     "memory_ref": "feedback_test_on_staging.md",
-    "message": "WARNING: localhost reference in PR body.\n\nPer feedback_test_on_staging.md the QA testing target is\ndev.dojocoding.io (staging), not localhost. Any reviewer who tries\nto verify against localhost will hit env mismatches:\n  - Local DB differs from staging\n  - Edge Functions missing local secrets\n  - Different feature flags\n\nReplace localhost links with dev.dojocoding.io equivalents.\n\nBypass marker (localhost-in-pr-body-allowed) ONLY for steps that\nlegitimately require an explicit local build (e.g. asking the\nreviewer to run `bun run dev` before pushing).\n",
+    "message": "WARNING: localhost reference in PR body.\n\nPer feedback_test_on_staging.md the QA testing target is\ndev.dojocoding.io (staging), not localhost. Any reviewer who tries\nto verify against localhost will hit env mismatches:\n  - Local DB differs from staging\n  - Edge Functions missing local secrets\n  - Different feature flags\n\nReplace localhost links with dev.dojocoding.io equivalents.\n\nA step that legitimately requires a local build (e.g. asking the\nreviewer to run `bun run dev` before pushing) is the exception — say\nso in the body so the reviewer knows it is deliberate.\n",
     "tests": [
       {
         "name": "warns-pr-create-with-localhost",
@@ -2507,7 +2587,7 @@
     "references": [
       "DOJ-4007 PR-2/PR-3 cross-ref fixup (2026-05-10) — bug that motivated this rule"
     ],
-    "message": "WARN: bash mutation command (git commit/push/mv/rm/reset/merge/revert,\nsed -i, or gh pr create/merge/edit) detected without a leading\n`cd /<path>` prefix.\n\nPer feedback_cd_between_worktrees.md: when working across multiple\nparallel git worktrees in the same session, EVERY bash invocation that\ntouches a specific worktree MUST start with explicit\n`cd /full/path/to/worktree && ...`.\n\nBug pattern this prevents (real, 2026-05-10):\n- Two parallel worktrees for two PRs (PR-2 + PR-3 of same repo).\n- First worktree's sed + commit + push: correct (cwd was PR-2).\n- Second worktree's sed + commit + push: missing cd → still in PR-2 cwd\n  → commit landed on PR-2 branch instead of PR-3 branch.\n- Required revert on PR-2 + correct re-apply on PR-3. Confused commit\n  history visible to reviewers.\n\nIf the command operates on absolute paths or doesn't need cwd context,\nor you've intentionally verified cwd via `pwd` immediately before,\nadd \"# hook-bypass: cd-worktree-rule\" to acknowledge.\n",
+    "message": "WARN: bash mutation command (git commit/push/mv/rm/reset/merge/revert,\nsed -i, or gh pr create/merge/edit) detected without a leading\n`cd /<path>` prefix.\n\nPer feedback_cd_between_worktrees.md: when working across multiple\nparallel git worktrees in the same session, EVERY bash invocation that\ntouches a specific worktree MUST start with explicit\n`cd /full/path/to/worktree && ...`.\n\nBug pattern this prevents (real, 2026-05-10):\n- Two parallel worktrees for two PRs (PR-2 + PR-3 of same repo).\n- First worktree's sed + commit + push: correct (cwd was PR-2).\n- Second worktree's sed + commit + push: missing cd → still in PR-2 cwd\n  → commit landed on PR-2 branch instead of PR-3 branch.\n- Required revert on PR-2 + correct re-apply on PR-3. Confused commit\n  history visible to reviewers.\n\nThe cheapest fix is to prefix the command with the absolute path you\nmean. If you have already verified cwd with `pwd` immediately before,\nprefixing it anyway costs nothing and survives the next turn.\n",
     "tests": [
       {
         "name": "warns-on-git-commit-no-cd",
@@ -2747,7 +2827,7 @@
       "Sister hook in dojo-os: .claude/hooks/post-write-version-readme-sync.sh",
       "make-no-mistakes-toolkit PR #21 — visible README version + reconstructed CHANGELOG"
     ],
-    "message": "WARN: a version manifest (package.json / plugin.json / marketplace.json)\nis being written with a \"version\": \"X.Y.Z\" field, but this hook cannot\nsee whether README.md and CHANGELOG.md were updated in the same change.\n\nWhen you bump the version in any manifest, also update in the same PR:\n  1. README.md — the \"Version: X.Y.Z\" line at the top\n  2. CHANGELOG.md — add a new entry under ## [X.Y.Z] - YYYY-MM-DD\n\nWhy this rule exists (DOJ-4064 three-layer drift thesis):\n- The repo shipped 1.1.0 → 1.14.0 with NO visible version anywhere a\n  human would look (README, CHANGELOG, or git tags). PR #21 closed that\n  gap by reconstructing the CHANGELOG and adding a header version line.\n- Without this rule, the same drift will reappear on the next bump.\n- Defense-in-depth: the dojo-os repo has a sister PostToolUse hook\n  (.claude/hooks/post-write-version-readme-sync.sh) that catches the\n  same drift locally even if this toolkit isn't installed.\n\nSuggested workflow:\n  bump version in manifest(s) → update README.md \"Version: ...\" line →\n  append CHANGELOG.md entry → commit all four files together.\n\nIf you're intentionally splitting the bump from the README/CHANGELOG\nupdate (e.g., bumping a vendored sub-manifest's version that isn't user-\nvisible), add \"# hook-bypass: version-readme-changelog-sync\" inline in\na comment near the version field or pass it on the Write call.\n",
+    "message": "WARN: a version manifest (package.json / plugin.json / marketplace.json)\nis being written with a \"version\": \"X.Y.Z\" field, but this hook cannot\nsee whether README.md and CHANGELOG.md were updated in the same change.\n\nWhen you bump the version in any manifest, also update in the same PR:\n  1. README.md — the \"Version: X.Y.Z\" line at the top\n  2. CHANGELOG.md — add a new entry under ## [X.Y.Z] - YYYY-MM-DD\n\nWhy this rule exists (DOJ-4064 three-layer drift thesis):\n- The repo shipped 1.1.0 → 1.14.0 with NO visible version anywhere a\n  human would look (README, CHANGELOG, or git tags). PR #21 closed that\n  gap by reconstructing the CHANGELOG and adding a header version line.\n- Without this rule, the same drift will reappear on the next bump.\n- Defense-in-depth: the dojo-os repo has a sister PostToolUse hook\n  (.claude/hooks/post-write-version-readme-sync.sh) that catches the\n  same drift locally even if this toolkit isn't installed.\n\nSuggested workflow:\n  bump version in manifest(s) → update README.md \"Version: ...\" line →\n  append CHANGELOG.md entry → commit all four files together.\n\nSplitting the bump from the README/CHANGELOG update is only defensible\nfor a vendored sub-manifest whose version no human ever reads. If that\nis what this is, say which manifest and why in the PR body.\n",
     "tests": [
       {
         "name": "warns-on-package-json-version-bump",
@@ -2900,7 +2980,7 @@
       "feedback_tail_with_desc_ordering.md — sister rule on DESC|tail bug",
       "CIV-728 PR #114 forensic 2026-05-25 — stale 3/5 review picked over 5/5 HEAD review"
     ],
-    "message": "WARN: Bash command extracts Greptile review state with a chronology-based\npattern (created_at / head -N / tail -N / capture(.../commit/...)).\n\nGreptile App on GitHub EDITS the same review comment in-place on each\nre-review. As a result:\n  - comment.created_at is FROZEN at original posting; it DOES NOT\n    change when Greptile re-analyzes a new commit.\n  - comment.updated_at IS what moves with each re-review.\n  - The \"<sub>Last reviewed commit: ...(commit/HASH)</sub>\" footer in\n    the body is the authoritative source for \"which commit this review\n    is about\" — NOT the first /commit/ URL captured anywhere in the\n    body (which is often a permalink quoted inside a finding).\n\nUse this pattern instead (copy-paste-able):\n\n  HEAD=$(gh pr view <N> --json headRefOid --jq '.headRefOid')\n  export SHORT=${HEAD:0:10}\n  gh api \"repos/<owner>/<repo>/issues/<N>/comments\" --jq '\n    [.[] | select(.user.login | test(\"greptile\";\"i\")) | {\n      updated: .updated_at,\n      commit: ((.body | split(\"Last reviewed commit:\")[1] // \"\" |\n                split(\"commit/\")[1] // \"\" | split(\")\")[0])[0:10]),\n      score: ((.body | capture(\"<h3>Confidence Score: (?<s>[0-9]/5)</h3>\").s) // \"?\")\n    }] | map(select(.commit == env.SHORT)) | sort_by(.updated) | last'\n\nThis:\n  1. Pulls the PR's actual HEAD SHA up front.\n  2. Filters Greptile comments to ONLY those whose \"Last reviewed\n     commit:\" footer matches HEAD (so a stale older review can't win).\n  3. Among the matching reviews, picks the latest by updated_at.\n\nPer feedback_greptile_match_head_not_chronology.md: out-of-order parallel\nre-runs make creation order misleading. Per feedback_tail_with_desc_\nordering.md: same failure mode (trust an implicit order without\nvalidating it).\n\nBypass marker (greptile-extraction-acknowledged) ONLY for legitimate\ncases (e.g., you explicitly WANT the creation order to audit posting\ncadence, not the latest state).\n",
+    "message": "WARN: Bash command extracts Greptile review state with a chronology-based\npattern (created_at / head -N / tail -N / capture(.../commit/...)).\n\nGreptile App on GitHub EDITS the same review comment in-place on each\nre-review. As a result:\n  - comment.created_at is FROZEN at original posting; it DOES NOT\n    change when Greptile re-analyzes a new commit.\n  - comment.updated_at IS what moves with each re-review.\n  - The \"<sub>Last reviewed commit: ...(commit/HASH)</sub>\" footer in\n    the body is the authoritative source for \"which commit this review\n    is about\" — NOT the first /commit/ URL captured anywhere in the\n    body (which is often a permalink quoted inside a finding).\n\nUse this pattern instead (copy-paste-able):\n\n  HEAD=$(gh pr view <N> --json headRefOid --jq '.headRefOid')\n  export SHORT=${HEAD:0:10}\n  gh api \"repos/<owner>/<repo>/issues/<N>/comments\" --jq '\n    [.[] | select(.user.login | test(\"greptile\";\"i\")) | {\n      updated: .updated_at,\n      commit: ((.body | split(\"Last reviewed commit:\")[1] // \"\" |\n                split(\"commit/\")[1] // \"\" | split(\")\")[0])[0:10]),\n      score: ((.body | capture(\"<h3>Confidence Score: (?<s>[0-9]/5)</h3>\").s) // \"?\")\n    }] | map(select(.commit == env.SHORT)) | sort_by(.updated) | last'\n\nThis:\n  1. Pulls the PR's actual HEAD SHA up front.\n  2. Filters Greptile comments to ONLY those whose \"Last reviewed\n     commit:\" footer matches HEAD (so a stale older review can't win).\n  3. Among the matching reviews, picks the latest by updated_at.\n\nPer feedback_greptile_match_head_not_chronology.md: out-of-order parallel\nre-runs make creation order misleading. Per feedback_tail_with_desc_\nordering.md: same failure mode (trust an implicit order without\nvalidating it).\n\nCreation order is the right question for exactly one thing — auditing\nposting cadence. If that is not what you are doing, it is the wrong\nquestion.\n",
     "tests": [
       {
         "name": "warns-on-sort-by-created-at-greptile-comments",
@@ -3010,7 +3090,7 @@
     "bypass_marker": "db-mutation-rule",
     "disable_if_repo_file": ".no-make-no-mistakes-db-mutation",
     "memory_ref": "feedback_scripts_not_db.md",
-    "message": "BLOCKED: inline mysql / mysqldump DB mutation detected.\n\nPer feedback_scripts_not_db.md: scripts-in-the-repo, not inline.\nMove the SQL into a versioned file under scripts/ or bin/ and invoke\nthat script. The script wrapper makes the change reviewable in git,\nre-runnable across environments, and auditable after the fact.\n\nAllowed patterns:\n  - SELECT / SHOW / DESCRIBE / EXPLAIN — read-only is fine inline\n  - `./scripts/<name>.sh` / `bash scripts/<name>.sh` — versioned wrapper\n  - `# hook-bypass: db-mutation-rule` appended to the command for an\n    explicitly-acknowledged one-shot\n\nPer-repo escape hatch: `touch .no-make-no-mistakes-db-mutation` at the\nrepo root if the entire repo's job is inline DB work.\n",
+    "message": "BLOCKED: inline mysql / mysqldump DB mutation detected.\n\nPer feedback_scripts_not_db.md: scripts-in-the-repo, not inline.\nMove the SQL into a versioned file under scripts/ or bin/ and invoke\nthat script. The script wrapper makes the change reviewable in git,\nre-runnable across environments, and auditable after the fact.\n\nAllowed patterns:\n  - SELECT / SHOW / DESCRIBE / EXPLAIN — read-only is fine inline\n  - `./scripts/<name>.sh` / `bash scripts/<name>.sh` — versioned wrapper\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-mysql-e-update",
@@ -3152,7 +3232,7 @@
     "bypass_marker": "db-mutation-rule",
     "disable_if_repo_file": ".no-make-no-mistakes-db-mutation",
     "memory_ref": "feedback_scripts_not_db.md",
-    "message": "BLOCKED: inline psql mutation or pg_restore detected.\n\nPer feedback_scripts_not_db.md: schema and data changes belong in a\nversioned migration (supabase/migrations/<ts>_<slug>.sql or your\nproject's equivalent), not in an ad-hoc `psql -c` one-liner.\n\nFor pg_restore: load the dump from a committed script that documents\ntarget DB, dump version, and the rollback plan — never from a raw\nshell invocation that exists only in the agent's transient history.\n\nSELECT / SHOW / EXPLAIN / DESCRIBE are still allowed inline.\n\nBypass with `# hook-bypass: db-mutation-rule` after explicit team\napproval, or drop `.no-make-no-mistakes-db-mutation` at the repo root.\n",
+    "message": "BLOCKED: inline psql mutation or pg_restore detected.\n\nPer feedback_scripts_not_db.md: schema and data changes belong in a\nversioned migration (supabase/migrations/<ts>_<slug>.sql or your\nproject's equivalent), not in an ad-hoc `psql -c` one-liner.\n\nFor pg_restore: load the dump from a committed script that documents\ntarget DB, dump version, and the rollback plan — never from a raw\nshell invocation that exists only in the agent's transient history.\n\nSELECT / SHOW / EXPLAIN / DESCRIBE are still allowed inline.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-psql-c-update",
@@ -3276,7 +3356,7 @@
     "bypass_marker": "db-mutation-rule",
     "disable_if_repo_file": ".no-make-no-mistakes-db-mutation",
     "memory_ref": "feedback_scripts_not_db.md",
-    "message": "BLOCKED: inline sqlite3 DB mutation detected.\n\nEven for local SQLite databases, drift between dev machines is a\nreal cost — when one teammate's local DB has the manual change and\nothers' don't, debugging session reproduction degrades silently.\nMove the SQL into scripts/ and commit it.\n\nSELECT / EXPLAIN remain allowed inline. The bypass marker is\n`db-mutation-rule`. Per-repo opt-out:\n`touch .no-make-no-mistakes-db-mutation` at the root.\n",
+    "message": "BLOCKED: inline sqlite3 DB mutation detected.\n\nEven for local SQLite databases, drift between dev machines is a\nreal cost — when one teammate's local DB has the manual change and\nothers' don't, debugging session reproduction degrades silently.\nMove the SQL into scripts/ and commit it.\n\nSELECT / EXPLAIN remain allowed inline.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-sqlite3-update",
@@ -3363,7 +3443,7 @@
     "bypass_marker": "db-mutation-rule",
     "disable_if_repo_file": ".no-make-no-mistakes-db-mutation",
     "memory_ref": "feedback_scripts_not_db.md",
-    "message": "BLOCKED: inline mongo / mongosh / mongorestore mutation detected.\n\nPer feedback_scripts_not_db.md, mongo data changes belong in a\nversioned migration runner script — never in a transient `--eval`\none-liner. The bypass marker is `db-mutation-rule`; the per-repo\nescape hatch is `.no-make-no-mistakes-db-mutation` at the root.\n\nRead methods (.find, .findOne, .aggregate, .countDocuments, etc.)\nremain allowed inline.\n",
+    "message": "BLOCKED: inline mongo / mongosh / mongorestore mutation detected.\n\nPer feedback_scripts_not_db.md, mongo data changes belong in a\nversioned migration runner script — never in a transient `--eval`\none-liner.\n\nRead methods (.find, .findOne, .aggregate, .countDocuments, etc.)\nremain allowed inline.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-mongo-eval-update",
@@ -3496,7 +3576,7 @@
     "bypass_marker": "db-mutation-rule",
     "disable_if_repo_file": ".no-make-no-mistakes-db-mutation",
     "memory_ref": "feedback_scripts_not_db.md",
-    "message": "BLOCKED: inline redis-cli mutation detected.\n\nEven in a cache, manual one-liners create cross-env drift: the value\nyou set is visible to your machine only until eviction, and other\nengineers cannot reproduce. Use a script under scripts/ or bin/.\n\nRead verbs (GET, MGET, HGET, KEYS, SCAN, INFO, PING, EXISTS, TYPE,\nTTL, LLEN, SCARD, ZRANGE, SMEMBERS, ...) remain allowed inline.\n\nBypass marker: `db-mutation-rule`. Per-repo opt-out:\n`touch .no-make-no-mistakes-db-mutation` at the root.\n",
+    "message": "BLOCKED: inline redis-cli mutation detected.\n\nEven in a cache, manual one-liners create cross-env drift: the value\nyou set is visible to your machine only until eviction, and other\nengineers cannot reproduce. Use a script under scripts/ or bin/.\n\nRead verbs (GET, MGET, HGET, KEYS, SCAN, INFO, PING, EXISTS, TYPE,\nTTL, LLEN, SCARD, ZRANGE, SMEMBERS, ...) remain allowed inline.\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-redis-cli-set",
@@ -3614,7 +3694,7 @@
     "references": [
       "feedback_never_touch_prod_without_approval.md (production guardrail)"
     ],
-    "message": "BLOCKED: inline `gcloud sql import` / `gcloud sql export` detected.\n\nImports overwrite target DB state. Exports against production cost\nIOPS and (when carrying PII) violate the data-handling guidelines.\nBoth belong in a versioned script that documents:\n  - source / destination instance IDs (PROD vs STAGING)\n  - dump version (timestamped GCS URI)\n  - PII-handling approval if any\n  - rollback procedure\n\nBypass marker: `db-mutation-rule`. Per-repo opt-out:\n`touch .no-make-no-mistakes-db-mutation` at the root.\n",
+    "message": "BLOCKED: inline `gcloud sql import` / `gcloud sql export` detected.\n\nImports overwrite target DB state. Exports against production cost\nIOPS and (when carrying PII) violate the data-handling guidelines.\nBoth belong in a versioned script that documents:\n  - source / destination instance IDs (PROD vs STAGING)\n  - dump version (timestamped GCS URI)\n  - PII-handling approval if any\n  - rollback procedure\n\nA block is a finding. Report it upward rather than routing around it.\n",
     "tests": [
       {
         "name": "blocks-gcloud-sql-import-sql",
@@ -3783,6 +3863,114 @@
         "input": {
           "tool_input": {
             "command": "gcloud sql import sql my-instance gs://backups/dump.sql --database=mydb # hook-bypass: db-mutation-rule"
+          }
+        },
+        "expected_exit": 0
+      }
+    ]
+  },
+  {
+    "id": "discard-stderr",
+    "description": "Block a command that routes stderr to /dev/null",
+    "applies_to": [
+      "Bash"
+    ],
+    "match": [
+      {
+        "field": "command",
+        "pattern": "(2>>?[[:space:]]*/dev/null|&>>?[[:space:]]*/dev/null|>&[[:space:]]*/dev/null|[^0-9&]1?>[[:space:]]*/dev/null[[:space:]]+2>&1)"
+      },
+      {
+        "field": "command",
+        "not_pattern": "['\\\"]2>>?[[:space:]]*/dev/null"
+      }
+    ],
+    "action": "block",
+    "bypass_marker": null,
+    "memory_ref": "feedback_never_redirect_errors_to_devnull.md",
+    "references": [
+      "dojo-os CLAUDE.md non-negotiable 24",
+      "DOJ-6391"
+    ],
+    "message": "BLOCKED: this command discards stderr.\n\nA failing command with its stderr discarded is INDISTINGUISHABLE from a\nsucceeding one that printed nothing. The empty result then reads as\n\"none found\" rather than \"it errored\".\n\nMeasured, 2026-07-31: `gh api --jq --arg ... 2>/dev/null` -- gh rejects that\nflag combination -- produced an empty file that was reported to the team as\n\"0 red PRs\". Sixteen of 41 were red, twelve on TypeScript.\n\nKeep stderr and put it somewhere:\n    cmd 2>>\"$logfile\"           # separate file, exit code preserved\n    cmd 2>&1 | tee \"$logfile\"   # interleaved, readable now and later\n    out=$(cmd 2>&1); rc=$?      # captured, inspected, still branchable\n\nOnly stdout is noisy? Already allowed, unchanged:\n    cmd >/dev/null              # stderr still reaches you\n    cmd 2>&1 >/dev/null         # stderr to the ORIGINAL stdout\n    command -v x >/dev/null     # the existence probe still passes\n\nNo bypass marker: the alternatives above cover every legitimate case, and\na gate whose refusal hands you the way around it is not a gate (DOJ-6247).\n",
+    "tests": [
+      {
+        "name": "blocks-bare-2-dev-null",
+        "input": {
+          "tool_input": {
+            "command": "gh api foo 2>/dev/null"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-append-form",
+        "input": {
+          "tool_input": {
+            "command": "node x.mjs 2>> /dev/null"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-ordered-both-streams",
+        "input": {
+          "tool_input": {
+            "command": "ls -la >/dev/null 2>&1"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "blocks-ampersand-form",
+        "input": {
+          "tool_input": {
+            "command": "find . -name x &>/dev/null"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-stdout-only",
+        "input": {
+          "tool_input": {
+            "command": "ls -la >/dev/null"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-existence-probe",
+        "input": {
+          "tool_input": {
+            "command": "command -v jq >/dev/null"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-reversed-order-stderr-survives",
+        "input": {
+          "tool_input": {
+            "command": "cmd 2>&1 >/dev/null"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-stderr-to-a-file",
+        "input": {
+          "tool_input": {
+            "command": "node s.mjs 2>>\"$log\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-single-quoted-mention",
+        "input": {
+          "tool_input": {
+            "command": "git grep '2>/dev/null' -- scripts/"
           }
         },
         "expected_exit": 0

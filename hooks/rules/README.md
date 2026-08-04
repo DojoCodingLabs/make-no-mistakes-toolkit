@@ -92,6 +92,30 @@ inside the command/content itself, not as silent flags.
 
 `bypass_marker: null` (or omitted) means the rule cannot be bypassed.
 
+**The `message` must never name the marker (v1.37.0, DOJ-6433).** A refusal
+that quotes its own bypass hands you the password: reading the block *is* the
+authorization, and typing the marker becomes a reflex instead of a decision.
+That is the DOJ-6247 shape — dojo-os's `pre-bash-block-main-target.sh`
+accepted `DOJO_HOTFIX_TO_MAIN=1` **and** printed that literal in its own
+refusal, and two agents filed false P0-hotfix claims through it.
+
+Write the message so it says what was blocked, why, and what to do instead,
+and close it with:
+
+```
+A block is a finding. Report it upward rather than routing around it.
+```
+
+The same holds for `disable_if_repo_file` — a sentinel named in a refusal is
+the same door one level up. Both are documented in the top-level `README.md`,
+which is a file a human opens on purpose.
+
+Enforced by three generic assertions in `hooks/test-hooks.sh` (`Running
+manifest invariants…`), which hold over every rule rather than case by case:
+the message may not contain the rule's own `bypass_marker`, may not contain
+its own `disable_if_repo_file`, and may not contain the literal `hook-bypass`
+in any form. The word "bypass" in ordinary prose is fine.
+
 ### Per-repo escape hatch (`disable_if_repo_file`)
 
 For rules that are too aggressive in specific repos (e.g., a data-migration
