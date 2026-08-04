@@ -102,7 +102,13 @@ function parseArgs(argv: string[]): ParsedArgs {
   return parsed;
 }
 
-function printHumanResult(result: Record<string, unknown>): void {
+// `object`, not `Record<string, unknown>`. The body only enumerates with
+// `Object.entries` and never indexes by an arbitrary key, so the index
+// signature was demanded and unused — and no interface in `src/lib/` declares
+// one. That mismatch is what produced the `as unknown as` at the doctor call
+// site: a cast that silenced the symptom at one of four call sites and left the
+// other three failing `tsc`.
+function printHumanResult(result: object): void {
   const lines: string[] = [];
 
   for (const [key, value] of Object.entries(result)) {
@@ -178,7 +184,7 @@ async function main(): Promise<void> {
       if (args.json) {
         process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
       } else {
-        printHumanResult(result as unknown as Record<string, unknown>);
+        printHumanResult(result);
       }
 
       if (!result.healthy) {
