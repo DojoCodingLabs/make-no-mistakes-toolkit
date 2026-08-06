@@ -73,7 +73,7 @@ After the audit(s), it runs a **premortem** on the aggregated remediation plan, 
 
 ## What's Inside
 
-### Commands (38)
+### Commands (40)
 
 Deliberate actions you invoke explicitly.
 
@@ -82,6 +82,7 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:implement <ISSUE-ID>`](commands/implement.md) | Disciplined execution of Linear issues — worktree isolation, all-reviewer loops, CI verification, clean merges |
 | [`/make-no-mistakes:prioritize <pillar-slug>`](commands/prioritize.md) | MoSCoW + RICE-adapted applied to a pillar's Linear issues, traceable to its PIBER+IDCF sub-spike and the latest vision audit. Outputs priority report + description-footer per issue + snapshot comment on the sub-spike. Chain: `product-vision-audit → prioritize → spike-recommend → implement` |
 | [`/make-no-mistakes:rebase <repo>`](commands/rebase.md) | Team release sync — rebase all branches, auto-merge ready PRs, health report |
+| [`/make-no-mistakes:merge-advisor [<base>]`](commands/merge-advisor.md) | The ORDER a set of open PRs must be merged in so each is still mergeable at its turn. "Mergeable" is a property of the pair (PR, base-it-lands-on), not of the PR — so ten green PRs is not ten merges. Read-only; prints the plan, merges nothing |
 | [`/make-no-mistakes:linear-projects-setup`](commands/linear-projects-setup.md) | Bootstrap Linear workspace with full label taxonomy, projects, and integrations |
 | [`/make-no-mistakes:e2e-test-builder <source>`](commands/e2e-test-builder.md) | Generate a TestSprite-compatible `test-suite.json` from docs or PRDs |
 | [`/make-no-mistakes:e2e-test-runner [filter]`](commands/e2e-test-runner.md) | Execute E2E tests from `test-suite.json` with runner selection and reporting |
@@ -100,6 +101,7 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:handover-pr <repo> [pr#] <@person>`](commands/handover-pr.md) | Package your open PR(s) / branch work into a structured handover and post it to a Slack thread for a teammate to pick up. The mirror of `/takeover-pr` |
 | [`/make-no-mistakes:takeover-pr <repo> [pr#]`](commands/takeover-pr.md) | Pick a random open PR from a teammate, check it out, review it, and take over the work |
 | [`/make-no-mistakes:secret-input`](commands/secret-input.md) | Stage a secret/password via OS-native GUI dialog (Linux zenity/kdialog/pinentry, macOS osascript, Windows Get-Credential). The value never appears in the conversation log or terminal history. Cross-platform via `.sh` (Linux/macOS/WSL/Git Bash) + `.ps1` (native Windows) |
+| [`/make-no-mistakes:secret-generate`](commands/secret-generate.md) | Mint a random secret with a CSPRNG and stage it, via a password-generator GUI (length slider, character-class toggles, regenerate). The value never reaches stdout — only length, alphabet and entropy do. `--fingerprint` prints a truncated SHA-256 so two stores can be compared without either revealing its value |
 | [`/make-no-mistakes:secret-use ENVVAR -- <cmd>`](commands/secret-use.md) | Run one command with the staged secret loaded as an environment variable. Env var lives only inside the consuming process and is unset on completion |
 | [`/make-no-mistakes:secret-clear`](commands/secret-clear.md) | Wipe the staged secret (shred/rm-P/random-overwrite per OS). Idempotent — safe to call when no secret is staged. Always run when done with credentials |
 | [`/make-no-mistakes:audit [path]`](commands/audit.md) | **Meta-dispatcher** — runs the full repo-health sweep (all six families `SCH→CDC→DDD→ARC→STR→ENF` via `audit-engine`) and delegates the component layer to `atomic-design-toolkit` when installed; aggregates one report + emits cure-scaffold proposals per `schemas/repo-health-rules.schema.json` |
@@ -118,7 +120,7 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:parallelize <work>`](commands/parallelize.md) | Decompose a body of work and fan it out across named, worktree-isolated agents. Opens with a mandatory capability gate that reads the agent-teams flag **and** the live tool surface (a retired `TeamCreate` is the healthy case, never an abort), splits streams by *who can execute them* as well as by topic, and converges the results into one report |
 | [`/make-no-mistakes:disk-cleanup-merged-worktrees [repo]`](commands/disk-cleanup-merged-worktrees.md) | Reclaim disk from git worktrees, refusing every one that still holds work. Dry-run by default; reclaims `node_modules` from **live** worktrees (reversible with one install) and removes merged worktrees only on `--worktrees`. Refuses the main checkout, uncommitted changes, **unpushed commits**, locks, and anything unmerged — where "merged" is measured three ways because ancestry alone reports *not merged* for every squash merge |
 
-### Skills (12)
+### Skills (13)
 
 Auto-activate by context — you don't need to remember the command name.
 
@@ -130,6 +132,7 @@ Auto-activate by context — you don't need to remember the command name.
 | [`review-open-prs`](skills/review-open-prs/SKILL.md) | Ask about open PRs, merge readiness, or Greptile scores |
 | [`review-active-issues`](skills/review-active-issues/SKILL.md) | Ask about your Linear issues, backlog, or issue status |
 | [`sync-advisor`](skills/sync-advisor/SKILL.md) | Ask "am I up to date", "is my checkout stale", or mention syncing after a release. Measures the drift with six read-only git predicates, names which **governed** files changed, and routes to the smallest fix — `git pull`, a single-branch rebase, or `/make-no-mistakes:rebase`. Never syncs anything itself |
+| [`merge-advisor`](skills/merge-advisor/SKILL.md) | Ask "in what order do I merge these", "which PR goes first", or "will merging this break the others". Computes the merge ORDER for a SET of PRs with seven read-only predicates — pairwise file collisions, **latent conflicts that only appear after an earlier PR lands**, and artifacts anchored to a base SHA that a squash merge orphans on every open PR at once. Ties break by fragility, not importance. Never merges anything |
 | [`audit-engine`](skills/audit-engine/SKILL.md) | Run any of the six repo-health audits (schema-drift, contract-drift, ddd, explicit-architecture, strangler, enforcement-hooks). Hybrid LLM-first detection + deterministic verification + cure-mapping |
 | [`domain-driven-advisor`](skills/domain-driven-advisor/SKILL.md) | Ask "which audit do I need?" / "where do I start with repo health?" — routes you to the right audit(s) and runs a premortem |
 | [`premortem`](skills/premortem/SKILL.md) | Say "premortem this", "what could kill this", "stress test this plan", "what am I missing", or "find the blind spots" on a plan/launch/decision |

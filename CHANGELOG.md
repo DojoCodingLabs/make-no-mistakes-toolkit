@@ -18,10 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-> No version bump in this entry, deliberately. `andres/ban-discard-stderr`
-> (v1.40.0) is open and unmerged on `main` at 1.38.0, so picking a number here
-> either collides with it or leaves a hole. Whichever lands second takes the
-> next number.
+> No version bump in this entry, deliberately. `main` is at **1.43.0** and this
+> branch carried 1.41.0; the merge takes main's version rather than guessing a
+> number, so whichever change lands next takes it. Measured 2026-08-06:
+> `git show origin/main:package.json | grep version` -> 1.43.0.
 
 ### Added
 - **`/make-no-mistakes:disk-cleanup-merged-worktrees`** + the `worktree-cleanup`
@@ -63,10 +63,135 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   5 tests red.
 
 ### Fixed
-- **README skill count and table.** The header read `Skills (10)` and the table
-  had 10 rows while `skills/` shipped 11 — `resolve-open-questions` had no row.
-  Both now read 12, matching the directory. Incidental to the above, and noted
-  rather than folded in silently.
+- **README and marketplace counts.** The README header read `Skills (10)` with 10
+  table rows while `skills/` shipped 11 — `resolve-open-questions` had no row.
+  After merging `main` the tables carry 40 command rows and 13 skill rows while
+  the headers still read 38 and 12, and `marketplace.json` still described
+  "38 commands, 12 auto-activating skills". All four now read the measured
+  values — 40 and 13, from `ls commands/*.md | wc -l` and
+  `ls skills/*/SKILL.md | wc -l` on this tree. Incidental to the above, and
+  noted rather than folded in silently.
+
+## [1.43.0] - 2026-08-03
+
+### Added
+- **`/secret-generate` — the CSPRNG half of the secret flow.** The toolkit had
+  three secret commands and they assumed the value already existed somewhere: a
+  human types it (`/secret-input`), one command consumes it (`/secret-use`),
+  `shred` removes it (`/secret-clear`). Nothing MADE one.
+
+  The gap is not cosmetic, because the obvious substitute defeats the other
+  three. `openssl rand -base64 32` prints the value on stdout, and when an agent
+  runs it that stdout is in the agent's context and in the session transcript on
+  disk — a place the value cannot be recalled from. The whole reason
+  `/secret-input` reaches for an OS-native dialog is to keep a typed secret out
+  of exactly those places; a generator that prints hands that property back.
+
+  So the invariant is structural rather than a matter of care: **the generated
+  value never goes to stdout.** It is written STRAIGHT into the same staged file
+  `/secret-input` uses, never assigned to a variable at the script's top scope,
+  and shown only in a GUI window a human is looking at. stdout carries length,
+  alphabet size and entropy — enough to audit a run without being a disclosure.
+  A negative control is part of the change: with a leak deliberately added, the
+  check finds the value in stdout; with the real script it does not.
+
+  **Rejection sampling, not `byte % n`.** 256 is not a multiple of most alphabet
+  sizes, so the modulo makes the first `256 mod n` symbols more likely — for the
+  89-symbol default, 78 of them at about 1.35x. Small, real, and avoidable for
+  the price of a loop. `/dev/urandom` throughout, never `$RANDOM`, which is a
+  15-bit generator seeded from pid and time.
+
+  **The symbol class excludes `'`, `"`, `` ` `` and `\`** on purpose. A generated
+  secret gets pasted into shell one-liners, JSON and YAML, and a backtick inside
+  a double-quoted shell string is command substitution. A generator that can emit
+  a value its consumer cannot safely carry fails at 3am, in a way that looks like
+  the consumer's bug.
+
+  **`--fingerprint` answers the question a secret store cannot.** A store will
+  not read a value back — that is the point of it — so after loading the same
+  value into two of them there is no way to confirm they match. A truncated
+  SHA-256 settles it with neither end printing anything sensitive, the same move
+  as an SSH key fingerprint. It is labelled in the code as what it is: a
+  comparison handle, NOT encryption and NOT protection. And the one case where it
+  is unsafe is named rather than left implicit — for a human-chosen password the
+  hash IS dictionary-attackable, which is precisely what a salt exists for. It is
+  safe here only because the input came from a CSPRNG.
+
+  Also carries the control `/secret-input` already had and `gh secret set` does
+  not: it refuses to stage an empty value. An empty staged secret is
+  indistinguishable from a good one to every consumer downstream, and that is how
+  an empty value reaches a store and then reads as configured.
+
+  Linux/macOS/WSL/Git Bash via bash; the GUI needs `zenity` and says so rather
+  than silently falling back to a different alphabet. There is no PowerShell twin
+  yet, so native Windows without bash has no `/secret-generate` — stated in the
+  command doc rather than discovered.
+
+## [1.42.0] - 2026-08-02
+
+### Added
+- **`merge-advisor` — the order, not the status.** A pile of PRs is open against
+  one base, and every one of them was measured green against a base that no
+  longer exists by the time its turn comes. The toolkit had two skills looking at
+  PRs and neither answered ordering: `review-open-prs` reads one PR at a time,
+  `sync-advisor` reads one branch against its base. Nothing read the **set**.
+
+  The distinction is not bookkeeping. **"Mergeable" is not a property of a PR; it
+  is a property of the pair (PR, base-it-will-land-on).** A per-PR report reads
+  every row against today's base, and the moment the first merge lands, every
+  other row describes a base that is gone. Ten green PRs is not ten merges.
+
+  **Seven read-only predicates**, of which two cannot be produced by any per-PR
+  view. Predicate 4 intersects the changed-file sets pairwise and reports the
+  overlap **by filename** rather than as a count, because "three files overlap"
+  is unactionable while naming `lefthook.yml` tells the reader which of the two
+  is the cheap rebase. Predicate 5 is the one that matters: `git merge-tree`
+  between two PR heads, not between a head and the base — **the dangerous
+  conflict is not the one blocking a PR today, it is the one that appears only
+  after an earlier PR lands, in a PR that is green right now.** That pair is
+  invisible to `gh pr list`, to every status report, and to both authors.
+
+  **Predicate 6 generalises typecheck-baseline drift** without hardcoding any
+  project's artifact. Some checked-in files are derived from the base and carry
+  the base SHA they were derived from; when a squash merge rewrites the base,
+  that anchor points at a commit that no longer exists and the artifact breaks on
+  **every open PR at once** — one merge, N failures, none caused by the PR they
+  appear on. The skill discovers such files (`baseSha`, `sourceSha`, `baseline`,
+  `__snapshots__`, lockfiles), then applies the two questions that decide whether
+  one constrains the order: is it touched by more than one open PR, and is it
+  regenerated rather than authored. If no regeneration command exists, that is
+  reported as a defect to file, not a step to improvise.
+
+  **Ties break by fragility, highest first — not by importance**, and that rule
+  ships with its reason because it reads backwards. Fragility is how likely a PR
+  is to stop applying while it waits, approximated by breadth of change times
+  distance behind base. The wide, old PR goes first not because it matters more
+  but because its window is the shortest, and every merge ahead of it narrows
+  that window further. Merging the small clean ones first *feels* like progress
+  and spends the exact resource the large one is running out of.
+
+  Capacity (predicate 7) is measured rather than assumed: idle runners and queue
+  depth from the Actions API, because each merge into the base re-triggers checks
+  on every remaining PR that auto-syncs, and on a FIFO fleet four at once can
+  queue deeper than the fleet drains.
+
+  Three-state discipline throughout. GitHub's `mergeable: UNKNOWN` means *"not
+  computed yet"*, never *"clean"*; reading the PR forces the calculation, so the
+  skill re-reads instead of recording the first answer. A `git merge-tree` exit
+  that is neither 0 nor 1 is `unverifiable`, and an unfetchable PR head is
+  `unverifiable` with its reason — never "clean". Degraded modes are declared
+  rather than hidden: with no `gh` auth it reports collisions from git alone and
+  says the check states are unmeasured; finding no anchored artifacts is reported
+  as a search that ran, because silence reads as "not checked".
+
+  Like `sync-advisor`, it **never acts** — every fix is printed for the user to
+  run — and it never offers a bypass as an option. `--admin`, `--force`, and
+  merging past a check that is red or has not answered are not rows in a menu; if
+  the ordering is blocked, the block is the finding.
+
+  `/make-no-mistakes:merge-advisor [<base>] [--repo <owner/name>] [--only <prs>]`,
+  backed by `skills/merge-advisor/SKILL.md`. Requires only `gh` and `git`; no
+  `linear-setup.json` and no toolkit config.
 
 ## [1.41.0] - 2026-08-02
 
@@ -1038,7 +1163,8 @@ installed caches) but had no representation on `main`; this release lands them.
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.38.0...HEAD
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.43.0...HEAD
+[1.42.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.42.0
 [1.38.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.38.0
 [1.37.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.37.0
 [1.36.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.36.0
