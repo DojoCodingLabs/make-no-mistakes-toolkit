@@ -29,10 +29,27 @@
  *                        A lock means someone or something claimed it.
  *   uncommitted          `git status --porcelain` is non-empty. Untracked files
  *                        count: they are work with no other copy either.
+ *   mid-operation        A merge, rebase, cherry-pick, revert or bisect is
+ *                        STOPPED here. This state lives in the worktree's git
+ *                        dir, NOT in the file list, so it is invisible to every
+ *                        other check — and it does not resolve itself.
  *   unpushed             The branch is AHEAD of its upstream. This is the
  *                        single most likely way to destroy work, because a
  *                        branch that is ahead is not stale — it is unfinished.
  *   not-merged           No merge evidence from any of the three tests below.
+ *
+ * ## Why `mid-operation` is its own check and not a corollary of `uncommitted`
+ *
+ * The intuition is that a stopped merge always leaves conflict markers, so the
+ * dirty check covers it. Measured, on a repository built for the question:
+ *
+ *   two branches add the SAME file with the SAME content. `git merge --no-commit`
+ *   auto-merges cleanly, the resulting tree is byte-identical to HEAD's, and
+ *   `git status --porcelain` returns ZERO lines while `MERGE_HEAD` exists.
+ *
+ * Against that worktree the classifier returned `remove` with an empty findings
+ * list, and `git worktree remove` then took it — exit 0, no output, no refusal
+ * of its own. Git offers no protection here; this check is the protection.
  *
  * ## "Merged" is measured three ways, and the third is the common one
  *
@@ -187,6 +204,19 @@ export function classify(f) {
       `\`git worktree list\` recorded \`${f.recordedBranch}\`, the worktree now reports \`${f.liveBranch}\` — a sibling process re-checked it out`);
     return finalize(findings);
   }
+  // Before `statusFailed` returns, because a stopped operation is a REFUSE and
+  // an unreadable status is only an UNVERIFIABLE — the stronger, more specific
+  // verdict must survive. And before `dirty`, because when both fire the
+  // stopped operation is the EXPLANATION for the dirty files, and a report
+  // that leads with "17 uncommitted changes" sends its reader to `git stash`
+  // when the answer is `git merge --abort`.
+  if (f.midOperationUnmeasurable) {
+    add(UNVERIFIABLE, 'mid-operation-unmeasurable',
+      `cannot read the worktree's git dir to check for a stopped merge/rebase: ${f.midOperationError || 'no stderr captured'} — a check that did not run is not a check that passed`);
+  } else if (f.midOperation) {
+    add(REFUSE, 'mid-operation',
+      `a ${f.midOperation} is stopped here (${f.midOperationEvidence}) — this state lives in the git dir, not in the file list, and it does not resolve itself`);
+  }
   if (f.statusFailed) {
     add(UNVERIFIABLE, 'status-unreadable', `\`git status --porcelain\` failed: ${f.statusError || 'no stderr captured'}`);
     return finalize(findings);
@@ -303,12 +333,55 @@ function lookupPr(repo, branch, index) {
   return merged[0] ?? null;
 }
 
+/**
+ * States a worktree can be STOPPED in, each identified by a path inside that
+ * worktree's own git dir. Ordered most-common first; the first hit wins.
+ *
+ * A linked worktree has its own git dir (`.git/worktrees/<name>`), and these
+ * files live in THAT directory rather than in the shared one — which is why
+ * this must be resolved per worktree and not once for the repository.
+ *
+ * `git status` prints "You are currently ..." for every one of these, but it
+ * prints it to the HUMAN-readable output; `--porcelain`, which is what a
+ * program can parse, says nothing about any of them.
+ */
+const STOPPED_STATES = [
+  { op: 'merge', rel: 'MERGE_HEAD' },
+  { op: 'rebase', rel: 'rebase-merge' },
+  { op: 'rebase', rel: 'rebase-apply' },
+  { op: 'cherry-pick', rel: 'CHERRY_PICK_HEAD' },
+  { op: 'revert', rel: 'REVERT_HEAD' },
+  { op: 'bisect', rel: 'BISECT_LOG' },
+];
+
+/**
+ * Detect a stopped merge/rebase/cherry-pick/revert/bisect in one worktree.
+ *
+ * Returns `{ unmeasurable: true }` when the git dir cannot be resolved. That is
+ * deliberate and is the whole reason this is not one `existsSync` call: if the
+ * git dir is unknown, every probe below returns "absent", and six absent probes
+ * read exactly like a worktree with nothing in progress. An answer that could
+ * not be taken is never the safe answer.
+ */
+export function detectStoppedOperation(worktreePath) {
+  const dir = git(['rev-parse', '--absolute-git-dir'], worktreePath);
+  if (!dir.ok || !dir.stdout) {
+    return { unmeasurable: true, error: dir.stderr || `git rev-parse --absolute-git-dir exited ${dir.code}` };
+  }
+  for (const { op, rel } of STOPPED_STATES) {
+    const full = path.join(dir.stdout, rel);
+    if (existsSync(full)) return { op, evidence: `${rel} exists in ${dir.stdout}` };
+  }
+  return { op: null };
+}
+
 /** Gather every fact `classify()` needs for one worktree. */
 export function measure(repo, entry, bases, prIndex) {
   const f = {
     isMain: entry.isMain, bare: entry.bare, locked: entry.locked, lockReason: entry.lockReason,
     missing: !existsSync(entry.path), prunableReason: entry.prunableReason,
     detached: entry.detached, recordedBranch: entry.branch, liveBranch: null,
+    midOperation: null, midOperationEvidence: '', midOperationUnmeasurable: false, midOperationError: '',
     dirty: false, dirtyCount: 0, statusFailed: false, statusError: '',
     hasUpstream: false, upstream: null, ahead: null,
     base: bases.map((b) => `origin/${b}`).join(', '),
@@ -321,6 +394,12 @@ export function measure(repo, entry, bases, prIndex) {
   const live = git(['rev-parse', '--abbrev-ref', 'HEAD'], entry.path);
   f.liveBranch = live.ok && live.stdout !== 'HEAD' ? live.stdout : null;
   if (f.liveBranch !== null && f.recordedBranch !== null && f.liveBranch !== f.recordedBranch) return f;
+
+  // Measured BEFORE `git status`, so that a worktree whose status is unreadable
+  // still reports the stopped operation it is actually in.
+  const stopped = detectStoppedOperation(entry.path);
+  if (stopped.unmeasurable) { f.midOperationUnmeasurable = true; f.midOperationError = stopped.error; }
+  else if (stopped.op) { f.midOperation = stopped.op; f.midOperationEvidence = stopped.evidence; }
 
   const status = git(['status', '--porcelain'], entry.path);
   if (!status.ok) { f.statusFailed = true; f.statusError = status.stderr; return f; }

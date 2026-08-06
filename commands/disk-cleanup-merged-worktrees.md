@@ -1,5 +1,5 @@
 ---
-description: Reclaim disk from git worktrees — deterministically, and refusing every worktree that still holds work. Dry-run by default; reclaims node_modules from live worktrees, and removes merged worktrees only when asked. Refuses the main checkout, anything uncommitted, anything unpushed, anything locked, and anything it cannot measure. Accepts a repo path and flags as $ARGUMENTS.
+description: Reclaim disk from git worktrees — deterministically, and refusing every worktree that still holds work. Dry-run by default; reclaims node_modules from live worktrees, and removes merged worktrees only when asked. Refuses the main checkout, anything uncommitted, anything with a merge/rebase/cherry-pick stopped in it, anything unpushed, anything locked, and anything it cannot measure. Accepts a repo path and flags as $ARGUMENTS.
 argument-hint: "[repo-path] [--worktrees] [--apply] [--base <branch>] [--force] [--no-gh] [--json]"
 priority: 70
 ---
@@ -42,6 +42,11 @@ Report in this order:
 Section 3 is the one that earns the run. "`feat/x` skipped — 4 commits ahead of
 `origin/feat/x`" is frequently the most useful line in the output, and a report
 that omits it looks like the tool found less than it did.
+
+**Surface any `mid-operation` line first and by name.** A merge, rebase or
+cherry-pick stopped in a worktree does not resolve itself, is invisible in a
+file listing, and is the one refusal that asks the reader to go and *do*
+something (`git merge --abort`, or finish it) rather than merely to know it.
 
 ## Step 3 — Decide the two actions separately, and confirm before either
 

@@ -27,6 +27,7 @@ import {
   UNVERIFIABLE,
   assertRemovableNodeModules,
   classify,
+  detectStoppedOperation,
   findNodeModules,
   humanBytes,
   measure,
@@ -39,6 +40,7 @@ import {
 const clean = {
   isMain: false, bare: false, locked: false, lockReason: '', missing: false,
   prunableReason: '', detached: false, recordedBranch: 'feat/x', liveBranch: 'feat/x',
+  midOperation: null, midOperationEvidence: '', midOperationUnmeasurable: false, midOperationError: '',
   dirty: false, dirtyCount: 0, statusFailed: false, statusError: '',
   hasUpstream: true, upstream: 'origin/feat/x', ahead: 0,
   base: 'origin/develop', mergedBy: 'pr', mergedBase: null, prNumber: 7,
@@ -89,6 +91,41 @@ describe('classify — the refusals, one broken fact at a time', () => {
     expect(reasons(r)).toContain('not-merged');
   });
 
+  it('never a worktree with a merge stopped in it — even when nothing else is wrong', () => {
+    // The single fact broken here is `midOperation`. Everything else says
+    // remove: merged, pushed, unlocked, and `git status --porcelain` EMPTY.
+    // That combination is not hypothetical; it is reproduced against real git
+    // in the integration suite below.
+    const r = classify({ ...clean, midOperation: 'merge', midOperationEvidence: 'MERGE_HEAD exists in /w/.git' });
+    expect(r.verdict).toBe(REFUSE);
+    expect(reasons(r)).toContain('mid-operation');
+    expect(r.findings[0].evidence).toContain('MERGE_HEAD');
+  });
+
+  it('never a worktree with a rebase stopped in it', () => {
+    const r = classify({ ...clean, midOperation: 'rebase', midOperationEvidence: 'rebase-merge exists in /w/.git' });
+    expect(r.verdict).toBe(REFUSE);
+    expect(reasons(r)).toContain('mid-operation');
+  });
+
+  it('POSITIVE CONTROL — a clean worktree produces no mid-operation finding', () => {
+    // Constraint: a guard that fires on everything is not a guard. If this
+    // starts failing, the detector has stopped discriminating and every
+    // negative control above became meaningless at the same moment.
+    expect(reasons(classify(clean))).not.toContain('mid-operation');
+    expect(reasons(classify({ ...clean, dirty: true, dirtyCount: 2 }))).not.toContain('mid-operation');
+    expect(reasons(classify({ ...clean, ahead: 3 }))).not.toContain('mid-operation');
+  });
+
+  it('reports the stopped operation ABOVE the dirty files it caused', () => {
+    // A mid-merge conflict is dirty AND stopped, and the order decides which
+    // command the reader reaches for. Leading with "uncommitted" sends them to
+    // `git stash`; the answer is `git merge --abort` or finishing the merge.
+    const r = classify({ ...clean, midOperation: 'merge', midOperationEvidence: 'MERGE_HEAD', dirty: true, dirtyCount: 17 });
+    expect(r.verdict).toBe(REFUSE);
+    expect(reasons(r)).toEqual(['mid-operation', 'uncommitted']);
+  });
+
   it('reports EVERY applicable reason, not just the first', () => {
     const r = classify({ ...clean, dirty: true, dirtyCount: 9, ahead: 4, mergedBy: null });
     expect(r.verdict).toBe(REFUSE);
@@ -129,6 +166,26 @@ describe('classify — ambiguity is its own verdict and never collapses into rem
     const r = classify({ ...clean, statusFailed: true, statusError: 'index.lock exists' });
     expect(r.verdict).toBe(UNVERIFIABLE);
     expect(reasons(r)).toContain('status-unreadable');
+  });
+
+  it('an unreadable git dir is unverifiable — six absent probes are not "nothing in progress"', () => {
+    // Without this, a git dir that cannot be resolved makes every MERGE_HEAD /
+    // rebase-merge probe return "absent", and absent-because-unknown reads
+    // exactly like absent-because-clean. That is the answer that authorises
+    // deletion, so it must not be reachable by failure.
+    const r = classify({ ...clean, midOperationUnmeasurable: true, midOperationError: 'not a git repository' });
+    expect(r.verdict).toBe(UNVERIFIABLE);
+    expect(reasons(r)).toContain('mid-operation-unmeasurable');
+    expect(r.verdict).not.toBe(REMOVE);
+  });
+
+  it('a stopped operation OUTRANKS an unreadable status — refuse beats unverifiable', () => {
+    const r = classify({
+      ...clean, midOperation: 'rebase', midOperationEvidence: 'rebase-merge',
+      statusFailed: true, statusError: 'index.lock exists',
+    });
+    expect(r.verdict).toBe(REFUSE);
+    expect(reasons(r)).toEqual(['mid-operation', 'status-unreadable']);
   });
 
   it('a missing gitdir is unverifiable, and prune is left to the user', () => {
@@ -312,6 +369,80 @@ function scenario() {
   return { repo, merged, dirty, unpushed };
 }
 
+/**
+ * A repo whose worktree can be stopped mid-merge with a COMPLETELY CLEAN
+ * `git status --porcelain`, plus a branch that conflicts with it on demand.
+ *
+ * The trick is that `feat/a` and `feat/b` add the SAME file with the SAME
+ * content, so merging one into the other auto-merges with no conflict and
+ * produces a tree byte-identical to HEAD's. `--no-commit` then leaves
+ * `MERGE_HEAD` behind with nothing whatsoever in the file list.
+ *
+ * The two commits carry DIFFERENT MESSAGES on purpose. With identical content,
+ * author, parent and message they hash to the SAME commit whenever both land
+ * inside one second — and then `feat/b` IS `feat/a`, the merge reports "already
+ * up to date", and the fixture silently stops testing anything. That is not
+ * hypothetical: it is what this fixture did on its first run, passing one test
+ * and failing three, entirely according to which side of a second boundary the
+ * two commits fell on.
+ *
+ * `feat/c` writes the same path with different content and exists only to make
+ * a rebase or a cherry-pick genuinely conflict.
+ *
+ * `feat/a` and `feat/b` are merged into `develop` and pushed, so every OTHER
+ * check the classifier makes says "remove". Measured against the code before
+ * the `mid-operation` guard existed: verdict `remove`, findings `[]`, and
+ * `git worktree remove` then took the directory with exit 0 and no output.
+ */
+function midOperationScenario() {
+  const remote = path.join(root, 'remote.git');
+  const repo = path.join(root, 'repo');
+  g(['init', '--bare', '-b', 'develop', remote], root);
+  g(['init', '-b', 'develop', repo], root);
+  g(['config', 'user.email', 't@example.com'], repo);
+  g(['config', 'user.name', 'T'], repo);
+  commit(repo, 'README.md');
+  g(['remote', 'add', 'origin', remote], repo);
+  g(['push', '-u', 'origin', 'develop'], repo);
+
+  const branchAdding = (branch: string, body: string, message: string) => {
+    g(['checkout', 'develop'], repo);
+    g(['checkout', '-b', branch], repo);
+    writeFileSync(path.join(repo, 'shared.txt'), body);
+    g(['add', 'shared.txt'], repo);
+    g(['commit', '-m', message], repo);
+  };
+
+  branchAdding('feat/a', 'identical on a and b', 'side a adds shared.txt');
+  g(['push', '-u', 'origin', 'feat/a'], repo);
+  branchAdding('feat/b', 'identical on a and b', 'side b adds the very same file');
+  g(['push', '-u', 'origin', 'feat/b'], repo);
+  branchAdding('feat/c', 'DIFFERENT — this one conflicts', 'side c writes other content');
+
+  g(['checkout', 'develop'], repo);
+  g(['merge', '--no-ff', '-m', 'merge feat/a', 'feat/a'], repo);
+  g(['merge', '--no-ff', '-m', 'merge feat/b', 'feat/b'], repo);
+  g(['push', 'origin', 'develop'], repo);
+
+  // The fixture asserts its own premise. If these ever collapse to one commit
+  // again, every test built on it starts passing for the wrong reason.
+  const sha = (ref: string) => g(['rev-parse', ref], repo).trim();
+  expect(sha('feat/a')).not.toBe(sha('feat/b'));
+
+  const wt = path.join(root, 'wt', 'stopped');
+  g(['worktree', 'add', wt, 'feat/a'], repo);
+  g(['config', 'user.email', 't@example.com'], wt);
+  g(['config', 'user.name', 'T'], wt);
+  g(['fetch', 'origin', '--prune'], repo);
+  return { repo, wt };
+}
+
+const factsFor = (repo: string, target: string) => {
+  const entries = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo));
+  const e = entries.find((x: { path: string }) => path.resolve(x.path) === path.resolve(target))!;
+  return measure(repo, e, ['develop'], noGh);
+};
+
 /** gh is never available in the suite, so PR evidence is always absent here. */
 const noGh = { available: false, error: 'gh disabled in tests', byHead: new Map() };
 
@@ -395,6 +526,84 @@ describe('integration — against real git repositories', () => {
     mkdirSync(path.join(inner, 'node_modules'), { recursive: true });
     const all = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo)).map((x) => x.path);
     expect(findNodeModules(repo, all)).toEqual([]);
+  });
+
+  it('REFUSES a worktree stopped mid-merge whose status is COMPLETELY CLEAN', () => {
+    // The case that motivated the guard, end to end against real git. Remove
+    // the `mid-operation` predicate from classify() and this returns `remove`
+    // with an empty findings list.
+    const { repo, wt } = midOperationScenario();
+    g(['merge', '--no-commit', '--no-ff', 'feat/b'], wt);
+
+    expect(g(['status', '--porcelain'], wt).trim()).toBe(''); // the whole point
+    expect(existsSync(path.join(g(['rev-parse', '--absolute-git-dir'], wt).trim(), 'MERGE_HEAD'))).toBe(true);
+
+    const facts = factsFor(repo, wt);
+    expect(facts.dirty).toBe(false);
+    expect(facts.midOperation).toBe('merge');
+    const r = classify(facts);
+    expect(r.verdict).toBe(REFUSE);
+    expect(reasons(r)).toContain('mid-operation');
+  });
+
+  it('POSITIVE CONTROL — the same worktree, merge aborted, goes back to REMOVE', () => {
+    // Constraint 4's other half. Without this, a detector hard-wired to
+    // "always stopped" would pass every test above and refuse the entire
+    // estate, and nothing in the suite would notice.
+    const { repo, wt } = midOperationScenario();
+    g(['merge', '--no-commit', '--no-ff', 'feat/b'], wt);
+    expect(classify(factsFor(repo, wt)).verdict).toBe(REFUSE);
+
+    g(['merge', '--abort'], wt);
+    const after = factsFor(repo, wt);
+    expect(after.midOperation).toBeNull();
+    expect(classify(after).verdict).toBe(REMOVE);
+  });
+
+  it('REFUSES a worktree stopped mid-rebase, and NAMES the rebase', () => {
+    // A stopped rebase is also dirty and detached, so the worktree would be
+    // kept either way — with the WRONG reason. "2 uncommitted changes" sends
+    // the reader to `git stash` and "detached HEAD" tells them nothing; the
+    // answer is `git rebase --abort` or `--continue`. This asserts the reason,
+    // which is the part that fails when the guard is removed.
+    const { repo, wt } = midOperationScenario();
+    let rebaseFailed = false;
+    try { g(['rebase', 'feat/c'], wt); } catch { rebaseFailed = true; }
+    expect(rebaseFailed).toBe(true); // the rebase must actually have stopped
+
+    const facts = factsFor(repo, wt);
+    expect(facts.midOperation).toBe('rebase');
+    const r = classify(facts);
+    expect(r.verdict).toBe(REFUSE);
+    expect(reasons(r)).toContain('mid-operation');
+  });
+
+  it('REFUSES a worktree stopped mid-cherry-pick', () => {
+    const { repo, wt } = midOperationScenario();
+    let pickFailed = false;
+    try { g(['cherry-pick', 'feat/c'], wt); } catch { pickFailed = true; }
+    expect(pickFailed).toBe(true);
+
+    const facts = factsFor(repo, wt);
+    expect(facts.midOperation).toBe('cherry-pick');
+    expect(classify(facts).verdict).toBe(REFUSE);
+  });
+
+  it('detectStoppedOperation reports nothing for an ordinary worktree, and unmeasurable off-repo', () => {
+    // Three variants, three DIFFERENT answers. Uniform results across variants
+    // would mean the detector is broken rather than that the variants agree.
+    const { wt } = midOperationScenario();
+    expect(detectStoppedOperation(wt)).toEqual({ op: null });
+
+    g(['merge', '--no-commit', '--no-ff', 'feat/b'], wt);
+    expect(detectStoppedOperation(wt).op).toBe('merge');
+
+    const outside = path.join(root, 'not-a-repo');
+    mkdirSync(outside, { recursive: true });
+    const off = detectStoppedOperation(outside);
+    expect(off.unmeasurable).toBe(true);
+    expect(off.op).toBeUndefined();
+    expect(off.error).toBeTruthy(); // stderr survives; it is not swallowed
   });
 
   it('git worktree remove leaves the BRANCH alone', () => {

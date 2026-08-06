@@ -78,12 +78,36 @@ predicate is removed. None of them is a comment.
 | `main-checkout` | first entry of `git worktree list` | the repository itself |
 | `locked` | `locked` in `--porcelain` output | something claimed this worktree |
 | `uncommitted` | `git status --porcelain` non-empty | work with no other copy — **untracked files included** |
+| `mid-operation` | `MERGE_HEAD` / `rebase-merge` / `rebase-apply` / `CHERRY_PICK_HEAD` / `REVERT_HEAD` / `BISECT_LOG` in the worktree's own git dir | a merge, rebase, cherry-pick, revert or bisect **stopped here** |
 | `unpushed` | `git rev-list --count <upstream>..HEAD` | the likeliest way to lose work |
 | `not-merged` | all three merge tests negative | work that never landed anywhere |
 
 **A branch that is AHEAD is not stale — it is unfinished.** That is the
 distinction the whole tool turns on, and it is invisible from a directory
 listing, a timestamp, or a branch name.
+
+### `mid-operation` is not a corollary of `uncommitted`
+
+The intuition is that a stopped merge always leaves conflict markers, so the
+dirty check already covers it. Measured against real git, on a repository built
+for the question: two branches add the **same file with the same content**,
+`git merge --no-commit` auto-merges cleanly, the resulting tree is identical to
+HEAD's, and **`git status --porcelain` returns zero lines while `MERGE_HEAD`
+exists.**
+
+Against that worktree the classifier returned `remove` with an empty findings
+list, and `git worktree remove` then took it — **exit 0, no output, no refusal
+of its own.** Git offers no protection here, so this check is the protection.
+
+It is also reported ABOVE the dirty files in the conflicting case, because when
+both fire the stopped operation is the *explanation* for the dirty files. A
+report leading with "17 uncommitted changes" sends its reader to `git stash`
+when the answer is `git merge --abort`.
+
+And the check can fail to run: if the worktree's git dir cannot be resolved,
+all six probes return "absent", and six absent probes read exactly like a
+worktree with nothing in progress. That case is `mid-operation-unmeasurable`
+and it is `unverifiable`, never `remove`.
 
 ## "Merged" is measured three ways, and the third is the common one
 
@@ -109,7 +133,7 @@ this work exist anywhere other than this directory*.
 
 ## `unverifiable` is a real outcome and never collapses into "safe"
 
-Five states are ambiguous rather than bad, and each one is reported and skipped:
+Six states are ambiguous rather than bad, and each one is reported and skipped:
 
 - `branch-changed-under-us` — the branch `git worktree list` recorded and the
   branch the worktree reports right now disagree. A sibling process re-checked
@@ -119,6 +143,9 @@ Five states are ambiguous rather than bad, and each one is reported and skipped:
 - `merge-unmeasurable` — no local merge evidence and no `gh`. Indistinguishable
   from a squash merge, so it is not called unmerged either.
 - `status-unreadable` — `git status` failed. Never assumed clean.
+- `mid-operation-unmeasurable` — the worktree's git dir could not be resolved,
+  so "is a merge stopped here" was not answered. A check that did not run is
+  not a check that passed.
 - `gitdir-missing` — the path is gone. `git worktree prune` is the operation
   and it is the user's to run, not this tool's.
 

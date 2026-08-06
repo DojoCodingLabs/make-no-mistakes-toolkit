@@ -33,9 +33,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The value is in what it REFUSES, so every refusal is a predicate with a test
   rather than a bullet point: the main checkout, a locked worktree, uncommitted
-  changes (untracked files included), **unpushed commits**, and anything
-  unmerged. A branch that is AHEAD of its remote is not stale, it is unfinished,
-  and that is the single most likely way to lose work.
+  changes (untracked files included), **a stopped merge/rebase/cherry-pick**,
+  **unpushed commits**, and anything unmerged. A branch that is AHEAD of its
+  remote is not stale, it is unfinished, and that is the single most likely way
+  to lose work.
+
+  **`mid-operation` is not a corollary of the dirty check, and the difference
+  was measured rather than assumed.** Two branches that add the SAME file with
+  the SAME content merge cleanly into a tree byte-identical to HEAD's, so
+  `git merge --no-commit` leaves `MERGE_HEAD` behind while
+  `git status --porcelain` returns **zero lines**. Against that worktree the
+  classifier returned `remove` with an empty findings list, and
+  `git worktree remove` then took the directory — **exit 0, no output, no
+  refusal of its own.** Git offers no protection there. The check reads the
+  worktree's OWN git dir (a linked worktree keeps these files in
+  `.git/worktrees/<name>`, not in the shared dir) and covers `MERGE_HEAD`,
+  `rebase-merge`, `rebase-apply`, `CHERRY_PICK_HEAD`, `REVERT_HEAD` and
+  `BISECT_LOG`. When that git dir cannot be resolved the verdict is
+  `mid-operation-unmeasurable` and therefore `unverifiable`, because six probes
+  returning "absent" because the location is unknown reads exactly like a
+  worktree with nothing in progress — and that is the answer that authorises
+  deletion.
+
+  It is reported ABOVE the dirty files in the conflicting case, deliberately:
+  when both fire the stopped operation is the *explanation* for the dirty files,
+  and a report leading with "17 uncommitted changes" sends its reader to
+  `git stash` when the answer is `git merge --abort`.
 
   **"Merged" is measured three ways**, because a squash merge leaves the branch
   neither an ancestor of the base nor patch-equivalent to it — so an ancestry
@@ -44,10 +67,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `git cherry`, and a GitHub PR with `state == MERGED`. Losing `gh` therefore
   downgrades a verdict to `unverifiable`, never to `not-merged`.
 
-  **`unverifiable` is a third verdict and never collapses into "safe".** Five
+  **`unverifiable` is a third verdict and never collapses into "safe".** Six
   states report and skip: a sibling process re-checked the worktree out mid-run,
   commits landed after the PR merged, a squash merge with no `gh` to confirm it,
-  an unreadable `git status`, a missing gitdir.
+  an unreadable `git status`, an unresolvable git dir, a missing gitdir.
 
   Dry-run by default. `node_modules` reclaim is the default action and is fully
   reversible with one install; worktree removal is opt-in behind `--worktrees`,
@@ -58,9 +81,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Verified in dry-run against those 60 worktrees: **2 removable (3.6 GB),
   41 refused, 17 unverifiable, 59.1 GB of `node_modules`** — including a
   worktree refused for 410 lines of uncommitted changes and one refused for
-  4 unpushed commits. 35 tests, and the two load-bearing refusals were
-  mutation-checked: disabling the `uncommitted` and `unpushed` predicates turns
-  5 tests red.
+  4 unpushed commits. That run predates the `mid-operation` guard and was not
+  repeated after it; since the guard can only move a worktree from `remove` to
+  `refuse`, treat the "2 removable" figure as an upper bound rather than a
+  current measurement.
+
+  **46 tests, and every keep-outcome is mutation-checked** — a guard that cannot
+  be observed to fail is decoration. Disabling each predicate in turn, and
+  counting the tests that go red: `uncommitted` **4**, `mid-operation` **7**,
+  `unpushed` **3**, `not-merged` **3**, collapsing the `unverifiable` verdict
+  into `remove` **9**, and making the mid-operation detector report a resolvable
+  git dir when it cannot read one **1**. The six mutations produce six DIFFERENT
+  failure sets; uniform results across variants would have meant the control was
+  broken rather than that the guards agreed. Unmutated and post-restore controls
+  both green, and the restored file verified byte-identical to the backup.
 
 ### Fixed
 - **README and marketplace counts.** The README header read `Skills (10)` with 10
