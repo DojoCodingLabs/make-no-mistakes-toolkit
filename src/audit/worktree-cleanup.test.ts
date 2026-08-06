@@ -453,6 +453,85 @@ describe('integration — against real git repositories', () => {
     expect(bases).toContain('develop');
   });
 
+  it('resolves EACH repo\'s own base — a main-only repo never falls back to develop', () => {
+    // The failure this exists to prevent is asymmetric and it destroys. A
+    // hardcoded `develop` run against a main-based repo cannot find the base,
+    // so nothing is an ancestor of it and every branch reads as unmerged —
+    // which is the SAFE direction. A hardcoded base that resolves to the wrong
+    // EXISTING ref is the dangerous one. Measured across the estate this tool
+    // is aimed at: 6 of 13 repos base on `main`, 7 on `develop`.
+    const remote = path.join(root, 'remote.git');
+    const repo = path.join(root, 'repo');
+    g(['init', '--bare', '-b', 'main', remote], root);
+    g(['init', '-b', 'main', repo], root);
+    g(['config', 'user.email', 't@example.com'], repo);
+    g(['config', 'user.name', 'T'], repo);
+    commit(repo, 'README.md');
+    g(['remote', 'add', 'origin', remote], repo);
+    g(['push', '-u', 'origin', 'main'], repo);
+    g(['checkout', '-b', 'feat/on-main'], repo);
+    commit(repo, 'landed.txt');
+    g(['push', '-u', 'origin', 'feat/on-main'], repo);
+    g(['checkout', 'main'], repo);
+    g(['merge', '--no-ff', '-m', 'merge feat/on-main', 'feat/on-main'], repo);
+    g(['push', 'origin', 'main'], repo);
+    g(['fetch', 'origin', '--prune'], repo);
+
+    const { bases } = resolveBases(repo, null);
+    expect(bases).toContain('main');
+    expect(bases).not.toContain('develop'); // it does not exist; it is not assumed
+
+    // ...and the resolved base is actually USED: the merged branch classifies.
+    const wt = path.join(root, 'wt', 'on-main');
+    g(['worktree', 'add', wt, 'feat/on-main'], repo);
+    const entries = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo));
+    const e = entries.find((x: { path: string }) => path.resolve(x.path) === path.resolve(wt))!;
+    const r = classify(measure(repo, e, bases, noGh));
+    expect(r.verdict).toBe(REMOVE);
+  });
+
+  it('resolves NO base rather than guessing one, when the repo has none of the conventional names', () => {
+    // Not hypothetical. Measured 2026-08-06 across the 23 git checkouts under
+    // ~/Documentos/GitHub/dojocoding: `openclaw` carries 3155 remote-tracking
+    // refs and not one of origin/{HEAD,main,develop,master,trunk} — every
+    // branch is `origin/dojo/v<date>-fixes`.
+    //
+    // An empty base set is the input that must NOT become "nothing to compare
+    // against, so nothing is unmerged". `main()` exits 2 on it; this asserts
+    // the resolver hands it that empty set honestly instead of inventing a
+    // plausible name.
+    const remote = path.join(root, 'remote.git');
+    const repo = path.join(root, 'repo');
+    g(['init', '--bare', '-b', 'dojo/v2026.5.22-fixes', remote], root);
+    g(['init', '-b', 'dojo/v2026.5.22-fixes', repo], root);
+    g(['config', 'user.email', 't@example.com'], repo);
+    g(['config', 'user.name', 'T'], repo);
+    commit(repo, 'README.md');
+    g(['remote', 'add', 'origin', remote], repo);
+    g(['push', '-u', 'origin', 'dojo/v2026.5.22-fixes'], repo);
+    g(['fetch', 'origin', '--prune'], repo);
+
+    const { bases, how } = resolveBases(repo, null);
+    expect(bases).toEqual([]);
+    expect(how).toMatch(/no remote base branch found/);
+
+    // ...and naming one explicitly still works, which is the documented way out.
+    expect(resolveBases(repo, 'dojo/v2026.5.22-fixes').bases).toEqual(['dojo/v2026.5.22-fixes']);
+  });
+
+  it('CONTROL — the same branch measured against a base it never reached is refused', () => {
+    // The positive control's mirror. If `resolveBases` ever returned a set that
+    // silently included branches the repo does not have, the test above would
+    // still pass while the tool started calling unmerged work merged. Here the
+    // base is named explicitly and is one the branch never landed in.
+    const { repo, unpushed } = scenario();
+    const entries = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo));
+    const e = entries.find((x: { path: string }) => path.resolve(x.path) === path.resolve(unpushed))!;
+    const facts = measure(repo, e, ['no-such-base'], noGh);
+    expect(facts.mergedBy).toBeNull();
+    expect(classify(facts).verdict).toBe(REFUSE);
+  });
+
   it('REMOVES the merged, clean, pushed worktree', () => {
     const { repo, merged } = scenario();
     const entries = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo));

@@ -86,7 +86,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `refuse`, treat the "2 removable" figure as an upper bound rather than a
   current measurement.
 
-  **46 tests, and every keep-outcome is mutation-checked** — a guard that cannot
+  **The base is resolved per repo and never assumed**, which matters because a
+  wrong base that RESOLVES makes every branch look merged — the failure
+  direction that destroys. Measured 2026-08-06 by running `resolveBases()`
+  read-only over the 23 git checkouts under `~/Documentos/GitHub/dojocoding`:
+  21 resolve `main` first, 1 resolves `develop` first, 7 resolve a two-element
+  set, and **1 (`openclaw`) resolves NONE** — it carries 3155 remote-tracking
+  refs and not one of `origin/{HEAD,main,develop,master,trunk}`. That last case
+  exits 2 asking for `--base` rather than treating an empty base set as
+  "nothing is unmerged". All three shapes now have a test.
+
+  **49 tests, and every keep-outcome is mutation-checked** — a guard that cannot
   be observed to fail is decoration. Disabling each predicate in turn, and
   counting the tests that go red: `uncommitted` **4**, `mid-operation` **7**,
   `unpushed` **3**, `not-merged` **3**, collapsing the `unverifiable` verdict

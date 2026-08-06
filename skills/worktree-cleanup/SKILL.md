@@ -124,12 +124,26 @@ landed** — and in a squash-merge repo that is the majority case, not an edge
 case. The PR test exists for exactly that, which is why losing `gh` downgrades
 the verdict to `unverifiable` rather than to `not-merged`.
 
-The base is resolved as a **set**, not one branch. A repo that merges features
-into `develop` and promotes to `main` at release time has `origin/HEAD` pointing
-at `main`; measuring only against it reported 41 false `not-merged` verdicts on
-the 60-worktree run that produced this skill. A branch contained in **any**
-shared remote base is merged for this purpose, because the question is *does
-this work exist anywhere other than this directory*.
+The base is resolved as a **set**, not one branch, and **per repository** — a
+hardcoded base is the failure that destroys, because a wrong base that RESOLVES
+makes every branch look merged. A repo that merges features into `develop` and
+promotes to `main` at release time has `origin/HEAD` pointing at `main`;
+measuring only against it reported 41 false `not-merged` verdicts on the
+60-worktree run that produced this skill. A branch contained in **any** shared
+remote base is merged for this purpose, because the question is *does this work
+exist anywhere other than this directory*.
+
+Measured 2026-08-06 by running `resolveBases()` read-only over the 23 git
+checkouts under one working root: **21 resolve `main` first, 1 resolves
+`develop` first, 7 resolve a two-element set, and 1 resolves NONE.** That last
+one carries 3155 remote-tracking refs and not one of
+`origin/{HEAD,main,develop,master,trunk}` — every branch is
+`origin/dojo/v<date>-fixes`. The tool exits 2 there asking for `--base`, rather
+than reading an empty base set as "nothing is unmerged".
+
+The two-element case is the one the set exists for: a repo whose `origin/HEAD`
+is `main` while its PRs target `develop` gets `[main, develop]`, tries `main`
+first, finds nothing, and lands the verdict on `develop`.
 
 ## `unverifiable` is a real outcome and never collapses into "safe"
 
