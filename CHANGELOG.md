@@ -110,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **49 tests, and every keep-outcome is mutation-checked** — a guard that cannot
   be observed to fail is decoration. Disabling each predicate in turn, and
   counting the tests that go red: `uncommitted` **4**, `mid-operation` **7**,
-  `unpushed` **3**, `not-merged` **3**, collapsing the `unverifiable` verdict
+  `unpushed` **4**, `not-merged` **3**, collapsing the `unverifiable` verdict
   into `remove` **9**, and making the mid-operation detector report a resolvable
   git dir when it cannot read one **1**. The six mutations produce six DIFFERENT
   failure sets; uniform results across variants would have meant the control was
