@@ -86,6 +86,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `refuse`, treat the "2 removable" figure as an upper bound rather than a
   current measurement.
 
+  **`scripts/worktree-cleanup.d.mts` types the script for its one consumer.**
+  The `.mjs` stays plain ESM — a slash command runs it as `node scripts/...`
+  with no build step — but the Vitest suite that imports it was `any`
+  throughout, and under `any` a MISSPELLED field in a `{ ...clean, x }` case is
+  not an error, it is a fact the classifier never reads. The test then passes
+  while asserting nothing about the guard in its own title, which is the exact
+  failure this suite exists to avoid. Adding the declarations found four such
+  latent holes immediately, starting with `mergedBy` widening to `string`.
+  It also takes `tsc --noEmit` on this file from 9 errors to 0, which matters
+  because PR #65 makes that a blocking gate with no `paths:` filter.
+
   **The base is resolved per repo and never assumed**, which matters because a
   wrong base that RESOLVES makes every branch look merged — the failure
   direction that destroys. Measured 2026-08-06 by running `resolveBases()`

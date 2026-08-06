@@ -35,9 +35,19 @@ import {
   parseWorktreeList,
   resolveBases,
 } from '../../scripts/worktree-cleanup.mjs';
+import type { Classification, WorktreeEntry, WorktreeFacts } from '../../scripts/worktree-cleanup.mjs';
 
-/** Facts for a worktree with nothing wrong with it. Each test breaks ONE thing. */
-const clean = {
+/**
+ * Facts for a worktree with nothing wrong with it. Each test breaks ONE thing.
+ *
+ * Annotated rather than inferred, on purpose. Every case below is
+ * `{ ...clean, someField: x }`, and an excess-property check does not reach
+ * inside a spread — so under inference a MISSPELLED field name is not an
+ * error, it is a fact the classifier never reads. The test then passes while
+ * asserting nothing about the guard in its own title, which is the failure
+ * this whole suite is written to avoid.
+ */
+const clean: WorktreeFacts = {
   isMain: false, bare: false, locked: false, lockReason: '', missing: false,
   prunableReason: '', detached: false, recordedBranch: 'feat/x', liveBranch: 'feat/x',
   midOperation: null, midOperationEvidence: '', midOperationUnmeasurable: false, midOperationError: '',
@@ -48,7 +58,7 @@ const clean = {
   ghAvailable: true, ghError: '',
 };
 
-const reasons = (r: { findings: { reason: string }[] }) => r.findings.map((f) => f.reason);
+const reasons = (r: Classification) => r.findings.map((f) => f.reason);
 
 describe('classify — the baseline it is measured against', () => {
   it('removes a worktree that is merged, clean, pushed and unlocked', () => {
@@ -246,7 +256,7 @@ describe('parseWorktreeList', () => {
   it('marks the FIRST record as the main checkout — the only thing identifying it', () => {
     const e = parseWorktreeList(porcelain);
     expect(e[0].isMain).toBe(true);
-    expect(e.slice(1).every((x) => x.isMain === false)).toBe(true);
+    expect(e.slice(1).every((x: WorktreeEntry) => x.isMain === false)).toBe(true);
   });
 
   it('strips refs/heads/ and keeps a branch name with a slash intact', () => {
@@ -439,7 +449,7 @@ function midOperationScenario() {
 
 const factsFor = (repo: string, target: string) => {
   const entries = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo));
-  const e = entries.find((x: { path: string }) => path.resolve(x.path) === path.resolve(target))!;
+  const e = entries.find((x: WorktreeEntry) => path.resolve(x.path) === path.resolve(target))!;
   return measure(repo, e, ['develop'], noGh);
 };
 
@@ -485,7 +495,7 @@ describe('integration — against real git repositories', () => {
     const wt = path.join(root, 'wt', 'on-main');
     g(['worktree', 'add', wt, 'feat/on-main'], repo);
     const entries = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo));
-    const e = entries.find((x: { path: string }) => path.resolve(x.path) === path.resolve(wt))!;
+    const e = entries.find((x: WorktreeEntry) => path.resolve(x.path) === path.resolve(wt))!;
     const r = classify(measure(repo, e, bases, noGh));
     expect(r.verdict).toBe(REMOVE);
   });
@@ -526,7 +536,7 @@ describe('integration — against real git repositories', () => {
     // base is named explicitly and is one the branch never landed in.
     const { repo, unpushed } = scenario();
     const entries = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo));
-    const e = entries.find((x: { path: string }) => path.resolve(x.path) === path.resolve(unpushed))!;
+    const e = entries.find((x: WorktreeEntry) => path.resolve(x.path) === path.resolve(unpushed))!;
     const facts = measure(repo, e, ['no-such-base'], noGh);
     expect(facts.mergedBy).toBeNull();
     expect(classify(facts).verdict).toBe(REFUSE);
@@ -535,7 +545,7 @@ describe('integration — against real git repositories', () => {
   it('REMOVES the merged, clean, pushed worktree', () => {
     const { repo, merged } = scenario();
     const entries = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo));
-    const e = entries.find((x) => path.resolve(x.path) === path.resolve(merged))!;
+    const e = entries.find((x: WorktreeEntry) => path.resolve(x.path) === path.resolve(merged))!;
     const r = classify(measure(repo, e, ['develop'], noGh));
     expect(r.verdict).toBe(REMOVE);
   });
@@ -543,7 +553,7 @@ describe('integration — against real git repositories', () => {
   it('REFUSES the worktree with an uncommitted file, by name', () => {
     const { repo, dirty } = scenario();
     const entries = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo));
-    const e = entries.find((x) => path.resolve(x.path) === path.resolve(dirty))!;
+    const e = entries.find((x: WorktreeEntry) => path.resolve(x.path) === path.resolve(dirty))!;
     const r = classify(measure(repo, e, ['develop'], noGh));
     expect(r.verdict).toBe(REFUSE);
     expect(reasons(r)).toContain('uncommitted');
@@ -552,7 +562,7 @@ describe('integration — against real git repositories', () => {
   it('REFUSES the worktree whose branch is ahead of its remote', () => {
     const { repo, unpushed } = scenario();
     const entries = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo));
-    const e = entries.find((x) => path.resolve(x.path) === path.resolve(unpushed))!;
+    const e = entries.find((x: WorktreeEntry) => path.resolve(x.path) === path.resolve(unpushed))!;
     const facts = measure(repo, e, ['develop'], noGh);
     expect(facts.ahead).toBe(1);
     const r = classify(facts);
@@ -572,7 +582,7 @@ describe('integration — against real git repositories', () => {
     const { repo, merged } = scenario();
     g(['worktree', 'lock', '--reason', 'claimed by an agent', merged], repo);
     const entries = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo));
-    const e = entries.find((x) => path.resolve(x.path) === path.resolve(merged))!;
+    const e = entries.find((x: WorktreeEntry) => path.resolve(x.path) === path.resolve(merged))!;
     expect(e.locked).toBe(true);
     expect(classify(measure(repo, e, ['develop'], noGh)).verdict).toBe(REFUSE);
   });
@@ -580,7 +590,7 @@ describe('integration — against real git repositories', () => {
   it('detects a sibling re-checkout as ambiguous rather than resolving it', () => {
     const { repo, merged } = scenario();
     const entries = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo));
-    const e = entries.find((x) => path.resolve(x.path) === path.resolve(merged))!;
+    const e = entries.find((x: WorktreeEntry) => path.resolve(x.path) === path.resolve(merged))!;
     g(['checkout', '-b', 'someone-elses-branch'], merged); // the sibling process
     const r = classify(measure(repo, e, ['develop'], noGh));
     expect(r.verdict).toBe(UNVERIFIABLE);
@@ -591,7 +601,7 @@ describe('integration — against real git repositories', () => {
     const { repo, merged, dirty } = scenario();
     for (const w of [merged, dirty]) mkdirSync(path.join(w, 'node_modules', 'pkg'), { recursive: true });
     mkdirSync(path.join(merged, 'node_modules', 'pkg', 'node_modules'), { recursive: true });
-    const all = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo)).map((x) => x.path);
+    const all = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo)).map((x: WorktreeEntry) => x.path);
 
     const found = findNodeModules(merged, all);
     expect(found).toEqual([path.join(merged, 'node_modules')]); // NOT the nested copy
@@ -603,7 +613,7 @@ describe('integration — against real git repositories', () => {
     const inner = path.join(repo, '.claude', 'worktrees', 'inner');
     g(['worktree', 'add', inner, '-b', 'inner-branch'], repo);
     mkdirSync(path.join(inner, 'node_modules'), { recursive: true });
-    const all = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo)).map((x) => x.path);
+    const all = parseWorktreeList(g(['worktree', 'list', '--porcelain'], repo)).map((x: WorktreeEntry) => x.path);
     expect(findNodeModules(repo, all)).toEqual([]);
   });
 
