@@ -1472,6 +1472,45 @@
         tool_input:
           command: 'git push -f'
       expected_exit: 2
+    # True negative worth locking in: `.*` only looks FORWARD from `git push`,
+    # so another command's `-f` BEFORE the push cannot reach the pattern.
+    - name: allows-other-command-f-flag-before-the-push
+      input:
+        tool_input:
+          command: 'rm -f stale.lock && git push origin main'
+      expected_exit: 0
+    # ---- KNOWN LIMITATION, characterized rather than specified ----------------
+    # The three cases below expect 2 because that is what the rule DOES today,
+    # NOT because blocking them is desired. They are false positives: the `-f`
+    # belongs to a sibling command, and `.*` reaches across `&&` / `;` to find
+    # it. They are recorded here so the behaviour is visible and so that fixing
+    # it is a deliberate, measured change rather than an accident.
+    #
+    # Whoever fixes the segmentation defect MUST flip these three to 0. The
+    # obvious cure — narrowing `.*` to `[^|;&]*`, the shape already used by
+    # `block-no-verify` — was measured and REJECTED: it silences these three,
+    # but it also stops blocking two REAL force pushes, because a separator
+    # character can legitimately sit between `git push` and the flag:
+    #   `git push $(git remote | head -1) -f main'  -> 2 today, 0 when narrowed
+    #   `git push origin 'feat&fix' -f`             -> 2 today, 0 when narrowed
+    # Trading a false positive for a missed force push is the wrong direction
+    # for this rule. A real fix needs shell-aware segment splitting, not a
+    # tighter character class.
+    - name: known-limitation-fires-on-grep-f-in-same-command
+      input:
+        tool_input:
+          command: 'git push origin main && grep -f patterns.txt build.log'
+      expected_exit: 2
+    - name: known-limitation-fires-on-tar-f-in-same-command
+      input:
+        tool_input:
+          command: 'git push origin main; tar -xz -f a.tgz'
+      expected_exit: 2
+    - name: known-limitation-fires-on-rm-f-in-same-command
+      input:
+        tool_input:
+          command: 'git push origin main && rm -f stale.lock'
+      expected_exit: 2
 
 - id: block-git-rebase-skip
   description: Block `git rebase --skip` (drops the conflicting commit silently)

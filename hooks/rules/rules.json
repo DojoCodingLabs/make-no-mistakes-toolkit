@@ -1753,6 +1753,42 @@
           }
         },
         "expected_exit": 2
+      },
+      {
+        "name": "allows-other-command-f-flag-before-the-push",
+        "input": {
+          "tool_input": {
+            "command": "rm -f stale.lock && git push origin main"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "known-limitation-fires-on-grep-f-in-same-command",
+        "input": {
+          "tool_input": {
+            "command": "git push origin main && grep -f patterns.txt build.log"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "known-limitation-fires-on-tar-f-in-same-command",
+        "input": {
+          "tool_input": {
+            "command": "git push origin main; tar -xz -f a.tgz"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "known-limitation-fires-on-rm-f-in-same-command",
+        "input": {
+          "tool_input": {
+            "command": "git push origin main && rm -f stale.lock"
+          }
+        },
+        "expected_exit": 2
       }
     ]
   },
