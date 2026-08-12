@@ -1380,11 +1380,24 @@
   description: Block `git push --force` / `-f` without `--force-with-lease` (overwrites collaborator pushes silently)
   applies_to: [Bash]
   match:
-    # Positive: a push command using -f or --force (the latter must be
-    # followed by whitespace or end-of-string so we don't accidentally
-    # match --force-with-lease, which has a `-` after `--force`).
+    # Positive: a push command using -f or --force. Both alternatives must
+    # match the flag as a standalone ARGUMENT, never as a substring of some
+    # other token:
+    #   - `-f` requires a preceding whitespace character. Without it, `-f\b`
+    #     matched `-f` ANYWHERE in the command string — including inside the
+    #     bracket expression of an unrelated regex, e.g. a plain `git push`
+    #     followed by `grep -aoE '[0-9a-f]{10}'`: `f` is a word char and `]`
+    #     is not, so `\b` was satisfied and the rule fired on a command with
+    #     no force flag at all. `^` is not needed as a second alternative:
+    #     the `git[[:space:]]+push` prefix guarantees at least one character
+    #     before the flag.
+    #   - `\b` is kept AFTER `-f` rather than tightened to `([[:space:]]|$)`,
+    #     so `git push -f;` (flag followed by a separator) stays blocked.
+    #   - `--force` must be followed by whitespace or end-of-string so we
+    #     don't accidentally match --force-with-lease, which has a `-` after
+    #     `--force`.
     - field: command
-      pattern: 'git[[:space:]]+push.*(-f\b|--force([[:space:]]|$))'
+      pattern: 'git[[:space:]]+push.*([[:space:]]-f\b|--force([[:space:]]|$))'
     # Negative: defense-in-depth — even if the author squeezed both flags
     # onto the line (`git push -f origin main --force-with-lease`),
     # presence of --force-with-lease aborts the fire.
@@ -1440,6 +1453,25 @@
         tool_input:
           command: 'git push --force origin feature-x # hook-bypass: git-force-push-bare-allowed'
       expected_exit: 0
+    # Regression: the `-f` inside a hex bracket expression is not a flag.
+    # This exact command was blocked before the leading-whitespace anchor.
+    - name: allows-plain-push-then-hex-range-grep
+      input:
+        tool_input:
+          command: 'git push > "$log" 2>&1; grep -aoE ''[0-9a-f]{10}\.\.[0-9a-f]{10}'' "$log"'
+      expected_exit: 0
+    - name: allows-plain-push-then-a-f-range-grep
+      input:
+        tool_input:
+          command: 'git push origin main && grep -E ''[a-f]+'' out.txt'
+      expected_exit: 0
+    # Guards the `\b` after `-f`: a trailing flag with nothing after it must
+    # still block, so the anchor fix cannot be "tightened" into a hole.
+    - name: blocks-force-short-flag-at-end-of-command
+      input:
+        tool_input:
+          command: 'git push -f'
+      expected_exit: 2
 
 - id: block-git-rebase-skip
   description: Block `git rebase --skip` (drops the conflicting commit silently)
