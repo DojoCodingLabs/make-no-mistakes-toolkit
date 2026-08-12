@@ -23,10 +23,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > number, so whichever change lands next takes it. Measured 2026-08-06:
 > `git show origin/main:package.json | grep version` -> 1.43.0.
 
+
 ### Added
-- **`/make-no-mistakes:disk-cleanup-merged-worktrees`** + the `worktree-cleanup`
-  skill + `scripts/worktree-cleanup.mjs` — reclaim disk from git worktrees
-  without destroying work.
+- **`/disk-cleanup` — reclaim disk in ascending order of risk, and report what was
+  actually freed.** Measured 2026-08-11 on a 468 GB volume that had hit 100% full:
+  `docker image prune -a` returned **48.3 GB**, worktree `node_modules` 11 GB, docker
+  volumes ~1 GB, and worktree removal cleared 8 of 69 while keeping 61.
+
+  The finding that shapes the whole command is that **`docker system df`
+  under-reports**. It predicted 18 GB where 48.3 GB came back, because it does not
+  count shared layers. A command built on that prediction would have told the user
+  the largest available reclaim was a third of its real size, and would have moved
+  on to the riskier stages to make up a shortfall that did not exist. So no stage
+  prints a prediction: each measures free space before and after and reports the
+  difference.
+
+  **Three outcomes, never two**, and collapsing any pair reproduces the confusion
+  the command exists to refuse. `already clean` means an `--apply` run removed
+  nothing because there was nothing to remove. `UNAVAILABLE` means the stage could
+  not run at all. A dry run says it is a dry run and reports the classifier's
+  recoverable figure — it never claims cleanliness, because in a dry run the
+  before/after delta is zero BY CONSTRUCTION rather than because the disk is tidy.
+  That third case was a real defect caught in review: the default invocation printed
+  `276 MB recoverable` and `already clean` two lines apart, and the command's own
+  protocol tells the reader to relay `already clean` verbatim.
+
+  **What it owns is the docker stages, and only those.** Stages 2 and 3 —
+  `node_modules` and worktree removal — are delegated to `scripts/worktree-cleanup.mjs`,
+  which already classifies worktrees against three independent merge tests and refuses
+  anything holding uncommitted or unpushed work. A second, shorter copy of a
+  *destructive* classifier is the worst kind of duplication: it reads as equivalent,
+  drifts in silence, and the drift surfaces as deleted work. Measured while building
+  this: a bash reimplementation found 4 removable `node_modules` where the classifier
+  found 3 — the extra one was inside a **locked** worktree, which the classifier
+  correctly skips.
+
+  When the classifier is absent the stage reports **`UNAVAILABLE`**, never
+  `already clean`. A stage that could not run and a stage with nothing to do are
+  different outcomes and only one of them means the disk is tidy.
+
+  Two guards have no flag behind them at all, which is the point:
+
+  - **Branch refs are never deleted.** `--branches` and `--force` are rejected with an
+    error rather than passed through. Removing a worktree is recoverable while its
+    branch survives; deleting the branch is not.
+  - **Docker volumes are listed, never removed** — with or without `--apply`, because
+    there is no `--apply` path in that stage. A volume can hold the only copy of real
+    data, so the names go to a human and the decision stays there.
+
+  No stream is discarded anywhere in `scripts/disk-cleanup.sh`. `command -v` captures
+  its stdout into a variable instead of redirecting it away, for the same reason every
+  other check does: a stage that failed and a stage that found nothing must never look
+  alike.
+
+- **`scripts/worktree-cleanup.mjs` + the `worktree-cleanup` skill** — the classifier
+  stages 2 and 3 above delegate to, which reclaims disk from git worktrees without
+  destroying work.
+
+  **It ships without a command of its own, deliberately.** It had one during
+  development (`/disk-cleanup-merged-worktrees`) and that command is not in this
+  release: once `/disk-cleanup` delegates to the same classifier, a second command
+  is a second door onto a subset of one job — the reader has to know which to
+  reach for, and the answer is always "the one that also does docker". The
+  classifier is invoked through `/disk-cleanup`, or directly by a caller that
+  wants only the worktree half. What follows is what that classifier guarantees,
+  and it is the whole reason stages 2 and 3 are delegated rather than rewritten.
 
   The measurement that motivated it, on one real checkout: **60 worktrees,
   20 GB under `.claude/worktrees`, 38 `node_modules`, the largest 1.6 GB.**
