@@ -1,10 +1,24 @@
+<p align="center">
+  <a href="https://dojocoding.io">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="docs/assets/banner-light.svg">
+      <img alt="make-no-mistakes by Dojo Coding: The disciplined dev lifecycle" src="docs/assets/banner-light.svg" width="100%">
+    </picture>
+  </a>
+</p>
+
 # make-no-mistakes
 
-**Version: 1.38.0** · [CHANGELOG](./CHANGELOG.md) · [Marketplace](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit)
+**A Claude Code and OpenCode plugin that gives builders a disciplined path from Linear issue to merged PR.**
 
 The disciplined dev lifecycle — implement issues, review PRs, sync releases, test E2E, and manage sessions. One plugin to make no mistakes.
 
 A Claude Code plugin by [Luis Andres Pena Castillo](https://github.com/lapc506).
+
+![Version 1.43.0](https://img.shields.io/badge/version-1.43.0-FF7151?labelColor=201E3D) [![License BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-FF7151?labelColor=201E3D)](LICENSE) ![Claude Code and OpenCode plugin](https://img.shields.io/badge/plugin-Claude%20Code%20%2B%20OpenCode-201E3D?labelColor=201E3D)
+
+[Get started](#install) · [What's inside](#whats-inside) · [Hooks](#hooks-v150) · [Changelog](CHANGELOG.md) · [Report an issue](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/issues/new)
 
 ## Install
 
@@ -529,3 +543,9 @@ See `skills/spec-recommend/references/bilingual-format.md` for the full template
 ## License
 
 [Business Source License 1.1](./LICENSE) — you may use, modify, and redistribute for non-competitive purposes. Converts to Non-Profit OSL 3.0 after 5 years.
+
+Built by [Dojo Coding](https://dojocoding.io).
+
+<p align="center">
+  <a href="https://dojocoding.io"><img src="docs/assets/dojocoding-mark.png" alt="Dojo Coding" width="48"></a>
+</p>

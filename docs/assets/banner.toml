@@ -1,0 +1,15 @@
+name = "make-no-mistakes"
+tagline = "The [disciplined] dev lifecycle"
+chips = ["39 commands / 12 skills"]
+meta = "Source available · Claude Code"
+tile = "/"
+
+[card]
+kind = "ledger"
+label = "Toolkit"
+status = "v1.43.0 · BSL 1.1"
+rows = [
+  ["/domain-driven-advisor", "Start here for repo health", "audits"],
+  ["/implement", "Linear issue to clean merge", "lifecycle"],
+  ["41 hook rules", "Guardrails on every tool call", "hooks"],
+]
