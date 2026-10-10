@@ -18,6 +18,176 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> No version bump in this entry, deliberately. `main` is at **1.43.0** and this
+> branch carried 1.41.0; the merge takes main's version rather than guessing a
+> number, so whichever change lands next takes it. Measured 2026-08-06:
+> `git show origin/main:package.json | grep version` -> 1.43.0.
+
+
+### Added
+- **`/disk-cleanup` — reclaim disk in ascending order of risk, and report what was
+  actually freed.** Measured 2026-08-11 on a 468 GB volume that had hit 100% full:
+  `docker image prune -a` returned **48.3 GB**, worktree `node_modules` 11 GB, docker
+  volumes ~1 GB, and worktree removal cleared 8 of 69 while keeping 61.
+
+  The finding that shapes the whole command is that **`docker system df`
+  under-reports**. It predicted 18 GB where 48.3 GB came back, because it does not
+  count shared layers. A command built on that prediction would have told the user
+  the largest available reclaim was a third of its real size, and would have moved
+  on to the riskier stages to make up a shortfall that did not exist. So no stage
+  prints a prediction: each measures free space before and after and reports the
+  difference.
+
+  **Three outcomes, never two**, and collapsing any pair reproduces the confusion
+  the command exists to refuse. `already clean` means an `--apply` run removed
+  nothing because there was nothing to remove. `UNAVAILABLE` means the stage could
+  not run at all. A dry run says it is a dry run and reports the classifier's
+  recoverable figure — it never claims cleanliness, because in a dry run the
+  before/after delta is zero BY CONSTRUCTION rather than because the disk is tidy.
+  That third case was a real defect caught in review: the default invocation printed
+  `276 MB recoverable` and `already clean` two lines apart, and the command's own
+  protocol tells the reader to relay `already clean` verbatim.
+
+  **What it owns is the docker stages, and only those.** Stages 2 and 3 —
+  `node_modules` and worktree removal — are delegated to `scripts/worktree-cleanup.mjs`,
+  which already classifies worktrees against three independent merge tests and refuses
+  anything holding uncommitted or unpushed work. A second, shorter copy of a
+  *destructive* classifier is the worst kind of duplication: it reads as equivalent,
+  drifts in silence, and the drift surfaces as deleted work. Measured while building
+  this: a bash reimplementation found 4 removable `node_modules` where the classifier
+  found 3 — the extra one was inside a **locked** worktree, which the classifier
+  correctly skips.
+
+  When the classifier is absent the stage reports **`UNAVAILABLE`**, never
+  `already clean`. A stage that could not run and a stage with nothing to do are
+  different outcomes and only one of them means the disk is tidy.
+
+  Two guards have no flag behind them at all, which is the point:
+
+  - **Branch refs are never deleted.** `--branches` and `--force` are rejected with an
+    error rather than passed through. Removing a worktree is recoverable while its
+    branch survives; deleting the branch is not.
+  - **Docker volumes are listed, never removed** — with or without `--apply`, because
+    there is no `--apply` path in that stage. A volume can hold the only copy of real
+    data, so the names go to a human and the decision stays there.
+
+  No stream is discarded anywhere in `scripts/disk-cleanup.sh`. `command -v` captures
+  its stdout into a variable instead of redirecting it away, for the same reason every
+  other check does: a stage that failed and a stage that found nothing must never look
+  alike.
+
+- **`scripts/worktree-cleanup.mjs` + the `worktree-cleanup` skill** — the classifier
+  stages 2 and 3 above delegate to, which reclaims disk from git worktrees without
+  destroying work.
+
+  **It ships without a command of its own, deliberately.** It had one during
+  development (`/disk-cleanup-merged-worktrees`) and that command is not in this
+  release: once `/disk-cleanup` delegates to the same classifier, a second command
+  is a second door onto a subset of one job — the reader has to know which to
+  reach for, and the answer is always "the one that also does docker". The
+  classifier is invoked through `/disk-cleanup`, or directly by a caller that
+  wants only the worktree half. What follows is what that classifier guarantees,
+  and it is the whole reason stages 2 and 3 are delegated rather than rewritten.
+
+  The measurement that motivated it, on one real checkout: **60 worktrees,
+  20 GB under `.claude/worktrees`, 38 `node_modules`, the largest 1.6 GB.**
+
+  The value is in what it REFUSES, so every refusal is a predicate with a test
+  rather than a bullet point: the main checkout, a locked worktree, uncommitted
+  changes (untracked files included), **a stopped merge/rebase/cherry-pick**,
+  **unpushed commits**, and anything unmerged. A branch that is AHEAD of its
+  remote is not stale, it is unfinished, and that is the single most likely way
+  to lose work.
+
+  **`mid-operation` is not a corollary of the dirty check, and the difference
+  was measured rather than assumed.** Two branches that add the SAME file with
+  the SAME content merge cleanly into a tree byte-identical to HEAD's, so
+  `git merge --no-commit` leaves `MERGE_HEAD` behind while
+  `git status --porcelain` returns **zero lines**. Against that worktree the
+  classifier returned `remove` with an empty findings list, and
+  `git worktree remove` then took the directory — **exit 0, no output, no
+  refusal of its own.** Git offers no protection there. The check reads the
+  worktree's OWN git dir (a linked worktree keeps these files in
+  `.git/worktrees/<name>`, not in the shared dir) and covers `MERGE_HEAD`,
+  `rebase-merge`, `rebase-apply`, `CHERRY_PICK_HEAD`, `REVERT_HEAD` and
+  `BISECT_LOG`. When that git dir cannot be resolved the verdict is
+  `mid-operation-unmeasurable` and therefore `unverifiable`, because six probes
+  returning "absent" because the location is unknown reads exactly like a
+  worktree with nothing in progress — and that is the answer that authorises
+  deletion.
+
+  It is reported ABOVE the dirty files in the conflicting case, deliberately:
+  when both fire the stopped operation is the *explanation* for the dirty files,
+  and a report leading with "17 uncommitted changes" sends its reader to
+  `git stash` when the answer is `git merge --abort`.
+
+  **"Merged" is measured three ways**, because a squash merge leaves the branch
+  neither an ancestor of the base nor patch-equivalent to it — so an ancestry
+  test alone reports `not-merged` for work that certainly landed, and in a
+  squash-merge repo that is the majority case, not an edge case. Ancestry,
+  `git cherry`, and a GitHub PR with `state == MERGED`. Losing `gh` therefore
+  downgrades a verdict to `unverifiable`, never to `not-merged`.
+
+  **`unverifiable` is a third verdict and never collapses into "safe".** Six
+  states report and skip: a sibling process re-checked the worktree out mid-run,
+  commits landed after the PR merged, a squash merge with no `gh` to confirm it,
+  an unreadable `git status`, an unresolvable git dir, a missing gitdir.
+
+  Dry-run by default. `node_modules` reclaim is the default action and is fully
+  reversible with one install; worktree removal is opt-in behind `--worktrees`,
+  deletion is opt-in behind `--apply`, and `--force` is never passed unless the
+  user asks for it in that invocation. Branch refs are never deleted — only
+  directories, so even a wrong removal is recoverable with `git worktree add`.
+
+  Verified in dry-run against those 60 worktrees: **2 removable (3.6 GB),
+  41 refused, 17 unverifiable, 59.1 GB of `node_modules`** — including a
+  worktree refused for 410 lines of uncommitted changes and one refused for
+  4 unpushed commits. That run predates the `mid-operation` guard and was not
+  repeated after it; since the guard can only move a worktree from `remove` to
+  `refuse`, treat the "2 removable" figure as an upper bound rather than a
+  current measurement.
+
+  **`scripts/worktree-cleanup.d.mts` types the script for its one consumer.**
+  The `.mjs` stays plain ESM — a slash command runs it as `node scripts/...`
+  with no build step — but the Vitest suite that imports it was `any`
+  throughout, and under `any` a MISSPELLED field in a `{ ...clean, x }` case is
+  not an error, it is a fact the classifier never reads. The test then passes
+  while asserting nothing about the guard in its own title, which is the exact
+  failure this suite exists to avoid. Adding the declarations found four such
+  latent holes immediately, starting with `mergedBy` widening to `string`.
+  It also takes `tsc --noEmit` on this file from 9 errors to 0, which matters
+  because PR #65 makes that a blocking gate with no `paths:` filter.
+
+  **The base is resolved per repo and never assumed**, which matters because a
+  wrong base that RESOLVES makes every branch look merged — the failure
+  direction that destroys. Measured 2026-08-06 by running `resolveBases()`
+  read-only over the 23 git checkouts under `~/Documentos/GitHub/dojocoding`:
+  21 resolve `main` first, 1 resolves `develop` first, 7 resolve a two-element
+  set, and **1 (`openclaw`) resolves NONE** — it carries 3155 remote-tracking
+  refs and not one of `origin/{HEAD,main,develop,master,trunk}`. That last case
+  exits 2 asking for `--base` rather than treating an empty base set as
+  "nothing is unmerged". All three shapes now have a test.
+
+  **49 tests, and every keep-outcome is mutation-checked** — a guard that cannot
+  be observed to fail is decoration. Disabling each predicate in turn, and
+  counting the tests that go red: `uncommitted` **4**, `mid-operation` **7**,
+  `unpushed` **4**, `not-merged` **3**, collapsing the `unverifiable` verdict
+  into `remove` **9**, and making the mid-operation detector report a resolvable
+  git dir when it cannot read one **1**. The six mutations produce six DIFFERENT
+  failure sets; uniform results across variants would have meant the control was
+  broken rather than that the guards agreed. Unmutated and post-restore controls
+  both green, and the restored file verified byte-identical to the backup.
+
+### Fixed
+- **README and marketplace counts.** The README header read `Skills (10)` with 10
+  table rows while `skills/` shipped 11 — `resolve-open-questions` had no row.
+  After merging `main` the tables carry 40 command rows and 13 skill rows while
+  the headers still read 38 and 12, and `marketplace.json` still described
+  "38 commands, 12 auto-activating skills". All four now read the measured
+  values — 40 and 13, from `ls commands/*.md | wc -l` and
+  `ls skills/*/SKILL.md | wc -l` on this tree. Incidental to the above, and
+  noted rather than folded in silently.
+
 ## [1.43.0] - 2026-08-03
 
 ### Added
@@ -1109,7 +1279,7 @@ installed caches) but had no representation on `main`; this release lands them.
 - Product Owner Extension (SPOPC) roadmap section in README
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
-[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.38.0...HEAD
+[Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.43.0...HEAD
 [1.42.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.42.0
 [1.38.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.38.0
 [1.37.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.37.0

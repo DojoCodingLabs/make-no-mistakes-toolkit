@@ -87,7 +87,7 @@ After the audit(s), it runs a **premortem** on the aggregated remediation plan, 
 
 ## What's Inside
 
-### Commands (37)
+### Commands (40)
 
 Deliberate actions you invoke explicitly.
 
@@ -96,6 +96,7 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:implement <ISSUE-ID>`](commands/implement.md) | Disciplined execution of Linear issues — worktree isolation, all-reviewer loops, CI verification, clean merges |
 | [`/make-no-mistakes:prioritize <pillar-slug>`](commands/prioritize.md) | MoSCoW + RICE-adapted applied to a pillar's Linear issues, traceable to its PIBER+IDCF sub-spike and the latest vision audit. Outputs priority report + description-footer per issue + snapshot comment on the sub-spike. Chain: `product-vision-audit → prioritize → spike-recommend → implement` |
 | [`/make-no-mistakes:rebase <repo>`](commands/rebase.md) | Team release sync — rebase all branches, auto-merge ready PRs, health report |
+| [`/make-no-mistakes:disk-cleanup [GB]`](commands/disk-cleanup.md) | Reclaim disk in ascending order of risk — docker images (48.3 GB on the measured run), then worktree `node_modules` and worktrees via the classifier, with docker volumes listed but never deleted. Reports what was **reclaimed**, measured before/after, never what `docker system df` predicted — it under-reported by 30 GB because it does not count shared layers |
 | [`/make-no-mistakes:merge-advisor [<base>]`](commands/merge-advisor.md) | The ORDER a set of open PRs must be merged in so each is still mergeable at its turn. "Mergeable" is a property of the pair (PR, base-it-lands-on), not of the PR — so ten green PRs is not ten merges. Read-only; prints the plan, merges nothing |
 | [`/make-no-mistakes:linear-projects-setup`](commands/linear-projects-setup.md) | Bootstrap Linear workspace with full label taxonomy, projects, and integrations |
 | [`/make-no-mistakes:e2e-test-builder <source>`](commands/e2e-test-builder.md) | Generate a TestSprite-compatible `test-suite.json` from docs or PRDs |
@@ -133,7 +134,7 @@ Deliberate actions you invoke explicitly.
 | [`/make-no-mistakes:observability-audit [target]`](commands/observability-audit.md) | Runtime audit of whether observability actually **works** rather than exists — measures events *received* per emitting surface, matches the configured credential to a live destination, finds init paths that silently disable monitoring, checks alert-channel liveness/ownership, and flags every alert never demonstrated capable of firing |
 | [`/make-no-mistakes:parallelize <work>`](commands/parallelize.md) | Decompose a body of work and fan it out across named, worktree-isolated agents. Opens with a mandatory capability gate that reads the agent-teams flag **and** the live tool surface (a retired `TeamCreate` is the healthy case, never an abort), splits streams by *who can execute them* as well as by topic, and converges the results into one report |
 
-### Skills (10)
+### Skills (13)
 
 Auto-activate by context — you don't need to remember the command name.
 
@@ -150,6 +151,8 @@ Auto-activate by context — you don't need to remember the command name.
 | [`domain-driven-advisor`](skills/domain-driven-advisor/SKILL.md) | Ask "which audit do I need?" / "where do I start with repo health?" — routes you to the right audit(s) and runs a premortem |
 | [`premortem`](skills/premortem/SKILL.md) | Say "premortem this", "what could kill this", "stress test this plan", "what am I missing", or "find the blind spots" on a plan/launch/decision |
 | [`prioritize`](skills/prioritize/SKILL.md) | Ask to "prioritize issues", "rank the backlog", "apply MoSCoW", or "RICE scoring" for a product pillar (suggests `/make-no-mistakes:prioritize`) |
+| [`resolve-open-questions`](skills/resolve-open-questions/SKILL.md) | Have open decisions or questions buried in the session's prose. Sweeps them out and resolves them in batches via `AskUserQuestion` with options + a recommendation |
+| [`worktree-cleanup`](skills/worktree-cleanup/SKILL.md) | Say "my worktrees are eating disk", "clean up merged worktrees", or "reclaim node_modules". Classifies every worktree deterministically and reports what it **refused** and why — `unverifiable` is its own verdict and never collapses into "safe to delete" |
 
 Skills can also be invoked explicitly: `/make-no-mistakes:spec-recommend T0-4`
 
