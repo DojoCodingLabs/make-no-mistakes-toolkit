@@ -1661,7 +1661,7 @@
     "match": [
       {
         "field": "command",
-        "pattern": "git[[:space:]]+push.*(-f\\b|--force([[:space:]]|$))"
+        "pattern": "git[[:space:]]+push.*([[:space:]]-f\\b|--force([[:space:]]|$))"
       },
       {
         "field": "command",
@@ -1726,6 +1726,69 @@
           }
         },
         "expected_exit": 0
+      },
+      {
+        "name": "allows-plain-push-then-hex-range-grep",
+        "input": {
+          "tool_input": {
+            "command": "git push > \"$log\" 2>&1; grep -aoE '[0-9a-f]{10}\\.\\.[0-9a-f]{10}' \"$log\""
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "allows-plain-push-then-a-f-range-grep",
+        "input": {
+          "tool_input": {
+            "command": "git push origin main && grep -E '[a-f]+' out.txt"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "blocks-force-short-flag-at-end-of-command",
+        "input": {
+          "tool_input": {
+            "command": "git push -f"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "allows-other-command-f-flag-before-the-push",
+        "input": {
+          "tool_input": {
+            "command": "rm -f stale.lock && git push origin main"
+          }
+        },
+        "expected_exit": 0
+      },
+      {
+        "name": "known-limitation-fires-on-grep-f-in-same-command",
+        "input": {
+          "tool_input": {
+            "command": "git push origin main && grep -f patterns.txt build.log"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "known-limitation-fires-on-tar-f-in-same-command",
+        "input": {
+          "tool_input": {
+            "command": "git push origin main; tar -xz -f a.tgz"
+          }
+        },
+        "expected_exit": 2
+      },
+      {
+        "name": "known-limitation-fires-on-rm-f-in-same-command",
+        "input": {
+          "tool_input": {
+            "command": "git push origin main && rm -f stale.lock"
+          }
+        },
+        "expected_exit": 2
       }
     ]
   },
