@@ -18,6 +18,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.43.1] - 2026-08-03
+
+### Added
+- **CI runs the TypeScript suite and the type checker.** The repository had three
+  workflows and none of them ran `vitest` or `tsc`. `test-hooks.yml` covers
+  `hooks/**`, `shellcheck.yml` covers `**.sh`, and `publish.yml` runs
+  `npm run build` only on a `v*` tag push — which, per the note at the top of
+  this file, never happens because the project shipped without tags. `src/`, the
+  published library, had no gate at all.
+
+  The new `test.yml` carries **no `paths:` filter**, and that is the one place it
+  departs from its siblings. A path filter is how the gap was built: scoping
+  `test-hooks.yml` to the directory it tests is right for it, and is exactly what
+  left `src/` uncovered. Enumerating the paths that can break a type check means
+  maintaining a second copy of the dependency graph, and the second copy drifts.
+  The suite costs about 1.4 s, so scoping buys nothing.
+
+  Neither step is `continue-on-error`. An advisory test run is a correct verdict
+  that stops nothing.
+
+### Fixed
+- **`tsc --noEmit` passes.** It had been failing on three errors in `src/cli.ts`,
+  where `printHumanResult` demanded `Record<string, unknown>` while its body only
+  ever calls `Object.entries` and never indexes by an arbitrary key. No `*Result`
+  interface in `src/lib/` declares an index signature, so none of them satisfied
+  it. Widening the parameter to `object` fixes all three call sites and makes the
+  `as unknown as Record<string, unknown>` at the fourth — the doctor path —
+  unnecessary; it is removed.
+
+  The cast is the artifact worth naming. Somebody hit this error at one call
+  site, silenced it there, and the other three stayed red because nothing ever
+  ran `tsc`. The fix is smaller than the workaround because the workaround never
+  asked what the signature was demanding.
+
+  No behaviour change: `Object.entries` accepts both types identically.
+
 ## [1.43.0] - 2026-08-03
 
 ### Added
@@ -1110,6 +1146,7 @@ installed caches) but had no representation on `main`; this release lands them.
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
 [Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.38.0...HEAD
+[1.43.1]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.43.1
 [1.42.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.42.0
 [1.38.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.38.0
 [1.37.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.37.0

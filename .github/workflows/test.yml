@@ -1,0 +1,59 @@
+# The TypeScript suite, and the type checker, on every pull request.
+#
+# WHAT WAS MISSING. This repository had three workflows and none of them ran
+# `vitest` or `tsc`. `test-hooks.yml` covers `hooks/**`, `shellcheck.yml` covers
+# `**.sh`, and `publish.yml` runs `npm run build` only on a `v*` tag push — and
+# the CHANGELOG records that the project shipped without tags. So `src/`, which
+# is the published library, had no gate at all: 60 tests that ran only when
+# somebody remembered, and a `tsc` that had been red for three errors long
+# enough for one of four call sites to be silenced with `as unknown as` while
+# the other three stayed broken.
+#
+# That is the failure this repo's own ENF audit calls shape 1 — "it does not
+# look" — and the partial coverage made it worse than a gap. The hook suite IS
+# gated, so CI went green on every pull request and green reads as "verified".
+# A check that covers part of a surface and reports like it covers all of it is
+# the audit's shape 4 applied to scope rather than to an assertion: correct, and
+# binding nothing where it matters.
+#
+# NO `paths:` FILTER, deliberately, and this is the one place this workflow
+# departs from its two siblings. A path filter is how the gap above was built:
+# `test-hooks.yml` is scoped to the directory it tests, which is right for it
+# and is exactly what left `src/` uncovered. Enumerating the paths that can
+# break a type check means listing every file the compiler follows, which is a
+# second copy of the dependency graph — and the second copy is what drifts.
+# The suite costs about 1.4 s. There is nothing to buy by scoping it.
+#
+# NEITHER STEP IS `continue-on-error`. An advisory test run is a correct verdict
+# that stops nothing, which is the shape this toolkit exists to refuse.
+
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    # Blacksmith managed runner, same as test-hooks.yml, to avoid the
+    # GitHub-hosted billing block. Drop-in replacement for ubuntu-latest.
+    runs-on: blacksmith-2vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Before the suite: a type error is a fact about the code that does not
+      # need a test to run, and reporting it first makes a red build easier to
+      # read than a wall of failing assertions caused by one bad signature.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Run the TypeScript suite
+        run: npm test
