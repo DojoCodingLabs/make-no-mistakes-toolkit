@@ -18,6 +18,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.44.0] - 2026-08-03
+
+### Added
+- **ENF now audits whether a gate BINDS, not only whether it exists.** The
+  existing `enforcement-hooks` verifier answers "is there a hook for this rule?"
+  — a question about presence, and the easy half. A gate can be present,
+  correctly named, wired into a config, reviewed and merged, and still assert
+  nothing. `enforcement-hooks-efficacy.ts` asks the other question, across seven
+  shapes of vacuous gate:
+
+  1. It does not look. *(coverage verifier)*
+  2. It looks at the adjacent property.
+  3. It was deleted. *(coverage verifier)*
+  4. It is correct and binds nothing.
+  5. It is correct, blocking, and too late.
+  6. It is registered where nothing reads.
+  7. Its incentive is inverted.
+
+  Shapes 1 and 3 are questions about the SET of hooks and stay in the coverage
+  verifier. Shapes 2 and 4–7 are questions about EACH hook and need a per-hook
+  observation, so they live in the new file.
+
+  **Every shape was observed in a live repository**, which is why each carries a
+  mechanical question rather than a warning. A shape with no question attached is
+  a lecture; a shape with a question is a check.
+
+  **Proxies are labelled as proxies.** Shape 2 — "does the hook assert the
+  proposition it claims?" — is not decidable from a file listing. What is
+  decidable is its strongest known correlate: a hook whose tests check only the
+  exit code has no assertion about *what* it said, so a hook that silently
+  stopped emitting its message still passes. That is recorded as a proxy in the
+  gap detail, and it is why the verifier reports `confidence` rather than a
+  verdict.
+
+  **Shape 7 is deliberately not automated.** Whether a gate's lenient branch is
+  cheaper than its strict one depends on what those branches cost in that repo,
+  so `severityFavorsCompliance` is an observation a reader makes and the verifier
+  records. Refusing to encode the un-automatable is the point: a verifier that
+  guessed shape 7 would be a gate looking at the adjacent property — shape 2, in
+  the tool built to find shape 2.
+
+  20 tests cover the verifier; the full suite is 80 across 13 files.
+
 ## [1.43.0] - 2026-08-03
 
 ### Added
@@ -1110,6 +1153,7 @@ installed caches) but had no representation on `main`; this release lands them.
   ([PR #4](https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/pull/4)).
 
 [Unreleased]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/compare/v1.38.0...HEAD
+[1.44.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.44.0
 [1.42.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.42.0
 [1.38.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.38.0
 [1.37.0]: https://github.com/DojoCodingLabs/make-no-mistakes-toolkit/releases/tag/v1.37.0
